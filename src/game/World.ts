@@ -1,0 +1,157 @@
+import * as THREE from 'three';
+
+/**
+ * The static park scene. No game logic, just visuals.
+ *
+ * The park is roughly 60 x 60 metres. The owner spawn is near (0, 0, 3); the
+ * "home" post sits at (0, 0, -2). Trees are scattered around the edges so the
+ * middle is open for walking.
+ */
+export class World {
+  readonly group = new THREE.Group();
+
+  constructor() {
+    this.buildGround();
+    this.buildPath();
+    this.buildHomePost();
+    this.buildTrees();
+    this.buildFlowers();
+  }
+
+  private buildGround(): void {
+    const geo = new THREE.PlaneGeometry(60, 60, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x8ec97a,
+      flatShading: true,
+    });
+    const ground = new THREE.Mesh(geo, mat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.group.add(ground);
+  }
+
+  private buildPath(): void {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xd6c79a,
+      flatShading: true,
+    });
+    const segments = 14;
+    for (let i = 0; i < segments; i++) {
+      const t = i - segments / 2;
+      const tile = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.06, 2.4), mat);
+      // gentle S-curve
+      const curve = Math.sin((t / segments) * Math.PI * 1.4) * 5;
+      tile.position.set(curve, 0.03, t * 2.4);
+      tile.receiveShadow = true;
+      this.group.add(tile);
+    }
+  }
+
+  private buildHomePost(): void {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x9a6a30,
+      flatShading: true,
+    });
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), mat);
+    post.position.set(0, 0.6, -2);
+    post.castShadow = true;
+    this.group.add(post);
+
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.6), mat);
+    cap.position.set(0, 1.35, -2);
+    cap.castShadow = true;
+    this.group.add(cap);
+
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(1.0, 0.4, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0xf4d39a, flatShading: true }),
+    );
+    sign.position.set(0, 0.9, -1.8);
+    sign.castShadow = true;
+    this.group.add(sign);
+  }
+
+  private buildTrees(): void {
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: 0x7a4a25,
+      flatShading: true,
+    });
+    const leafMatA = new THREE.MeshStandardMaterial({
+      color: 0x4a8a3a,
+      flatShading: true,
+    });
+    const leafMatB = new THREE.MeshStandardMaterial({
+      color: 0x5fa84d,
+      flatShading: true,
+    });
+
+    // Hand-placed: cluster at edges, leave centre open.
+    const layout: Array<[number, number, number]> = [
+      [-14, -12, 0],
+      [-18, 4, 1],
+      [-12, 14, 0],
+      [-6, 18, 1],
+      [10, 16, 0],
+      [16, 8, 1],
+      [18, -4, 0],
+      [12, -14, 1],
+      [3, -18, 0],
+      [-8, -18, 1],
+      [-20, -5, 0],
+      [20, -12, 1],
+    ];
+
+    for (const [x, z, variant] of layout) {
+      const tree = new THREE.Group();
+      const trunkH = 1.1 + Math.random() * 0.4;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, trunkH, 6), trunkMat);
+      trunk.position.y = trunkH / 2;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      const leafR = 1.0 + Math.random() * 0.5;
+      const leafH = 2.2 + Math.random() * 0.6;
+      const leaves = new THREE.Mesh(
+        new THREE.ConeGeometry(leafR, leafH, 6),
+        variant === 0 ? leafMatA : leafMatB,
+      );
+      leaves.position.y = trunkH + leafH / 2 - 0.1;
+      leaves.castShadow = true;
+      tree.add(leaves);
+
+      tree.position.set(x, 0, z);
+      tree.rotation.y = Math.random() * Math.PI * 2;
+      this.group.add(tree);
+    }
+  }
+
+  private buildFlowers(): void {
+    const stemMat = new THREE.MeshStandardMaterial({
+      color: 0x4a7a3a,
+      flatShading: true,
+    });
+    const petalColors = [0xf07a8a, 0xf5d050, 0xa7c8f0, 0xf5a050];
+
+    for (let i = 0; i < 18; i++) {
+      const flower = new THREE.Group();
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 4), stemMat);
+      stem.position.y = 0.2;
+      flower.add(stem);
+
+      const petalMat = new THREE.MeshStandardMaterial({
+        color: petalColors[i % petalColors.length],
+        flatShading: true,
+      });
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.12, 5, 4), petalMat);
+      petal.position.y = 0.45;
+      flower.add(petal);
+
+      const x = (Math.random() - 0.5) * 36;
+      const z = (Math.random() - 0.5) * 36;
+      // keep flowers off the central path strip
+      if (Math.abs(x) < 4 && Math.abs(z) < 14) continue;
+      flower.position.set(x, 0, z);
+      this.group.add(flower);
+    }
+  }
+}

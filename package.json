@@ -1,0 +1,41 @@
+{
+  "name": "walk-with-datou",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A cozy web game prototype to walk with Datou (大头), a virtual companion robot dog. Built to validate game mechanics before the hardware ships.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VitaDynamics/walk-with-datou.git"
+  },
+  "homepage": "https://github.com/VitaDynamics/walk-with-datou#readme",
+  "bugs": {
+    "url": "https://github.com/VitaDynamics/walk-with-datou/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^5.4.0"
+  }
+}
