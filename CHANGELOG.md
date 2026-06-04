@@ -21,6 +21,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Open-source project hygiene: README, LICENSE (MIT), CONTRIBUTING, CODE_OF_CONDUCT, ROADMAP,
   ARCHITECTURE, PHYSICS_INTEGRATION docs
 - GitHub Actions CI: typecheck + lint + build on every push and PR
+- GitHub Actions deploy: build + publish `dist/` to GitHub Pages on every push to `main`
 - Issue and PR templates
 
 ## [0.1.0] - TBD

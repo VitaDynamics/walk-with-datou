@@ -5,6 +5,10 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](./.nvmrc)
+[![CI](https://github.com/VitaDynamics/walk-with-datou/actions/workflows/ci.yml/badge.svg)](https://github.com/VitaDynamics/walk-with-datou/actions/workflows/ci.yml)
+[![Deploy](https://github.com/VitaDynamics/walk-with-datou/actions/workflows/deploy.yml/badge.svg)](https://github.com/VitaDynamics/walk-with-datou/actions/workflows/deploy.yml)
+
+🎮 **[Play the latest build](https://vitadynamics.github.io/walk-with-datou/)** - auto-deployed from `main`.
 
 ## Why this exists
 
