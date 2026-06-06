@@ -5,11 +5,17 @@ import { PlaceholderPhysics } from './PlaceholderPhysics';
  * Selects and constructs the physics backend (docs/MUJOCO_DESIGN.md §4.6).
  *
  * Policy (Q2): PlaceholderPhysics is the default through Phase 1–3. MuJoCo is
- * opt-in via `?physics=mujoco`, and even then we fall back to the placeholder
- * if the WASM engine fails to load — so a flaky 8.5 MB download never yields a
- * broken game.
+ * opt-in — via the in-game Settings UI (persisted to localStorage) or a
+ * `?physics=mujoco` URL override — and even then we fall back to the
+ * placeholder if the WASM engine fails to load, so a flaky 8.5 MB download
+ * never yields a broken game.
+ *
+ * Precedence: URL `?physics=` (explicit, one-off) > saved preference > default.
  */
 export type PhysicsBackend = 'placeholder' | 'mujoco';
+
+/** localStorage key the Settings UI writes the user's chosen backend to. */
+export const PHYSICS_PREF_KEY = 'wwd.physics';
 
 export interface CreatePhysicsResult {
   adapter: PhysicsAdapter;
@@ -17,10 +23,38 @@ export interface CreatePhysicsResult {
   backend: PhysicsBackend;
 }
 
-/** Read the requested backend from the URL (`?physics=mujoco|placeholder`). */
+function parseBackend(value: string | null): PhysicsBackend | null {
+  if (value === 'mujoco' || value === 'placeholder') return value;
+  return null;
+}
+
+/** Read the user's saved backend preference, if any. */
+export function readSavedBackend(): PhysicsBackend | null {
+  try {
+    return parseBackend(localStorage.getItem(PHYSICS_PREF_KEY));
+  } catch {
+    return null; // private mode / storage disabled
+  }
+}
+
+/** Persist the user's backend choice (written by the Settings UI). */
+export function saveBackendPreference(backend: PhysicsBackend): void {
+  try {
+    localStorage.setItem(PHYSICS_PREF_KEY, backend);
+  } catch {
+    // Non-fatal: choice just won't survive a reload.
+  }
+}
+
+/**
+ * Resolve the backend to load: a `?physics=` URL param overrides everything
+ * (handy for links and debugging); otherwise the saved preference; otherwise
+ * the default placeholder.
+ */
 export function readRequestedBackend(search: string): PhysicsBackend {
-  const params = new URLSearchParams(search);
-  return params.get('physics') === 'mujoco' ? 'mujoco' : 'placeholder';
+  const fromUrl = parseBackend(new URLSearchParams(search).get('physics'));
+  if (fromUrl) return fromUrl;
+  return readSavedBackend() ?? 'placeholder';
 }
 
 /**

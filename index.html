@@ -61,6 +61,89 @@
         background: #ffe8a3;
         font-size: 12px;
       }
+
+      /* --- Settings (cog button + popover) --- */
+      #settings-button {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.82);
+        color: #2a3540;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        backdrop-filter: blur(6px);
+        cursor: pointer;
+        user-select: none;
+        transition:
+          transform 0.15s ease,
+          background 0.15s ease;
+      }
+      #settings-button:hover {
+        background: #fff;
+        transform: rotate(35deg);
+      }
+      #settings-panel {
+        position: absolute;
+        top: 66px;
+        right: 16px;
+        width: 232px;
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+        border-radius: 14px;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.12);
+        font-size: 13px;
+        color: #2a3540;
+        user-select: none;
+        z-index: 10;
+      }
+      #settings-panel .panel-title {
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      #settings-panel .panel-sub {
+        font-size: 11px;
+        opacity: 0.6;
+        margin-bottom: 10px;
+      }
+      #settings-panel .opt {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px;
+        margin-bottom: 6px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.12s ease;
+      }
+      #settings-panel .opt:hover {
+        background: rgba(255, 232, 163, 0.4);
+      }
+      #settings-panel .opt input {
+        margin-top: 2px;
+        accent-color: #e8a23a;
+      }
+      #settings-panel .opt .opt-label {
+        font-weight: 600;
+      }
+      #settings-panel .opt .opt-desc {
+        font-size: 11px;
+        opacity: 0.65;
+        line-height: 1.4;
+      }
+      #settings-note {
+        min-height: 14px;
+        margin-top: 6px;
+        font-size: 11px;
+        color: #b8742a;
+      }
     </style>
   </head>
   <body>
@@ -72,6 +155,40 @@
       <div>Datou mood: <span id="mood-tag" class="mood">calm</span></div>
       <div id="physics-tag" style="margin-top: 4px; opacity: 0.6; font-size: 11px"></div>
     </div>
+
+    <button
+      id="settings-button"
+      type="button"
+      title="Settings"
+      aria-label="Settings"
+      aria-haspopup="true"
+      aria-expanded="false"
+      aria-controls="settings-panel"
+    >
+      ⚙️
+    </button>
+    <div id="settings-panel" role="dialog" aria-label="Settings" hidden>
+      <div class="panel-title">Physics engine</div>
+      <div class="panel-sub">Now running: <span id="settings-active">Lite</span></div>
+
+      <label class="opt">
+        <input type="radio" name="physics-choice" value="placeholder" />
+        <span>
+          <span class="opt-label">Lite</span>
+          <span class="opt-desc">Instant, lightweight motion. Best on older devices.</span>
+        </span>
+      </label>
+      <label class="opt">
+        <input type="radio" name="physics-choice" value="mujoco" />
+        <span>
+          <span class="opt-label">MuJoCo physics</span>
+          <span class="opt-desc">Real simulation engine (~8.5 MB download).</span>
+        </span>
+      </label>
+
+      <div id="settings-note"></div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

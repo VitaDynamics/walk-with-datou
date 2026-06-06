@@ -1,17 +1,21 @@
 import { Game } from './game/Game';
 import { createPhysics } from './physics/createPhysics';
+import { mountSettings } from './ui/Settings';
 
 const canvas = document.getElementById('game-canvas');
 if (!(canvas instanceof HTMLCanvasElement)) {
   throw new Error('#game-canvas not found or wrong type');
 }
 
-// Default is PlaceholderPhysics; `?physics=mujoco` opts into the MuJoCo backend
-// (with automatic fallback to the placeholder if the engine fails to load).
+// The backend is chosen in-game via the ⚙️ Settings panel (persisted to
+// localStorage) or a one-off `?physics=mujoco` URL override; default is the
+// lightweight placeholder, with automatic fallback if MuJoCo fails to load.
 createPhysics()
   .then(({ adapter, backend }) => {
     const tag = document.getElementById('physics-tag');
     if (tag) tag.textContent = `physics: ${backend}`;
+
+    mountSettings({ activeBackend: backend });
 
     const game = new Game(canvas, adapter);
     return game.start();
