@@ -18,13 +18,20 @@ import type {
  *    drifts to 'curious' while moving, and to 'tired' if stationary too long.
  */
 export class PlaceholderPhysics implements PhysicsAdapter {
-  private static readonly SPEED = 2.8; // m/s
+  // Datou's top speed. Set a touch above the player's 7 m/s so follow mode can
+  // actually catch up over the larger 500×500 park (it eases to a stop within
+  // FOLLOW_MIN_DIST, so it doesn't overshoot).
+  private static readonly SPEED = 7.5; // m/s
   private static readonly FOLLOW_MIN_DIST = 1.8;
   private static readonly ARRIVE_DIST = 0.4;
   private static readonly HAPPY_DURATION = 5; // seconds
   private static readonly WANDER_INTERVAL_MIN = 3;
   private static readonly WANDER_INTERVAL_MAX = 7;
-  private static readonly PARK_HALF_EXTENT = 22;
+  // Wander/clamp bound, kept just inside the player's PARK_HALF (250, see
+  // game/World.ts — the world-size source of truth) so Datou never pushes
+  // against the very edge. The physics layer stays independent of the game
+  // layer, so this mirrors that value rather than importing it.
+  private static readonly PARK_HALF_EXTENT = 245;
 
   private state: DatouState = {
     position: { x: 2, y: 0, z: 0 },

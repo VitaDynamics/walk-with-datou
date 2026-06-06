@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { resolveCircleCollisions } from './collision';
 import type { InputState } from './Input';
-import type { Collider } from './World';
+import { PARK_HALF, type Collider } from './World';
 
 /**
  * The owner avatar. A simple capsule + sphere head; movement is fixed-speed and
@@ -9,8 +9,11 @@ import type { Collider } from './World';
  * obstacles via the shared collider list.
  */
 export class Player {
-  static readonly SPEED = 4; // m/s
-  static readonly PARK_HALF = 28;
+  // Walk speed in m/s. Bumped from the old 4 m/s now the park is 500×500 — at
+  // 4 m/s, crossing the world took ~2 min; 7 m/s keeps a stroll feeling like a
+  // stroll without it becoming a slog. (docs/ENVIRONMENT_DESIGN.md §5.3.)
+  static readonly SPEED = 7; // m/s
+  static readonly PARK_HALF = PARK_HALF;
   static readonly RADIUS = 0.35; // collision radius
 
   readonly group = new THREE.Group();

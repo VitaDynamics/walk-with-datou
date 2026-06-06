@@ -34,7 +34,9 @@ export interface DatouSceneOptions {
 
 export const DEFAULT_SCENE_OPTIONS: DatouSceneOptions = {
   timestep: 0.005,
-  parkHalfExtent: 22,
+  // Matches the 500×500 park (PARK_HALF 250 in game/World.ts), kept just inside
+  // the player bound like the placeholder's PARK_HALF_EXTENT.
+  parkHalfExtent: 245,
   bodyRadius: 0.35,
   bodyHalfLength: 0.45,
   colliders: [],

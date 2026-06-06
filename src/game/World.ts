@@ -1,6 +1,19 @@
 import * as THREE from 'three';
 
 /**
+ * Half the side length of the (square) park, in metres. The world spans
+ * [-PARK_HALF, +PARK_HALF] on both X and Z. This is the single source of truth
+ * for world size: the ground mesh, the player's clamp, the placeholder's
+ * wander bounds, and the MuJoCo ground geom all derive from it.
+ *
+ * The old prototype was 60×60 (PARK_HALF 30-ish); we grow to a 500×500 park so
+ * there is real distance to walk and the whole world can't be seen at once.
+ * See docs/ENVIRONMENT_DESIGN.md. The home meadow + dressing still cluster near
+ * the origin; zones radiate outward (added in a later milestone).
+ */
+export const PARK_HALF = 250;
+
+/**
  * A solid, walk-blocking obstacle, modelled as an upright cylinder in the XZ
  * plane (height is irrelevant for ground navigation). Both the player's
  * kinematic movement and the MuJoCo scene consume the same list so the
@@ -81,7 +94,10 @@ export class World {
   }
 
   private buildGround(): void {
-    const geo = new THREE.PlaneGeometry(60, 60, 1, 1);
+    // Flat plane spanning the whole park (heightfield terrain is deferred —
+    // see docs/ENVIRONMENT_DESIGN.md §3.2). Kept at 1 segment: it's flat, so
+    // subdivision buys nothing until the heightfield lands.
+    const geo = new THREE.PlaneGeometry(PARK_HALF * 2, PARK_HALF * 2, 1, 1);
     const mat = new THREE.MeshStandardMaterial({
       color: 0x8ec97a,
       flatShading: true,

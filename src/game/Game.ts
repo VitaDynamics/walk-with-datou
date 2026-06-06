@@ -42,7 +42,11 @@ export class Game {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xd9eef7);
-    this.scene.fog = new THREE.Fog(0xd9eef7, 28, 70);
+    // Fog reaches much farther now the park is 500×500: it fades distant
+    // geometry into the sky (cozy + hides the far edges) while keeping nearby
+    // landmarks readable. Fades to the background colour. Coordinated with the
+    // camera far plane (CameraRig). See docs/ENVIRONMENT_DESIGN.md §4.3.
+    this.scene.fog = new THREE.Fog(0xd9eef7, 60, 320);
 
     this.cameraRig = new CameraRig(canvas, window.innerWidth / window.innerHeight);
 

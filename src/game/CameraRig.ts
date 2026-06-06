@@ -33,13 +33,15 @@ export class CameraRig {
   private static readonly MIN_PITCH = 0.16; // ~9°  — keep some downward tilt
   private static readonly MAX_PITCH = 1.35; // ~77° — near top-down, not flipped
   private static readonly MIN_DIST = 6;
-  private static readonly MAX_DIST = 32;
+  private static readonly MAX_DIST = 60; // pull back farther to read distant landmarks in the 500×500 park
   private static readonly ROTATE_SPEED = 0.005; // rad per pixel
   private static readonly ZOOM_SPEED = 0.0015; // dist per wheel delta
   private static readonly PIVOT_HEIGHT = 1; // look slightly above the ground
 
   constructor(canvas: HTMLCanvasElement, aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(55, aspect, 0.1, 200);
+    // Far plane sits beyond the fog far (320, see Game) so fog — not a hard
+    // clip — is what hides distant geometry in the 500×500 park.
+    this.camera = new THREE.PerspectiveCamera(55, aspect, 0.1, 400);
     this.attach(canvas);
     this.snapTo(0, 3); // initial target ~ player spawn
   }
