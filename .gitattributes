@@ -1,0 +1,5 @@
+# MuJoCo WebAssembly engine — large binary, tracked via Git LFS so it does not
+# bloat normal Git history. See docs/MUJOCO_DESIGN.md §5.3.
+# Requires: `git lfs install` locally and `lfs: true` in the Pages deploy
+# checkout (.github/workflows/deploy.yml).
+*.wasm filter=lfs diff=lfs merge=lfs -text

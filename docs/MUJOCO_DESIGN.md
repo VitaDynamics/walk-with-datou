@@ -32,7 +32,7 @@ WebAssembly. It is meant to be reviewed **before** any implementation lands.
 - Multi-threaded (`SharedArrayBuffer`) build. GitHub Pages cannot send the
   COOP/COEP headers the MT build requires (see §6). We ship single-threaded.
 - Rendering MuJoCo geoms directly via `mjv_updateScene`. The game keeps its
-  stylised Three.js Datou mesh; MuJoCo is the *motion source*, not the renderer.
+  stylised Three.js Datou mesh; MuJoCo is the _motion source_, not the renderer.
 
 ---
 
@@ -41,12 +41,12 @@ WebAssembly. It is meant to be reviewed **before** any implementation lands.
 `/home/fengchen/feng-ws/mujoco/wasm/dist/` is the official Google DeepMind
 `@mujoco/mujoco` build (Apache-2.0). Relevant files:
 
-| File | Size | Purpose |
-|------|------|---------|
-| `mujoco_st.js` | ~280 KB | single-threaded ESM loader (`export default loadMujoco`) |
-| `mujoco_st.wasm` | ~8.5 MB | single-threaded engine |
-| `mujoco_st.d.ts` | ~134 KB | TypeScript declarations for `MainModule` |
-| `mujoco.js` / `mujoco.wasm` | ~8.7 MB | multi-threaded build (not used — see §6) |
+| File                        | Size    | Purpose                                                  |
+| --------------------------- | ------- | -------------------------------------------------------- |
+| `mujoco_st.js`              | ~280 KB | single-threaded ESM loader (`export default loadMujoco`) |
+| `mujoco_st.wasm`            | ~8.5 MB | single-threaded engine                                   |
+| `mujoco_st.d.ts`            | ~134 KB | TypeScript declarations for `MainModule`                 |
+| `mujoco.js` / `mujoco.wasm` | ~8.7 MB | multi-threaded build (not used — see §6)                 |
 
 **Decision:** we vendor the **single-threaded** trio (`mujoco_st.*`). The `.wasm`
 is ~8.5 MB; that is the headline cost of this change and is discussed in §6.
@@ -72,10 +72,10 @@ By default Emscripten fetches the `.wasm` sibling to the `.js`; we override
 
 This is the highest-risk detail, so it is called out first.
 
-| | Up axis | Datou facing | Notes |
-|---|---|---|---|
-| **Three.js / game** | `+Y` | yaw 0 → `+Z` (per `PhysicsAdapter.ts`) | ground plane is XZ |
-| **MuJoCo** | `+Z` | model author's choice | ground plane is XY |
+|                     | Up axis | Datou facing                           | Notes              |
+| ------------------- | ------- | -------------------------------------- | ------------------ |
+| **Three.js / game** | `+Y`    | yaw 0 → `+Z` (per `PhysicsAdapter.ts`) | ground plane is XZ |
+| **MuJoCo**          | `+Z`    | model author's choice                  | ground plane is XY |
 
 The MuJoCo demo app reflects this with `camera.up.set(0, 0, 1)`. Our adapter
 must therefore do a **frame swap at the boundary** so the rest of the game never
@@ -113,7 +113,9 @@ src/physics/
     ├── loader.ts            wraps loadMujoco() + locateFile, returns MainModule
     ├── frame.ts             game<->mujoco coordinate + yaw conversion (unit-tested)
     ├── datou.scene.ts       builds the MJCF model string (Datou + ground)
-    └── controller.ts        maps DatouMode/target -> ctrl/qvel each step
+    ├── controller.ts        maps DatouMode/target -> ctrl/qvel each step
+    ├── rng.ts               seeded PRNG (mulberry32) for deterministic wander
+    └── replay.ts            InputRecorder + state snapshot/restore (diary replay)
 ```
 
 `MujocoAdapter` stays the **only** file the rest of the repo imports; everything
@@ -188,6 +190,43 @@ whether we ever construct the MuJoCo adapter at all.
 This makes the 8.5 MB download non-fatal: a user on a flaky connection still
 gets a playable game.
 
+### 4.7 Determinism & diary replay (Q3 — Phase 1 requirement)
+
+The AI-written daily diary needs to _replay_ what Datou did so a generated
+entry matches what the user saw. MuJoCo is deterministic given identical model,
+initial state, and inputs, so we make the adapter replayable end-to-end:
+
+- **Seeded RNG.** The only non-determinism in our outer controller is the
+  `idle`-mode wander target (currently `Math.random()`). We replace it with a
+  small seeded PRNG (`mulberry32`) owned by the adapter. `init({ seed })` fixes
+  the seed; the same seed ⇒ the same wander sequence. The solver itself adds no
+  randomness for our model.
+- **Input log, not full trajectory.** A run is fully reconstructable from
+  `(seed, model, timestep)` plus the time-stamped sequence of _external inputs_
+  — `setMode`, `setTarget`, `setPlayerPosition`, `applyPet`. The adapter exposes
+  an optional recorder that appends `{ t, kind, args }` events. The player path
+  is the bulkiest stream; we sample it at a fixed cadence (e.g. 10 Hz) rather
+  than per-frame to keep logs small. Replaying = construct a fresh adapter with
+  the same seed and feed the events back at their timestamps.
+- **Snapshot/restore for "where Datou was".** For cheap save/restore (resume a
+  session, or seek within a replay) we wrap MuJoCo state: `snapshot()` copies
+  `time`, `qpos`, `qvel`, `act` into a plain `Float64Array` POJO;
+  `restore(snap)` writes them back and calls `mj_forward`. This is the
+  JS-binding equivalent of `mj_getState`/`mj_setState` over the fields our model
+  uses, and avoids depending on a specific binding name. Snapshots are small
+  (a handful of doubles for the 3-DOF puck) and JSON-serializable.
+
+This keeps replay an **adapter-level** concern: the game still only sees
+`PhysicsAdapter`. The recorder/replayer is an additive, optional surface
+(`PhysicsAdapter` gains no required methods) so `PlaceholderPhysics` is
+unaffected. The concrete recorder/snapshot types live in
+`src/physics/mujoco/replay.ts` and are re-exported for the diary feature to
+consume in Sprint 3.
+
+> Interface note: replay support is exposed via **optional** methods
+> (`snapshot?()`, `restore?()`) and a separate `InputRecorder` helper, so the
+> core `PhysicsAdapter` contract is unchanged and both backends still satisfy it.
+
 ---
 
 ## 5. Build, bundling & serving
@@ -257,14 +296,14 @@ budget; the cost here is download size and compile time, not per-step CPU.
 
 ## 7. Performance & risk budget
 
-| Risk | Mitigation |
-|------|------------|
-| 8.5 MB WASM download hurts first paint | Lazy load; placeholder plays during download; asset is cached after first visit; consider `Content-Encoding` (Pages gzips → ~2–3 MB on the wire). |
-| WASM compile jank on weak devices | `init()` is off the render path; placeholder runs until ready; fallback on failure. |
-| Embind memory leaks | All handles owned by the adapter and freed in `dispose()`; a leak test in the unit suite creates/destroys an adapter N times and asserts no growth. |
-| Coordinate-frame bugs | Single `frame.ts` with round-trip unit tests (`game→mujoco→game` is identity). |
-| Solver instability at variable fps | Fixed-timestep accumulator (§4.4). |
-| Determinism for diary replay (open Q from existing doc) | MuJoCo is deterministic given seed + timestep; we can expose a seed. Flagged in Q3. |
+| Risk                                       | Mitigation                                                                                                                                          |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8.5 MB WASM download hurts first paint     | Lazy load; placeholder plays during download; asset is cached after first visit; consider `Content-Encoding` (Pages gzips → ~2–3 MB on the wire).   |
+| WASM compile jank on weak devices          | `init()` is off the render path; placeholder runs until ready; fallback on failure.                                                                 |
+| Embind memory leaks                        | All handles owned by the adapter and freed in `dispose()`; a leak test in the unit suite creates/destroys an adapter N times and asserts no growth. |
+| Coordinate-frame bugs                      | Single `frame.ts` with round-trip unit tests (`game→mujoco→game` is identity).                                                                      |
+| Solver instability at variable fps         | Fixed-timestep accumulator (§4.4).                                                                                                                  |
+| Diary replay drifts from what the user saw | Seeded PRNG + input-log replay + snapshot/restore (§4.7); a unit test replays a recorded run and asserts the final state is bit-identical.          |
 
 ---
 
@@ -272,9 +311,10 @@ budget; the cost here is download size and compile time, not per-step CPU.
 
 **Phase 1 — Puck on the real solver (this PR's target).**
 Vendor asset, wire Vite/LFS, rewrite `MujocoAdapter` with the 3-DOF planar
-Datou + velocity controller + frame conversion + fallback. Behaviour matches
-the placeholder but runs on MuJoCo. Ship behind `?physics=mujoco`, placeholder
-stays default until we're confident.
+Datou + velocity controller + frame conversion + fallback, plus deterministic
+seeding and the replay/snapshot surface (§4.7) for the Sprint-3 diary.
+Behaviour matches the placeholder but runs on MuJoCo. Ship behind
+`?physics=mujoco`, placeholder stays default until Phase 4.
 
 **Phase 2 — Environment fidelity.**
 Add `World.getColliders()` and feed real obstacle geoms (trees, home post) into
@@ -284,7 +324,8 @@ source of truth.
 **Phase 3 — Legged Datou.**
 Replace the puck with an articulated quadruped model + a gait controller (or a
 trained policy exported from the hardware team's stack). This is where MT/COOP
-+ a non-Pages host may become necessary.
+
+- a non-Pages host may become necessary.
 
 **Phase 4 — Make MuJoCo the default**, placeholder demoted to explicit fallback.
 
@@ -293,7 +334,9 @@ trained policy exported from the hardware team's stack). This is where MT/COOP
 ## 9. Test plan
 
 - **Unit:** `frame.ts` round-trip identity; controller waypoint selection per
-  mode; fixed-step accumulator step-count math.
+  mode; fixed-step accumulator step-count math; `rng.ts` reproducibility
+  (same seed ⇒ same sequence); **replay determinism** — record a run, replay it
+  from the same seed + input log, assert identical final snapshot.
 - **Integration (jsdom/headless or a small harness):** `init()` loads the WASM,
   `step()` advances `data.time`, `getDatouState()` returns finite, in-park
   values; `dispose()` frees handles with no double-delete.
@@ -304,34 +347,36 @@ trained policy exported from the hardware team's stack). This is where MT/COOP
 
 ---
 
-## 10. Open questions for review
+## 10. Review decisions (resolved)
 
-- **Q1 — Git LFS vs. fetch-at-runtime vs. plain commit.** LFS keeps the repo
-  thin but adds a checkout dependency to the Pages deploy. Alternative: host the
-  `.wasm` on a CDN/release asset and fetch at runtime (no LFS, but an external
-  dependency). Which do we want? *(Recommend: Git LFS.)*
-- **Q2 — Default backend on `main`.** Keep placeholder as default through
-  Phase 1–2 (lowest risk), or flip to MuJoCo-with-fallback sooner to get real
-  usage data? *(Recommend: placeholder default until Phase 4.)*
-- **Q3 — Determinism / save-restore.** The existing doc asks whether we need a
-  deterministic mode for diary replay and cheap state serialization. MuJoCo
-  supports both (seed + `mj_get/setState`). Is this a Phase 1 requirement or
-  later?
-- **Q4 — Scope of Phase 1 model.** Is the 3-DOF planar puck acceptable as the
-  first MuJoCo milestone, or do we want at least a floating-base body from the
-  start (more realistic fall/settle, but heavier and a bigger jump)?
+These were the open questions at design review; the team's answers are recorded
+here and are now binding on the implementation.
+
+- **Q1 — WASM hosting → ✅ Git LFS.** Track `*.wasm` via Git LFS (§5.3). The
+  Pages deploy workflow checks out LFS files (`actions/checkout` with
+  `lfs: true`).
+- **Q2 — Default backend → ✅ placeholder until Phase 4.** `main.ts` keeps
+  `PlaceholderPhysics` as the default; MuJoCo is opt-in via `?physics=mujoco`
+  until we flip the default in Phase 4 (§4.6, §8).
+- **Q3 — Determinism / diary replay → ✅ in scope for Phase 1.** We _do_ need a
+  deterministic, replayable mode for the AI diary. This is now a Phase-1
+  requirement, designed in §4.7 below — not deferred.
+- **Q4 — Phase-1 model → ✅ 3-DOF planar puck.** Ship the puck now; a
+  floating-base / legged body is future work (Phase 3).
 
 ---
 
 ## 11. Summary of changes this design implies
 
 - `docs/MUJOCO_DESIGN.md` (this file).
-- Rewrite `src/physics/MujocoAdapter.ts` (stub → real).
-- New `src/physics/mujoco/{loader,frame,datou.scene,controller}.ts` + `vendor/`.
+- Rewrite `src/physics/MujocoAdapter.ts` (stub → real, with seed + replay).
+- New `src/physics/mujoco/{loader,frame,datou.scene,controller,rng,replay}.ts`
+  - `vendor/`.
 - `main.ts`: async `createPhysics()` factory with query-param override + fallback.
-- `.gitattributes` (LFS) + deploy workflow `lfs: true` (pending Q1).
+- `.gitattributes` (LFS for `*.wasm`) + deploy workflow `lfs: true`.
 - Fix the stale yaw convention note in `docs/PHYSICS_INTEGRATION.md`.
-- Unit/integration tests for frame conversion and adapter lifecycle.
+- Add `vitest` + unit/integration tests (frame, controller, rng, replay,
+  adapter lifecycle).
 
 No changes to `Game.ts`, `World.ts`, `Datou.ts`, `Player.ts`, or the
 `PhysicsAdapter` interface itself.

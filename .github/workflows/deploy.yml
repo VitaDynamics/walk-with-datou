@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # MuJoCo WASM engine is tracked via Git LFS (docs/MUJOCO_DESIGN.md §5.3).
+          lfs: true
 
       - name: Read .nvmrc
         id: nvmrc
