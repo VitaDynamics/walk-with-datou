@@ -32,7 +32,11 @@
         display: block;
         width: 100vw;
         height: 100vh;
-        cursor: crosshair;
+        cursor: grab;
+        touch-action: none; /* let us handle drag/zoom gestures ourselves */
+      }
+      #game-canvas:active {
+        cursor: grabbing;
       }
       #hud {
         position: absolute;
@@ -151,6 +155,7 @@
     <div id="hud">
       <div class="title">Walk with Datou</div>
       <div>WASD / Arrow keys to walk</div>
+      <div>Drag to look · scroll to zoom</div>
       <div>Click on Datou to pet</div>
       <div>Datou mood: <span id="mood-tag" class="mood">calm</span></div>
       <div id="physics-tag" style="margin-top: 4px; opacity: 0.6; font-size: 11px"></div>

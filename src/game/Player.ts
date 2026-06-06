@@ -36,23 +36,36 @@ export class Player {
     this.sync();
   }
 
-  update(input: InputState, dt: number): void {
-    let vx = 0;
-    let vz = 0;
-    if (input.forward) vz -= 1;
-    if (input.back) vz += 1;
-    if (input.left) vx -= 1;
-    if (input.right) vx += 1;
-    const len = Math.hypot(vx, vz);
-    if (len > 0) {
-      vx /= len;
-      vz /= len;
-      this.position.x += vx * Player.SPEED * dt;
-      this.position.z += vz * Player.SPEED * dt;
-      this.clampToPark();
-      this.yaw = Math.atan2(vx, vz);
-      this.sync();
-    }
+  /**
+   * Move the player. Input directions are interpreted relative to the camera
+   * via `viewYaw` (radians, the camera's horizontal angle), so "forward" is
+   * always away from the camera regardless of how the view has been dragged.
+   */
+  update(input: InputState, dt: number, viewYaw = 0): void {
+    let ix = 0;
+    let iz = 0;
+    if (input.forward) iz -= 1;
+    if (input.back) iz += 1;
+    if (input.left) ix -= 1;
+    if (input.right) ix += 1;
+    const len = Math.hypot(ix, iz);
+    if (len === 0) return;
+
+    ix /= len;
+    iz /= len;
+
+    // Rotate the screen-space intent into world space by the camera yaw.
+    // The rig's yaw=0 looks down +Z, matching the original "forward = -Z" feel.
+    const cos = Math.cos(viewYaw);
+    const sin = Math.sin(viewYaw);
+    const vx = ix * cos + iz * sin;
+    const vz = -ix * sin + iz * cos;
+
+    this.position.x += vx * Player.SPEED * dt;
+    this.position.z += vz * Player.SPEED * dt;
+    this.clampToPark();
+    this.yaw = Math.atan2(vx, vz);
+    this.sync();
   }
 
   private clampToPark(): void {

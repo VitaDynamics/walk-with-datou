@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { DatouMood, PhysicsAdapter } from '../physics/PhysicsAdapter';
+import { CameraRig } from './CameraRig';
 import { Datou } from './Datou';
 import { Input } from './Input';
 import { Player } from './Player';
@@ -15,8 +16,7 @@ const MAX_DT = 1 / 30;
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
-  private readonly camera: THREE.PerspectiveCamera;
-  private readonly cameraTarget = new THREE.Vector3();
+  private readonly cameraRig: CameraRig;
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
 
@@ -44,9 +44,7 @@ export class Game {
     this.scene.background = new THREE.Color(0xd9eef7);
     this.scene.fog = new THREE.Fog(0xd9eef7, 28, 70);
 
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(0, 9, 14);
-    this.camera.lookAt(0, 0, 0);
+    this.cameraRig = new CameraRig(canvas, window.innerWidth / window.innerHeight);
 
     this.setupLights();
 
@@ -104,7 +102,9 @@ export class Game {
     this.lastTime = now;
 
     const input = this.input.poll();
-    this.player.update(input, dt);
+    // Movement is camera-relative: pass the current view yaw so "forward" is
+    // always away from the camera, no matter how the user has dragged the view.
+    this.player.update(input, dt, this.cameraRig.viewYaw);
 
     if (input.clicked) {
       this.handleClick(input.clickNdcX, input.clickNdcY);
@@ -117,34 +117,18 @@ export class Game {
     this.datou.apply(state);
     this.updateMoodHUD(state.mood);
 
-    this.updateCamera(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.cameraRig.update(this.player.position, dt);
+    this.renderer.render(this.scene, this.cameraRig.camera);
 
     requestAnimationFrame((t) => this.tick(t));
   }
 
   private handleClick(ndcX: number, ndcY: number): void {
     this.ndc.set(ndcX, ndcY);
-    this.raycaster.setFromCamera(this.ndc, this.camera);
+    this.raycaster.setFromCamera(this.ndc, this.cameraRig.camera);
     if (this.datou.intersectsRay(this.raycaster)) {
       this.physics.applyPet();
     }
-  }
-
-  private updateCamera(dt: number): void {
-    const desiredX = this.player.position.x * 0.6;
-    const desiredY = 9;
-    const desiredZ = this.player.position.z + 12;
-
-    const lerp = Math.min(1, dt * 3.5);
-    this.camera.position.x += (desiredX - this.camera.position.x) * lerp;
-    this.camera.position.y += (desiredY - this.camera.position.y) * lerp;
-    this.camera.position.z += (desiredZ - this.camera.position.z) * lerp;
-
-    this.cameraTarget.x += (this.player.position.x - this.cameraTarget.x) * lerp;
-    this.cameraTarget.y += (1 - this.cameraTarget.y) * lerp;
-    this.cameraTarget.z += (this.player.position.z - this.cameraTarget.z) * lerp;
-    this.camera.lookAt(this.cameraTarget);
   }
 
   private updateMoodHUD(mood: DatouMood): void {
@@ -157,8 +141,7 @@ export class Game {
 
   private onResize(): void {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
+    this.cameraRig.setAspect(window.innerWidth / window.innerHeight);
   }
 }
 
