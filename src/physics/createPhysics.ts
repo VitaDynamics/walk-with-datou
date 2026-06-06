@@ -67,8 +67,13 @@ export async function createPhysics(search = window.location.search): Promise<Cr
   if (requested === 'mujoco') {
     try {
       // Lazy import so the placeholder path never pulls the WASM into the bundle.
-      const { MujocoAdapter } = await import('./MujocoAdapter');
-      const adapter = new MujocoAdapter();
+      const [{ MujocoAdapter }, { getParkColliders }] = await Promise.all([
+        import('./MujocoAdapter'),
+        import('../game/World'),
+      ]);
+      // Build the simulation with the park's obstacles so Datou collides with
+      // trees and the home post, matching what the player collides with.
+      const adapter = new MujocoAdapter({ scene: { colliders: getParkColliders() } });
       await adapter.init();
       return { adapter, backend: 'mujoco' };
     } catch (err) {

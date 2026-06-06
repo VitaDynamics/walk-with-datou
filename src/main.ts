@@ -18,6 +18,8 @@ createPhysics()
     mountSettings({ activeBackend: backend });
 
     const game = new Game(canvas, adapter);
+    // Expose a minimal debug handle (used by automated checks and the console).
+    (window as unknown as { game?: Game }).game = game;
     return game.start();
   })
   .catch((err) => {

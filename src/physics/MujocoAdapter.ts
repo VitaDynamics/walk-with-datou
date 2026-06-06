@@ -1,4 +1,10 @@
-import type { DatouMode, DatouMood, DatouState, PhysicsAdapter } from './PhysicsAdapter';
+import type {
+  DatouMode,
+  DatouMood,
+  DatouState,
+  PhysicsAdapter,
+  WorldCollider,
+} from './PhysicsAdapter';
 import { Controller, DEFAULT_CONTROLLER_CONFIG } from './mujoco/controller';
 import {
   DEFAULT_SCENE_OPTIONS,
@@ -162,6 +168,20 @@ export class MujocoAdapter implements PhysicsAdapter {
     this.recorder?.record({ t: this.simTime(), kind: 'applyPet' });
   }
 
+  /**
+   * Obstacles are baked into the MJCF as fixed geoms at init (passed via the
+   * constructor's scene.colliders), so the solver already collides Datou with
+   * them. If colliders arrive after init this would require a model rebuild;
+   * we warn rather than silently ignore.
+   */
+  setColliders(colliders: readonly WorldCollider[]): void {
+    if (this.data && colliders.length !== this.sceneOpts.colliders.length) {
+      console.warn(
+        '[MujocoAdapter] setColliders() after init is ignored; pass scene.colliders to the constructor.',
+      );
+    }
+  }
+
   getDatouState(): DatouState {
     return this.cachedState;
   }
@@ -222,8 +242,14 @@ export class MujocoAdapter implements PhysicsAdapter {
     if (!this.data) return;
     const X = this.data.qpos[SLIDE_X];
     const Y = this.data.qpos[SLIDE_Y];
-    const Z = this.sceneOpts.bodyRadius; // resting height; planar puck stays level
-    const p = mujocoToGamePos(X, Y, Z);
+    // DatouState.position.y is the ground-contact (feet) height, because the
+    // rendered Datou mesh has its origin at its feet. The MuJoCo body is a
+    // capsule whose center sits bodyRadius above the ground; the planar puck
+    // has no vertical DOF, so its feet are always on the ground (y = 0). This
+    // matches PlaceholderPhysics (which always reports y = 0) and keeps Datou
+    // from floating when switching backends.
+    const feetY = 0;
+    const p = mujocoToGamePos(X, Y, feetY);
     this.cachedState.position.x = p.x;
     this.cachedState.position.y = p.y;
     this.cachedState.position.z = p.z;

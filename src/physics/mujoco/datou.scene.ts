@@ -12,6 +12,13 @@
  * hingeZ]. MujocoAdapter relies on this layout.
  */
 
+/** A solid obstacle as an XZ-plane circle (mirrors World's Collider). */
+export interface SceneCollider {
+  x: number;
+  z: number;
+  radius: number;
+}
+
 export interface DatouSceneOptions {
   /** MuJoCo integration timestep in seconds. */
   timestep: number;
@@ -21,6 +28,8 @@ export interface DatouSceneOptions {
   bodyRadius: number;
   /** Capsule half-length, metres. */
   bodyHalfLength: number;
+  /** Static park obstacles to emit as fixed cylinder geoms. */
+  colliders: SceneCollider[];
 }
 
 export const DEFAULT_SCENE_OPTIONS: DatouSceneOptions = {
@@ -28,7 +37,25 @@ export const DEFAULT_SCENE_OPTIONS: DatouSceneOptions = {
   parkHalfExtent: 22,
   bodyRadius: 0.35,
   bodyHalfLength: 0.45,
+  colliders: [],
 };
+
+/**
+ * Emit a static (unjointed) vertical cylinder geom per obstacle. Game-space
+ * (x, z) maps to MuJoCo (X, Y) — frame.ts owns that swap — and the cylinder is
+ * tall enough that the planar Datou body can never slip over it. `half_height`
+ * is the cylinder's z half-extent in MuJoCo's Z-up frame.
+ */
+function buildColliderGeoms(colliders: SceneCollider[]): string {
+  const halfHeight = 1.5;
+  return colliders
+    .map(
+      (c, i) =>
+        `    <geom name="obstacle_${i}" type="cylinder" size="${c.radius} ${halfHeight}" ` +
+        `pos="${c.x} ${c.z} ${halfHeight}" rgba="0.48 0.29 0.15 1"/>`,
+    )
+    .join('\n');
+}
 
 export function buildDatouSceneXml(opts: DatouSceneOptions = DEFAULT_SCENE_OPTIONS): string {
   const restHeight = opts.bodyRadius; // capsule resting on the ground (Z-up)
@@ -43,6 +70,8 @@ export function buildDatouSceneXml(opts: DatouSceneOptions = DEFAULT_SCENE_OPTIO
   <worldbody>
     <geom name="ground" type="plane" size="${opts.parkHalfExtent} ${opts.parkHalfExtent} 0.1"
           pos="0 0 0" rgba="0.55 0.78 0.47 1"/>
+
+${buildColliderGeoms(opts.colliders)}
 
     <body name="datou" pos="0 0 ${restHeight}">
       <joint name="slide_x" type="slide" axis="1 0 0" damping="6"/>

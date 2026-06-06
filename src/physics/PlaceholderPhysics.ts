@@ -1,4 +1,10 @@
-import type { DatouMode, DatouMood, DatouState, PhysicsAdapter } from './PhysicsAdapter';
+import type {
+  DatouMode,
+  DatouMood,
+  DatouState,
+  PhysicsAdapter,
+  WorldCollider,
+} from './PhysicsAdapter';
 
 /**
  * Lightweight kinematic stand-in for the real MuJoCo simulation. Good enough to
@@ -26,6 +32,8 @@ export class PlaceholderPhysics implements PhysicsAdapter {
     velocity: { x: 0, y: 0, z: 0 },
     mood: 'calm',
   };
+  private static readonly DATOU_RADIUS = 0.45; // for obstacle push-out
+
   private mode: DatouMode = 'follow';
   private playerPos = { x: 0, z: 0 };
   private target = { x: 0, z: 0 };
@@ -33,9 +41,14 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   private wanderTimer = 0;
   private happyTimer = 0;
   private stationaryTimer = 0;
+  private colliders: readonly WorldCollider[] = [];
 
   async init(): Promise<void> {
     // Nothing to load.
+  }
+
+  setColliders(colliders: readonly WorldCollider[]): void {
+    this.colliders = colliders;
   }
 
   setMode(mode: DatouMode): void {
@@ -61,7 +74,28 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   step(dt: number): void {
     const desired = this.computeDesiredTarget(dt);
     this.moveToward(desired.x, desired.z, dt);
+    this.resolveCollisions();
     this.updateMood(dt);
+  }
+
+  /** Push Datou out of any park obstacle it overlaps (circle vs circle). */
+  private resolveCollisions(): void {
+    const r = PlaceholderPhysics.DATOU_RADIUS;
+    for (const c of this.colliders) {
+      const dx = this.state.position.x - c.x;
+      const dz = this.state.position.z - c.z;
+      const minDist = c.radius + r;
+      const distSq = dx * dx + dz * dz;
+      if (distSq >= minDist * minDist) continue;
+      const dist = Math.sqrt(distSq);
+      if (dist < 1e-6) {
+        this.state.position.x = c.x + minDist;
+        continue;
+      }
+      const push = (minDist - dist) / dist;
+      this.state.position.x += dx * push;
+      this.state.position.z += dz * push;
+    }
   }
 
   getDatouState(): DatouState {

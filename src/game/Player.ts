@@ -1,18 +1,23 @@
 import * as THREE from 'three';
+import { resolveCircleCollisions } from './collision';
 import type { InputState } from './Input';
+import type { Collider } from './World';
 
 /**
- * The owner avatar. A simple capsule + sphere head; movement is fixed-speed
- * along world-space cardinal directions (no camera-relative steering in
- * Sprint 0 - keeps the controls predictable).
+ * The owner avatar. A simple capsule + sphere head; movement is fixed-speed and
+ * camera-relative. After moving, the player is pushed out of any park
+ * obstacles via the shared collider list.
  */
 export class Player {
   static readonly SPEED = 4; // m/s
   static readonly PARK_HALF = 28;
+  static readonly RADIUS = 0.35; // collision radius
 
   readonly group = new THREE.Group();
   readonly position = { x: 0, y: 0, z: 3 };
   yaw = 0;
+
+  private colliders: readonly Collider[] = [];
 
   constructor() {
     const bodyMat = new THREE.MeshStandardMaterial({
@@ -34,6 +39,11 @@ export class Player {
     this.group.add(head);
 
     this.sync();
+  }
+
+  /** Provide the park obstacles the player should collide with. */
+  setColliders(colliders: readonly Collider[]): void {
+    this.colliders = colliders;
   }
 
   /**
@@ -64,6 +74,7 @@ export class Player {
     this.position.x += vx * Player.SPEED * dt;
     this.position.z += vz * Player.SPEED * dt;
     this.clampToPark();
+    resolveCircleCollisions(this.position, Player.RADIUS, this.colliders);
     this.yaw = Math.atan2(vx, vz);
     this.sync();
   }

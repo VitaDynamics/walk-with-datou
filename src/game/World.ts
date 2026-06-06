@@ -1,7 +1,58 @@
 import * as THREE from 'three';
 
 /**
- * The static park scene. No game logic, just visuals.
+ * A solid, walk-blocking obstacle, modelled as an upright cylinder in the XZ
+ * plane (height is irrelevant for ground navigation). Both the player's
+ * kinematic movement and the MuJoCo scene consume the same list so the
+ * collision the user sees matches the simulation. Radius is the *physical*
+ * radius; callers add the mover's own radius on top.
+ */
+export interface Collider {
+  x: number;
+  z: number;
+  radius: number;
+}
+
+// Tree placements (x, z, variant). Hand-placed: clustered at the edges so the
+// centre stays open for walking. Shared by the visual build and getColliders().
+const TREE_LAYOUT: ReadonlyArray<readonly [number, number, number]> = [
+  [-14, -12, 0],
+  [-18, 4, 1],
+  [-12, 14, 0],
+  [-6, 18, 1],
+  [10, 16, 0],
+  [16, 8, 1],
+  [18, -4, 0],
+  [12, -14, 1],
+  [3, -18, 0],
+  [-8, -18, 1],
+  [-20, -5, 0],
+  [20, -12, 1],
+];
+
+// Collision radii. Trunks are thin, but we pad them a little so Datou and the
+// player brush past the trunk rather than clipping the visual foliage base.
+const TREE_COLLIDER_RADIUS = 0.5;
+const HOME_POST = { x: 0, z: -2, radius: 0.45 };
+
+/**
+ * The park's solid obstacles as XZ-plane circles, derived purely from the
+ * static layout (no random visual jitter). Exported as a free function so the
+ * physics backend can build matching colliders at init time, before any World
+ * instance exists. World.getColliders() returns the same set.
+ */
+export function getParkColliders(): Collider[] {
+  const colliders: Collider[] = TREE_LAYOUT.map(([x, z]) => ({
+    x,
+    z,
+    radius: TREE_COLLIDER_RADIUS,
+  }));
+  colliders.push({ x: HOME_POST.x, z: HOME_POST.z, radius: HOME_POST.radius });
+  return colliders;
+}
+
+/**
+ * The static park scene. No game logic, just visuals + collision geometry.
  *
  * The park is roughly 60 x 60 metres. The owner spawn is near (0, 0, 3); the
  * "home" post sits at (0, 0, -2). Trees are scattered around the edges so the
@@ -9,6 +60,7 @@ import * as THREE from 'three';
  */
 export class World {
   readonly group = new THREE.Group();
+  private readonly colliders: Collider[] = getParkColliders();
 
   constructor() {
     this.buildGround();
@@ -16,6 +68,16 @@ export class World {
     this.buildHomePost();
     this.buildTrees();
     this.buildFlowers();
+  }
+
+  /**
+   * Solid obstacles in the park (trees, home post) as XZ-plane circles. The
+   * physics layer turns these into MuJoCo geoms and the player uses them for
+   * kinematic collision, so there is a single source of truth for what blocks
+   * movement.
+   */
+  getColliders(): readonly Collider[] {
+    return this.colliders;
   }
 
   private buildGround(): void {
@@ -85,23 +147,7 @@ export class World {
       flatShading: true,
     });
 
-    // Hand-placed: cluster at edges, leave centre open.
-    const layout: Array<[number, number, number]> = [
-      [-14, -12, 0],
-      [-18, 4, 1],
-      [-12, 14, 0],
-      [-6, 18, 1],
-      [10, 16, 0],
-      [16, 8, 1],
-      [18, -4, 0],
-      [12, -14, 1],
-      [3, -18, 0],
-      [-8, -18, 1],
-      [-20, -5, 0],
-      [20, -12, 1],
-    ];
-
-    for (const [x, z, variant] of layout) {
+    for (const [x, z, variant] of TREE_LAYOUT) {
       const tree = new THREE.Group();
       const trunkH = 1.1 + Math.random() * 0.4;
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, trunkH, 6), trunkMat);

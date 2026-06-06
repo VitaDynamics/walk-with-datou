@@ -50,6 +50,11 @@ export class Game {
 
     this.world = new World();
     this.player = new Player();
+    this.player.setColliders(this.world.getColliders());
+    // Let the physics backend collide Datou with the scene too. The MuJoCo
+    // backend bakes obstacles into its model at init; the placeholder uses
+    // these for push-out. Optional on the contract — guard the call.
+    this.physics.setColliders?.(this.world.getColliders());
     this.datou = new Datou();
     this.input = new Input(canvas);
 
@@ -68,6 +73,15 @@ export class Game {
     this.lastTime = performance.now();
     this.running = true;
     requestAnimationFrame((t) => this.tick(t));
+  }
+
+  /** Lightweight snapshot for debugging / automated checks (positions in metres). */
+  debugState(): { player: { x: number; z: number }; datou: { x: number; y: number; z: number } } {
+    const d = this.physics.getDatouState();
+    return {
+      player: { x: this.player.position.x, z: this.player.position.z },
+      datou: { x: d.position.x, y: d.position.y, z: d.position.z },
+    };
   }
 
   stop(): void {
