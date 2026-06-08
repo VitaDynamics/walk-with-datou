@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import type { DatouMood, PhysicsAdapter } from '../physics/PhysicsAdapter';
 import { Particles } from './ambient/Particles';
 import { Wind } from './ambient/Wind';
+import { Bond } from './Bond';
 import { CameraRig } from './CameraRig';
+import { Companion } from './Companion';
 import { Datou } from './Datou';
 import { Input } from './Input';
 import { Player } from './Player';
@@ -29,6 +31,8 @@ export class Game {
   private readonly physics: PhysicsAdapter;
   private readonly wind = new Wind();
   private readonly particles = new Particles();
+  private readonly bond = new Bond();
+  private readonly companion: Companion;
   private sun!: THREE.DirectionalLight;
 
   private readonly moodEl: HTMLElement | null;
@@ -68,6 +72,13 @@ export class Game {
     this.physics.setColliders?.(this.world.getColliders());
     this.datou = new Datou();
     this.input = new Input(canvas);
+
+    // The want/read loop. Companion drives Datou's behaviour through the physics
+    // mode/target levers (a thin command sink) and feeds the shared Bond.
+    this.companion = new Companion(this.bond, {
+      setMode: (m) => this.physics.setMode(m),
+      setTarget: (x, z) => this.physics.setTarget(x, z),
+    });
 
     this.scene.add(this.world.group);
     this.scene.add(this.player.group);
@@ -141,15 +152,22 @@ export class Game {
     // always away from the camera, no matter how the user has dragged the view.
     this.player.update(input, dt, this.cameraRig.viewYaw);
 
+    let petted = false;
     if (input.clicked) {
-      this.handleClick(input.clickNdcX, input.clickNdcY);
+      petted = this.handleClick(input.clickNdcX, input.clickNdcY);
     }
 
     this.physics.setPlayerPosition(this.player.position.x, this.player.position.z);
     this.physics.step(dt);
 
     const state = this.physics.getDatouState();
+
+    // Want/read loop: Companion may surface a want, judge the player's response
+    // (including this frame's pet), grant bond, and steer Datou via the physics
+    // levers. Then pose Datou for the active want. (docs/GAMEPLAY_DESIGN.md §F1.)
+    this.companion.update(state, this.player.position, petted, dt);
     this.datou.apply(state);
+    this.datou.applyExpression(this.companion.expression);
     this.updateMoodHUD(state.mood);
 
     // Ambient life: sway the foliage and drift the motes with the player.
@@ -169,12 +187,15 @@ export class Game {
     requestAnimationFrame((t) => this.tick(t));
   }
 
-  private handleClick(ndcX: number, ndcY: number): void {
+  /** Returns true if the click landed on Datou (a pet). */
+  private handleClick(ndcX: number, ndcY: number): boolean {
     this.ndc.set(ndcX, ndcY);
     this.raycaster.setFromCamera(this.ndc, this.cameraRig.camera);
     if (this.datou.intersectsRay(this.raycaster)) {
       this.physics.applyPet();
+      return true;
     }
+    return false;
   }
 
   private updateMoodHUD(mood: DatouMood): void {

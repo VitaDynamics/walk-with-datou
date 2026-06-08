@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { DatouState } from '../physics/PhysicsAdapter';
+import type { Expression } from './Companion';
 
 /**
  * Datou's visual representation. Pure rendering - all state comes from a
@@ -98,6 +99,47 @@ export class Datou {
       this.head.position.y = 0.5;
     } else {
       this.head.position.y = 0.58;
+    }
+  }
+
+  /**
+   * Pose Datou for the current want (docs/INTERACTION_VERBS.md). Layered on top
+   * of apply(): apply() sets yaw + mood animation; this adds the want's body
+   * language. Call once per frame, after apply().
+   *
+   * - attention: sit back a little, head up toward the player.
+   * - play: a play-bow — front end dips down.
+   * - curious: ears/head turn toward the point of interest.
+   * - none: relax to the neutral pose.
+   */
+  applyExpression(expr: Expression): void {
+    const t = performance.now() * 0.001;
+    switch (expr.kind) {
+      case 'attention':
+        // Tip back onto the haunches and lift the head.
+        this.group.rotation.x = -0.12;
+        this.head.position.z = 0.5;
+        this.head.position.y = 0.66;
+        break;
+      case 'play':
+        // Front-down/rear-up bow, with a little bounce.
+        this.group.rotation.x = 0.32 + Math.sin(t * 6) * 0.05;
+        this.head.position.z = 0.5;
+        break;
+      case 'curious': {
+        // Turn the head to face the point of interest (relative to body yaw).
+        this.group.rotation.x = 0;
+        const headYaw = Math.atan2(expr.dirX, expr.dirZ) - this.group.rotation.y;
+        this.head.rotation.y = THREE.MathUtils.clamp(headYaw, -0.9, 0.9);
+        break;
+      }
+      case 'none':
+      default:
+        // Relax back to neutral.
+        this.group.rotation.x = 0;
+        this.head.rotation.y = 0;
+        this.head.position.z = 0.5;
+        break;
     }
   }
 
