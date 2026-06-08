@@ -63,7 +63,14 @@ export function buildDatouSceneXml(opts: DatouSceneOptions = DEFAULT_SCENE_OPTIO
   const restHeight = opts.bodyRadius; // capsule resting on the ground (Z-up)
   return `<mujoco model="datou-puck">
   <option timestep="${opts.timestep}" gravity="0 0 -9.81" integrator="implicitfast"/>
-  <size memory="16M"/>
+  <!-- The park emits one static cylinder geom per MAJOR obstacle (trees, rocks,
+       logs, lampposts, the full lake-shore ring, landmarks, placed features).
+       Small props (reeds, mushrooms) are flagged 'minor' in World and dropped
+       before they reach here (see getPhysicsColliders / createPhysics), keeping
+       this to ~1400 geoms instead of ~1800. They are all static, so static–
+       static contacts are skipped and only Datou-vs-nearby pairs cost anything,
+       but the model arrays still scale with geom count — 128M is ample. -->
+  <size memory="128M"/>
 
   <default>
     <geom condim="1" friction="1 0.005 0.0001"/>

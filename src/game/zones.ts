@@ -1,5 +1,3 @@
-import { PARK_HALF } from './World';
-
 /**
  * Zone definitions for the 500×500 park (docs/ENVIRONMENT_DESIGN.md §1, §3).
  *
@@ -11,6 +9,18 @@ import { PARK_HALF } from './World';
  *
  * Coordinates are world XZ in metres, spanning [-PARK_HALF, +PARK_HALF].
  */
+
+/**
+ * Half the side length of the (square) park, in metres. The world spans
+ * [-PARK_HALF, +PARK_HALF] on both X and Z — the single source of truth for
+ * world size (ground mesh, player clamp, wander bounds, MuJoCo ground geom).
+ *
+ * Lives here (the lowest-level geometry module) rather than in World.ts so the
+ * import graph stays acyclic: World/features/Player all depend on zones, and
+ * zones depends on nothing in the game layer. World re-exports it for callers
+ * that historically imported it from there.
+ */
+export const PARK_HALF = 250;
 
 export type ZoneId = 'meadow' | 'woods' | 'lake' | 'grove';
 

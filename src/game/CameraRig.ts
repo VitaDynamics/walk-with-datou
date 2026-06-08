@@ -38,6 +38,16 @@ export class CameraRig {
   private static readonly ZOOM_SPEED = 0.0015; // dist per wheel delta
   private static readonly PIVOT_HEIGHT = 1; // look slightly above the ground
 
+  // --- Creator (free-fly) mode ---
+  // When on, the camera detaches from the player and the pivot flies freely so
+  // you can survey the whole 500×500 park quickly. Fly speed is well above the
+  // player's 7 m/s walk (the user asked for ≥4×); boost goes much faster still.
+  private freeFly = false;
+  private static readonly FLY_SPEED = 40; // m/s (~5.7× the 7 m/s walk)
+  private static readonly FLY_BOOST = 3; // Shift multiplier → ~17× walk
+  /** Allow flying higher than the orbit range so you can get a map-like view. */
+  private static readonly FLY_MAX_HEIGHT = 240;
+
   constructor(canvas: HTMLCanvasElement, aspect: number) {
     // Far plane sits beyond the fog far (320, see Game) so fog — not a hard
     // clip — is what hides distant geometry in the 500×500 park.
@@ -51,14 +61,55 @@ export class CameraRig {
     return this.yaw;
   }
 
+  /** Whether the camera is in creator (free-fly) mode. */
+  get isFreeFly(): boolean {
+    return this.freeFly;
+  }
+
+  /** Turn creator (free-fly) mode on/off. Returns the new state. */
+  setFreeFly(on: boolean): boolean {
+    this.freeFly = on;
+    return this.freeFly;
+  }
+
+  /**
+   * Fly the pivot in creator mode. Inputs are screen-relative intents in
+   * [-1,1]: `ix` strafes, `iz` moves along the view heading (forward = away
+   * from the camera, matching Player.update's convention), `iy` raises/lowers.
+   * `boost` flies much faster. Has no effect unless free-fly is on.
+   */
+  flyMove(ix: number, iz: number, iy: number, boost: boolean, dt: number): void {
+    if (!this.freeFly) return;
+    const speed = CameraRig.FLY_SPEED * (boost ? CameraRig.FLY_BOOST : 1);
+    // Rotate the screen-space intent into world space by the camera yaw — same
+    // mapping as Player.update so flying "feels" like walking, just faster.
+    const cos = Math.cos(this.yaw);
+    const sin = Math.sin(this.yaw);
+    const vx = ix * cos + iz * sin;
+    const vz = -ix * sin + iz * cos;
+    this.pivot.x += vx * speed * dt;
+    this.pivot.z += vz * speed * dt;
+    this.pivot.y = THREE.MathUtils.clamp(
+      this.pivot.y + iy * speed * dt,
+      CameraRig.PIVOT_HEIGHT,
+      CameraRig.FLY_MAX_HEIGHT,
+    );
+    this.applyToCamera();
+  }
+
   /** Snap the pivot directly to a target (no smoothing) — used at startup. */
   snapTo(x: number, z: number): void {
     this.pivot.set(x, CameraRig.PIVOT_HEIGHT, z);
     this.applyToCamera();
   }
 
-  /** Smoothly follow `target`, then place the camera on its orbit. */
+  /** Smoothly follow `target`, then place the camera on its orbit. In free-fly
+   *  the pivot is driven by flyMove instead, so following is skipped. */
   update(target: { x: number; z: number }, dt: number): void {
+    if (this.freeFly) {
+      this.applyToCamera();
+      return;
+    }
     const lerp = Math.min(1, dt * 4);
     this.pivot.x += (target.x - this.pivot.x) * lerp;
     this.pivot.z += (target.z - this.pivot.z) * lerp;

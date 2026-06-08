@@ -1,0 +1,568 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "3d-platformer-block-coin",
+      "name": "3d Platformer Block Coin",
+      "category": "collectible",
+      "modelPath": "models/collectible/3d-platformer-block-coin.glb",
+      "license": "CC0",
+      "footprintRadius": 0.15,
+      "blocking": false,
+      "interactable": true,
+      "verbs": [
+        "carry"
+      ],
+      "zones": [],
+      "spawnWeight": 0.6,
+      "scaleRange": [
+        0.8,
+        1.2
+      ],
+      "mass": 0.3
+    },
+    {
+      "id": "3d-platformer-brick",
+      "name": "3d Platformer Brick",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-brick.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-brick-particle",
+      "name": "3d Platformer Brick Particle",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-brick-particle.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-character",
+      "name": "3d Platformer Character",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-character.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-cloud",
+      "name": "3d Platformer Cloud",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-cloud.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-coin",
+      "name": "3d Platformer Coin",
+      "category": "collectible",
+      "modelPath": "models/collectible/3d-platformer-coin.glb",
+      "license": "CC0",
+      "footprintRadius": 0.15,
+      "blocking": false,
+      "interactable": true,
+      "verbs": [
+        "carry"
+      ],
+      "zones": [],
+      "spawnWeight": 0.6,
+      "scaleRange": [
+        0.8,
+        1.2
+      ],
+      "mass": 0.3
+    },
+    {
+      "id": "3d-platformer-dust",
+      "name": "3d Platformer Dust",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-dust.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-flag",
+      "name": "3d Platformer Flag",
+      "category": "collectible",
+      "modelPath": "models/collectible/3d-platformer-flag.glb",
+      "license": "CC0",
+      "footprintRadius": 0.15,
+      "blocking": false,
+      "interactable": true,
+      "verbs": [
+        "carry"
+      ],
+      "zones": [],
+      "spawnWeight": 0.6,
+      "scaleRange": [
+        0.8,
+        1.2
+      ],
+      "mass": 0.3
+    },
+    {
+      "id": "3d-platformer-grass",
+      "name": "3d Platformer Grass",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-grass.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-grass-small",
+      "name": "3d Platformer Grass Small",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-grass-small.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-platform",
+      "name": "3d Platformer Platform",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-platform.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-platform-falling",
+      "name": "3d Platformer Platform Falling",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-platform-falling.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-platform-grass-large-round",
+      "name": "3d Platformer Platform Grass Large Round",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-platform-grass-large-round.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-platform-large",
+      "name": "3d Platformer Platform Large",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-platform-large.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "3d-platformer-platform-medium",
+      "name": "3d Platformer Platform Medium",
+      "category": "play",
+      "modelPath": "models/play/3d-platformer-platform-medium.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "grove",
+        "meadow"
+      ],
+      "spawnWeight": 0.12,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-building-garage",
+      "name": "City Builder Building Garage",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-building-garage.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-building-small-a",
+      "name": "City Builder Building Small A",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-building-small-a.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-building-small-b",
+      "name": "City Builder Building Small B",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-building-small-b.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-building-small-c",
+      "name": "City Builder Building Small C",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-building-small-c.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-building-small-d",
+      "name": "City Builder Building Small D",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-building-small-d.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-grass",
+      "name": "City Builder Grass",
+      "category": "grass",
+      "modelPath": "models/grass/city-builder-grass.glb",
+      "license": "CC0",
+      "footprintRadius": 0,
+      "blocking": false,
+      "interactable": true,
+      "verbs": [
+        "sniff"
+      ],
+      "zones": [],
+      "spawnWeight": 2,
+      "scaleRange": [
+        0.8,
+        1.6
+      ]
+    },
+    {
+      "id": "city-builder-grass-trees",
+      "name": "City Builder Grass Trees",
+      "category": "tree",
+      "modelPath": "models/tree/city-builder-grass-trees.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "woods",
+        "grove"
+      ],
+      "spawnWeight": 0.6,
+      "scaleRange": [
+        0.8,
+        1.4
+      ]
+    },
+    {
+      "id": "city-builder-grass-trees-tall",
+      "name": "City Builder Grass Trees Tall",
+      "category": "tree",
+      "modelPath": "models/tree/city-builder-grass-trees-tall.glb",
+      "license": "CC0",
+      "footprintRadius": 0.6,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [
+        "woods",
+        "grove"
+      ],
+      "spawnWeight": 0.6,
+      "scaleRange": [
+        0.8,
+        1.4
+      ]
+    },
+    {
+      "id": "city-builder-pavement",
+      "name": "City Builder Pavement",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-pavement.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-pavement-fountain",
+      "name": "City Builder Pavement Fountain",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-pavement-fountain.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-road-corner",
+      "name": "City Builder Road Corner",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-road-corner.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-road-intersection",
+      "name": "City Builder Road Intersection",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-road-intersection.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-road-split",
+      "name": "City Builder Road Split",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-road-split.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-road-straight",
+      "name": "City Builder Road Straight",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-road-straight.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "id": "city-builder-road-straight-lightposts",
+      "name": "City Builder Road Straight Lightposts",
+      "category": "infrastructure",
+      "modelPath": "models/infrastructure/city-builder-road-straight-lightposts.glb",
+      "license": "CC0",
+      "footprintRadius": 0.5,
+      "blocking": true,
+      "interactable": false,
+      "verbs": [],
+      "zones": [],
+      "spawnWeight": 0.15,
+      "scaleRange": [
+        0.9,
+        1.1
+      ]
+    }
+  ]
+}

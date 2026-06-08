@@ -10,6 +10,17 @@
 > - **This doc** — the _systems_ (wants, bond, explore, daily ritual, character, diary). Features are labelled **F1–F6**; the other docs cite them as **GF1–GF6**.
 > - **`docs/INTERACTION_VERBS.md`** — the _creature-interaction verbs_ (pet, call, play, lead, fetch…) that the player uses to answer these systems.
 > - **`docs/ENVIRONMENT_DESIGN.md`** — the _world_ (zones, landmarks) and its _object-manipulation verbs_ (push/throw/carry/break…). The two verb docs meet at **fetch**.
+>
+> **Research grounding (2026-06-08).** This design is now reconciled with
+> **`docs/quadruped-game-design-research.md`** — a survey of _Pokopia_, _Stardew
+> Valley_, _Don't Starve_, _Mario Odyssey_, and the long-term HRI / companion-robot
+> literature. The research's headline conclusions are folded in below: build a
+> **Companion Diorama** (a moderate-duration companion-exploration loop), make
+> rapport **one public level over four hidden vectors**, express personality as
+> **four perceivable axes that drift over time**, treat scenes as **stateful
+> interaction boards with high reward density** rather than backdrops, and use
+> **gentle recall, never decay/punishment or monetized attachment**. The §8 loop
+> map and §9 boundaries below are new and trace directly to that report.
 
 ---
 
@@ -103,16 +114,41 @@ One integer `bond` (0–100+), persisted, fed by **every** interaction mode — 
 
 This makes progression _legible through behaviour_ — the Pokopia lesson that rapport, not a number, is the reward.
 
-### F3 — Explore mode & shared discovery (environment exploration)
+**Refinement from the research (one public level, four hidden vectors).** The
+HRI literature argues that a single affinity bar flattens distinct kinds of
+relationship-building. So `bond` stays the **one public level** (still never shown
+as a number — only unlocks), but it is fed by **four hidden vectors** that the
+diary and personality drift can read separately:
 
-Promotes the existing `explore` mode from "Datou picks a path, you watch" into a **shared-attention** mechanic.
+| Hidden vector            | Grows from…                                                       | Current `BondReason` inputs (`Bond.ts`) |
+| ------------------------ | ----------------------------------------------------------------- | --------------------------------------- |
+| **Security**             | comforting, regular routines, answering an _attention_ want       | `pet`, `want-attention`, `proximity`    |
+| **Understanding**        | reading wants correctly, choosing what makes Datou "feel read"    | `want-curious`, answering before expiry |
+| **Synergy**              | synchronised/cooperative action — play beats, leading together    | `play`, `want-play`                     |
+| **Shared Memory Density** | discoveries made together, debriefs, the diary remembering them   | `discovery`                             |
 
-- **Procedural POIs** (Roadmap Sprint 2): 1–2 per session from a template library, placed in the park (a curious smell, a butterfly, a shiny thing, a puddle, a buried something). Lightweight `THREE.Group` markers; no new geometry pipeline. The _environmental_ half of a POI (the reactive prop) is specced in `docs/ENVIRONMENT_DESIGN.md` §4.1.
-- **Two ways a POI enters play:**
-  1. _Datou-led:_ a _Curious_ want (F1) points you toward a POI. You follow the gaze → you both arrive → Datou reacts (sniff/dig/alert animation) → **shared moment** (+bond, diary-worthy).
-  2. _Player-led:_ you walk toward something; if Datou is bonded enough it notices your heading and converges (the "glance back / follow your lead" behaviour — the _lead_ verb).
-- **The reaction is the payoff**, not a collectible. Some POIs yield a tiny tangible (a "treasure" Datou digs up that appears at the home post) to give the daily ritual a visible souvenir, but the felt reward is _we noticed this together._
-- **Daily gate:** the richer explore beat runs **once per real-world day** (Sprint 2) — scarcity that makes it a ritual, not a grind.
+`bond.level` (the public level, the unlock gate) = a weighted sum of the four.
+Today `Bond.ts` already routes each `BondReason` to a base amount; promoting it
+to track the four sub-totals is **additive and non-breaking** (the public level
+and unlock thresholds are unchanged) and is what the diary (§F6) and drift (§F5)
+consume to characterise _how_ a player bonds, not just _how much_.
+
+### F3 — Explore mode & shared discovery (environment exploration) — _partially implemented_
+
+Promotes the existing `explore` mode from "Datou picks a path, you watch" into a **shared-attention** mechanic. **This is the fix for "the gameplay had nothing to do with the scene":** before, the _Curious_ want pointed Datou at a random empty point, so the want loop ignored the actual park. It now points at a **real POI**.
+
+**Built (`src/game/pois.ts`, `src/game/Poi.ts`, wired in `Companion`/`Game`):**
+
+- **Procedural POIs** placed deterministically across the park from a template library — `sniff-spot`, `shiny-thing`, `butterfly`, `puddle`, `burrow`, `berry-bush`, `scent-trail`. Lightweight `THREE.Group` markers (a faint ground ring + a kind accent); no new geometry pipeline.
+- **Reward density (the _Mario Odyssey_ lesson).** ~40 POIs, **clustered near each landmark** (arrival is rewarded) and **scattered through the connective grassland** (the walk between landmarks pays off too), avoiding colliders/water/spawn. Goal: "a meaningful discovery every few steps," not a sparse fetch-quest.
+- **Datou-led discovery (the keystone link).** A _Curious_ want (F1) selects the **nearest undiscovered POI** within range and Datou tells toward it. You follow → you **arrive together** (`POI_REACH_DIST`) → the marker plays its reveal, Datou reacts, and the **Shared Memory Density** vector gets the `discovery` bond. This is the inner "Companion Action Loop" closing on a real scene element.
+- **Landmark / zone-aware wants.** The Companion tracks how long the player has spent in each zone and biases _Curious_ want selection toward POIs in **under-visited zones**, so wants actively pull exploration toward fresh ground (toward the Big Oak / lake / grove you haven't seen yet).
+
+**Still to build:**
+
+- _Player-led_ convergence: you head somewhere and a bonded Datou notices and converges (the "glance back / follow your lead" `lead` verb).
+- **Souvenirs:** some POIs yield a tiny tangible (a "treasure" at the home post) so the daily ritual has a visible memento. The felt reward stays _we noticed this together._
+- **Daily gate:** the richer explore beat runs **once per real-world day** (needs `Storage.ts`) — scarcity that makes it a ritual, not a grind.
 
 This is where the most _diary-worthy_ moments are generated (§F6), so explore and character are tightly coupled.
 
@@ -132,9 +168,14 @@ A gentle **streak** notion exists only as flavor in the diary ("third morning in
 Datou is an _individual_, and _your_ Datou diverges from everyone else's over a week — README hypothesis #3, Roadmap Sprint 4.
 
 - **Moods** (existing 4-state enum) remain the moment-to-moment surface, driven by recent interaction (already in `PlaceholderPhysics.updateMood`). Keep them numberless and animation-expressed (tail wag speed, head bob — already in `Datou.apply`).
-- **Two archetypes** (Roadmap Sprint 4): **Adventurer** (favors exploration, initiates POIs sooner, restless idle) vs **Cuddler** (favors proximity, wants attention more, settles at your feet sooner).
-- **Drift, not switch:** a **7-day rolling window** of _how you actually played_ nudges Datou toward an archetype. Lots of exploring → Adventurer; lots of petting/standing together → Cuddler. No instant flips; the change is felt over days.
-- Personality biases **want frequency** (F1), **POI selection** (F3), small **verb traits** (`INTERACTION_VERBS.md` §5: favourite pet spot, call-eagerness, lead-readiness), and the **~90-bond signature habit** (F2) — so the same systems express personality without new mechanics.
+- **Four perceivable axes (from the research), not raw traits.** Rather than expose Big-Five numbers, Datou drifts along four axes a player can actually _feel_:
+  - **Explorer ↔ Guardian** — pulls you toward new ground vs checks you're keeping up.
+  - **Lively ↔ Calm** — rushes at novelty vs pauses to observe first.
+  - **Dependent ↔ Independent** — seeks comfort often vs tries things itself first.
+  - **Playful ↔ Restrained** — initiates play beats vs settles quietly.
+  - (The old Adventurer/Cuddler archetypes are just the corners of the Explorer and Dependent axes — kept as shorthand.)
+- **Drift, not switch:** a **7-day rolling window** of _how you actually played_ nudges each axis. Lots of leading Datou to POIs → Explorer/Lively; lots of petting/standing together → Dependent/Calm. No instant flips; the change is felt over days. The research is explicit that **long-term identifiability beats performative randomness** — your Datou should be recognisably itself.
+- **Implementation:** the safe pattern from the research is **personality weights + situational (utility) scoring + behaviour-tree branching** — the tree gives macro structure, utility scoring picks "which action fits right now" under the current axes. The axes bias **want frequency** (F1), **POI selection** (F3 — e.g. an Explorer pulls toward farther/unseen POIs sooner), small **verb traits** (`INTERACTION_VERBS.md` §5), and the **~90-bond signature habit** (F2) — so the same systems express personality without new mechanics.
 
 ### F6 — AI daily diary (character — the "uniquely yours" payoff)
 
@@ -260,3 +301,33 @@ Each sprint still ends in a playable demo — the doc's loop degrades gracefully
 3. **"?" bubble default:** ON for everyone first session, or only when a "needs help" heuristic triggers? (Recommend: ON first session, auto-dims.)
 4. **Diary LLM:** confirm model + whether generation is client-side (key exposure risk) or via a tiny serverless endpoint. (Likely serverless even for the prototype.)
 5. **Bond visibility:** truly never numeric, or a soft "heart that fills" for legibility? (Recommend: never numeric — behavioural unlocks only, per the README hypothesis.)
+
+---
+
+## 8. The three nested loops & retention cadence (from the research)
+
+The research frames the whole experience as a **Companion Diorama** built from three nested loops. Our F-features slot cleanly into them — this is the macro-structure the §1 core loop expands into:
+
+- **Companion Action Loop (seconds–minutes).** Spot a tell → read Datou's state → respond → complete the action together → immediate feedback. **= F1 (wants) + the pet/play verbs.** Already running.
+- **Scene Exploration Loop (a session, 20–40 min).** Enter the park → a want or your own heading surfaces a POI → reach it together → bring back a memory/souvenir. **= F3 (POIs) + the want→explore link.** Now wired (the curious-want → real POI → discovery moment).
+- **Relationship Season Loop (days–weeks).** Accumulated play shifts Datou's **personality axes (F5)**, fills the **diary archive (F6)**, deepens **bond unlocks (F2)**, and (later) changes scene permissions and the home base. **= F2 + F5 + F6 + the daily ritual (F4).**
+
+**Four reasons to "come back and see"** (the research's retention taxonomy), mapped to our roadmap:
+
+| Return cadence  | Driver                                                   | Our feature                              |
+| --------------- | -------------------------------------------------------- | ---------------------------------------- |
+| **Daily**       | greeting, today's POIs, a short want loop                | F4 greeting + F3 daily explore beat      |
+| **Weekly**      | a rhythm/play activity, a time-limited exploration       | F1 play beats + rotating POI templates   |
+| **Seasonal**    | weather/ecology changes the scene's meaning              | `ENVIRONMENT_DESIGN.md` seasonal clock   |
+| **Relationship**| Datou remembers, changed, responds to you in a new way   | F5 drift + F6 diary + F2 unlocks         |
+
+The prototype's job is **not** to maximise single-session length but to ensure **every login leaves a new, recallable relationship trace** (a discovery, a diary line, a newly-unlocked habit).
+
+## 9. Ethics & commercialization boundaries (hard constraints)
+
+The companion-robot literature is consistent that attachment is real and can both comfort and create dependency. These are **design constraints, not suggestions**:
+
+- **Gentle recall, never decay or guilt.** No "neglect-punishes-your-pet" meter, no withering, no bond loss for missing a want (already true in F1). Absence is met with a _warmer_ greeting, never a reproach.
+- **Proactivity is bounded and user-controllable.** Wants have a readable wind-up and expire quietly; the long-term plan includes **adjustable proactivity, do-not-disturb periods, and editable/erasable memory fields** (matters once the diary/telemetry land).
+- **Never monetize the relationship.** The prototype is **zero-monetization**. If commercialized later, only **cosmetics, seasonal packs, base decorations, album templates, postcard styles** are acceptable — never "restore neglect," "recover a missed storyline," or "remove separation anxiety."
+- **The robot is a _supplementary_ partner, not a fake dog.** Per the HRI research, lean into Datou's robot-ness (its unique capability cues) rather than pretending it's a perfect electronic dog — that honesty is part of the character (F5).

@@ -1,5 +1,8 @@
 import type { DatouMode, DatouState } from '../physics/PhysicsAdapter';
 import { Bond } from './Bond';
+import { POI_REACH_DIST, type PoiData, type PoiField } from './pois';
+import type { ZoneId } from './zones';
+import { zoneAt, ZONES } from './zones';
 
 /**
  * Companion — Datou's "brain" for the want/read loop (docs/GAMEPLAY_DESIGN.md
@@ -31,6 +34,13 @@ export type Expression =
 export interface CompanionActions {
   setMode(mode: DatouMode): void;
   setTarget(x: number, z: number): void;
+  /**
+   * Optional: the player + Datou reached a real POI together. The game reveals
+   * the marker, plays Datou's reaction, and grants a "discovery" bond moment.
+   * This is the hook that ties the want loop to the actual scene (F3 / the
+   * research doc's Scene Exploration Loop).
+   */
+  onDiscover?(poi: PoiData): void;
 }
 
 interface Vec2 {
@@ -44,6 +54,9 @@ interface ActiveWant {
   kind: WantKind;
   /** For a curious want, the point of interest Datou is drawn toward. */
   poi?: Vec2;
+  /** The real POI this want points at, when it's anchored to one (vs a fallback
+   *  empty point in the rare case no POI is in range). */
+  poiData?: PoiData;
 }
 
 export class Companion {
@@ -56,20 +69,43 @@ export class Companion {
   private static readonly COOLDOWN = 2.5;
   /** Player within this distance counts as "near" for proximity + responses. */
   private static readonly NEAR_DIST = 3.2;
+  /** How far Datou will look for a real POI to be curious about. POIs further
+   *  than this are too far to lead the player to in one want window. */
+  private static readonly CURIOUS_SEARCH_DIST = 40;
+  /** Min seconds between bond-granting investigates, so clicking can't farm it. */
+  private static readonly INVESTIGATE_COOLDOWN = 4;
 
   private phase: Phase = 'rest';
   private timer: number;
   private want: ActiveWant | null = null;
   private expressionState: Expression = { kind: 'none' };
+  private investigateCooldown = 0;
 
   private readonly bond: Bond;
   private readonly actions: CompanionActions;
   private readonly rand: () => number;
+  /** Real POIs in the park. Optional so the want loop still runs (with random
+   *  curious points) when no field is supplied (e.g. in unit tests). */
+  private readonly pois: PoiField | null;
+  /** Seconds the player has spent in each zone this session — drives the
+   *  landmark/zone-aware want bias (under-visited zones are pulled toward). */
+  private readonly zoneTime: Record<ZoneId, number> = {
+    meadow: 0,
+    woods: 0,
+    lake: 0,
+    grove: 0,
+  };
 
-  constructor(bond: Bond, actions: CompanionActions, rand: () => number = Math.random) {
+  constructor(
+    bond: Bond,
+    actions: CompanionActions,
+    rand: () => number = Math.random,
+    pois: PoiField | null = null,
+  ) {
     this.bond = bond;
     this.actions = actions;
     this.rand = rand;
+    this.pois = pois;
     this.timer = this.restDuration();
   }
 
@@ -83,6 +119,34 @@ export class Companion {
     return this.phase === 'active' || this.phase === 'windup' ? (this.want?.kind ?? null) : null;
   }
 
+  /** The POI id the current curious want points at, or null. Lets the renderer
+   *  highlight exactly the marker Datou is interested in. */
+  get activePoiId(): number | null {
+    return this.activeWant === 'curious' ? (this.want?.poiData?.id ?? null) : null;
+  }
+
+  /**
+   * Player-initiated: send Datou over to investigate a point in the world (a
+   * named feature the player clicked). Cancels any active want, steers Datou
+   * there via the explore lever, and grants a small "examined it together"
+   * bond — turning a click on the scenery into a shared moment. Returns the
+   * bond actually granted (0 if a recent investigate is still on cooldown, so
+   * spamming clicks can't farm bond).
+   */
+  investigate(x: number, z: number): number {
+    if (this.investigateCooldown > 0) {
+      // Still steer Datou (responsive feel), but don't grant bond again.
+      this.actions.setMode('explore');
+      this.actions.setTarget(x, z);
+      return 0;
+    }
+    this.investigateCooldown = Companion.INVESTIGATE_COOLDOWN;
+    if (this.phase === 'active' || this.phase === 'windup') this.endWant();
+    this.actions.setMode('explore');
+    this.actions.setTarget(x, z);
+    return this.bond.add('discovery');
+  }
+
   /**
    * Advance the want machine one frame.
    * @param datou  Datou's current state (position/mood/velocity).
@@ -92,6 +156,10 @@ export class Companion {
    */
   update(datou: DatouState, player: Vec2, petted: boolean, dt: number): void {
     const near = this.distTo(datou.position, player) <= Companion.NEAR_DIST;
+
+    // Track where the player spends time so wants can pull toward fresh ground.
+    this.zoneTime[zoneAt(player.x, player.z).id] += dt;
+    if (this.investigateCooldown > 0) this.investigateCooldown -= dt;
 
     // Passive companionship: being near trickles bond regardless of wants.
     if (near) this.bond.proximity(dt);
@@ -138,12 +206,38 @@ export class Companion {
   // --- want lifecycle ---
 
   private beginWant(datou: DatouState): void {
-    this.want = { kind: this.pickWant() };
-    if (this.want.kind === 'curious') {
-      this.want.poi = this.pickCuriousPoint(datou);
+    const kind = this.pickWant();
+    this.want = { kind };
+    if (kind === 'curious') {
+      // Anchor the curious want on a REAL nearby undiscovered POI when one is
+      // in range — this is what makes the want loop about the actual park. The
+      // zone-time bias gently prefers POIs in under-visited zones so wants pull
+      // exploration toward fresh ground (landmark/zone-aware wants). Fall back
+      // to a random nearby point only when there's no POI to head for.
+      const poiData = this.pois?.nearestUndiscovered(
+        datou.position.x,
+        datou.position.z,
+        Companion.CURIOUS_SEARCH_DIST,
+        (zone) => this.zoneFreshness(zone),
+      );
+      if (poiData) {
+        this.want.poiData = poiData;
+        this.want.poi = { x: poiData.x, z: poiData.z };
+      } else {
+        this.want.poi = this.pickCuriousPoint(datou);
+      }
     }
     this.phase = 'windup';
     this.timer = Companion.WINDUP;
+  }
+
+  /** A zone's "freshness" in [0,1]: 1 = least-visited this session, 0 = most.
+   *  Drives the curious-want bias toward unexplored ground. */
+  private zoneFreshness(zone: ZoneId): number {
+    let max = 0;
+    for (const z of ZONES) max = Math.max(max, this.zoneTime[z.id]);
+    if (max <= 0) return 0.5; // nothing visited yet — neutral
+    return 1 - this.zoneTime[zone] / max;
   }
 
   /**
@@ -204,11 +298,16 @@ export class Companion {
         // Engage the bow with a pet (a throw/fetch also counts, wired later).
         return petted;
       case 'curious': {
-        // Follow the gaze: move toward the POI side, ending up nearer it.
         const poi = this.want.poi!;
+        if (this.want.poiData) {
+          // Anchored on a real POI: success is the player ARRIVING at it (the
+          // shared moment), not merely stepping past Datou. Reaching it fires
+          // the discovery in satisfy().
+          return this.distTo(player, poi) <= POI_REACH_DIST;
+        }
+        // Fallback (no real POI): follow the gaze — end up nearer it than Datou.
         const playerToPoi = this.distTo(player, poi);
         const datouToPoi = this.distTo(datou.position, poi);
-        // Player has walked out toward the POI (past Datou, roughly).
         return playerToPoi < datouToPoi - 1;
       }
     }
@@ -218,9 +317,17 @@ export class Companion {
     if (this.want) {
       this.bond.add(`want-${this.want.kind}` as const);
       if (this.want.kind === 'curious' && this.want.poi) {
-        // Lead the shared approach: send Datou to the POI (explore lever).
+        // Lead the shared approach: send Datou to the POI (explore lever) so it
+        // trots over to react where you arrived.
         this.actions.setMode('explore');
         this.actions.setTarget(this.want.poi.x, this.want.poi.z);
+        // A real POI reached together is a discovery moment: mark it found, let
+        // the game play Datou's reaction, and grant the bigger "discovery"
+        // bond — the heart of the Scene Exploration Loop.
+        if (this.want.poiData) {
+          this.bond.add('discovery');
+          this.actions.onDiscover?.(this.want.poiData);
+        }
       }
     }
     this.endWant();
