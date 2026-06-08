@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { DatouMood, PhysicsAdapter } from '../physics/PhysicsAdapter';
+import { Particles } from './ambient/Particles';
+import { Wind } from './ambient/Wind';
 import { CameraRig } from './CameraRig';
 import { Datou } from './Datou';
 import { Input } from './Input';
@@ -25,6 +27,9 @@ export class Game {
   private readonly datou: Datou;
   private readonly input: Input;
   private readonly physics: PhysicsAdapter;
+  private readonly wind = new Wind();
+  private readonly particles = new Particles();
+  private sun!: THREE.DirectionalLight;
 
   private readonly moodEl: HTMLElement | null;
   private lastTime = 0;
@@ -53,6 +58,8 @@ export class Game {
     this.setupLights();
 
     this.world = new World();
+    // Make the park's foliage sway in the shared wind shader.
+    for (const mat of this.world.getSwayMaterials()) this.wind.apply(mat);
     this.player = new Player();
     this.player.setColliders(this.world.getColliders());
     // Let the physics backend collide Datou with the scene too. The MuJoCo
@@ -65,6 +72,7 @@ export class Game {
     this.scene.add(this.world.group);
     this.scene.add(this.player.group);
     this.scene.add(this.datou.group);
+    this.scene.add(this.particles.points);
 
     this.moodEl = document.getElementById('mood-tag');
 
@@ -94,23 +102,32 @@ export class Game {
   }
 
   private setupLights(): void {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    // Warm afternoon grade (docs/ENVIRONMENT_DESIGN.md §4.2): a slightly warm
+    // ambient + a warm low sun + a sky/ground hemi. Cheap, and colour does most
+    // of the cozy emotional work.
+    const ambient = new THREE.AmbientLight(0xfff1d8, 0.55);
     this.scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xffe8b8, 0.95);
-    sun.position.set(12, 18, 6);
+    const sun = new THREE.DirectionalLight(0xffe0a8, 1.05);
+    sun.position.set(40, 60, 22);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -28;
-    sun.shadow.camera.right = 28;
-    sun.shadow.camera.top = 28;
-    sun.shadow.camera.bottom = -28;
+    sun.shadow.mapSize.set(2048, 2048);
+    // Tight shadow frustum that FOLLOWS the player (see tick) — at 500 m we keep
+    // it small for crisp near shadows and let distant geometry fog out, rather
+    // than covering the whole park (which would collapse shadow resolution).
+    const s = 36;
+    sun.shadow.camera.left = -s;
+    sun.shadow.camera.right = s;
+    sun.shadow.camera.top = s;
+    sun.shadow.camera.bottom = -s;
     sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 60;
+    sun.shadow.camera.far = 200;
     sun.shadow.bias = -0.0005;
     this.scene.add(sun);
+    this.scene.add(sun.target); // target is moved to the player each frame
+    this.sun = sun;
 
-    const hemi = new THREE.HemisphereLight(0xc9e8ff, 0x6ba35a, 0.3);
+    const hemi = new THREE.HemisphereLight(0xcfeaff, 0x6ba35a, 0.35);
     this.scene.add(hemi);
   }
 
@@ -134,6 +151,17 @@ export class Game {
     const state = this.physics.getDatouState();
     this.datou.apply(state);
     this.updateMoodHUD(state.mood);
+
+    // Ambient life: sway the foliage and drift the motes with the player.
+    this.wind.update(dt);
+    this.particles.update(dt, this.player.position);
+
+    // Keep the shadow-casting sun centred on the player so its tight frustum
+    // gives crisp shadows wherever you roam in the 500 m park. The light keeps
+    // its direction (offset) and aims at the player's feet.
+    this.sun.position.set(this.player.position.x + 40, 60, this.player.position.z + 22);
+    this.sun.target.position.set(this.player.position.x, 0, this.player.position.z);
+    this.sun.target.updateMatrixWorld();
 
     this.cameraRig.update(this.player.position, dt);
     this.renderer.render(this.scene, this.cameraRig.camera);

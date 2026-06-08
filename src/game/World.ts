@@ -164,6 +164,8 @@ export function getParkColliders(): Collider[] {
 export class World {
   readonly group = new THREE.Group();
   private readonly colliders: Collider[] = getParkColliders();
+  /** Foliage materials that should sway in the wind (filled during build). */
+  private readonly swayMaterials: THREE.Material[] = [];
 
   constructor() {
     this.buildGround();
@@ -183,6 +185,12 @@ export class World {
    */
   getColliders(): readonly Collider[] {
     return this.colliders;
+  }
+
+  /** Foliage materials the wind system should animate (grass, fern, reed,
+   *  pine). Game wires these into the shared Wind shader after construction. */
+  getSwayMaterials(): readonly THREE.Material[] {
+    return this.swayMaterials;
   }
 
   private buildGround(): void {
@@ -329,6 +337,7 @@ export class World {
   private buildTrees(): void {
     const pine = pineGeometry();
     this.group.add(instanced(pine.geo, pine.mat, TREES));
+    this.swayMaterials.push(pine.mat); // tips sway gently in the wind
   }
 
   /** Non-blocking scattered foliage: ferns/grass in green zones, reeds by the
@@ -394,6 +403,8 @@ export class World {
     this.group.add(instanced(rd.geo, rd.mat, reed, false));
     const rk = rockGeometry();
     this.group.add(instanced(rk.geo, rk.mat, rock));
+    // Grass, ferns, and reeds bend in the wind; rocks don't.
+    this.swayMaterials.push(g.mat, f.mat, rd.mat);
 
     // A handful of mushroom accents in the woods (Groups — few enough).
     for (let i = 0; i < 18; i++) {
