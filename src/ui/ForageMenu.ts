@@ -80,6 +80,11 @@ export class ForageMenu {
   }
 
   private render(): void {
+    // Preserve scroll position: render() rebuilds the whole panel (and is
+    // called on a 0.5s tick while Datou works), so without this the list
+    // jumps back to the top every refresh as the user scrolls.
+    const prevScroll =
+      this.root.querySelector<HTMLDivElement>('.forage-list')?.scrollTop ?? 0;
     this.root.replaceChildren();
 
     const head = div('panel-head');
@@ -162,6 +167,7 @@ export class ForageMenu {
       list.append(row);
     }
     this.root.append(list);
+    if (prevScroll > 0) list.scrollTop = prevScroll;
     applyStaticI18n(this.root);
   }
 }
