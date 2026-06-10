@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CLEARINGS } from './landmarks';
 import { KIND_DEFS, LAKE, kindDef, scatterPickables, scatterStatic } from './scatter';
 import { WORLD_HALF, zoneAt } from './zones';
 
@@ -43,6 +44,30 @@ describe('world scatter', () => {
     const pines = statics.filter((i) => i.kind === 'pine');
     const inWoods = pines.filter((i) => zoneAt(i.x, i.z).id === 'woods').length;
     expect(inWoods / pines.length).toBeGreaterThan(0.7);
+  });
+
+  it('keeps landmark activity rings clear of all scatter (reed screens stay)', () => {
+    const all = [...scatterStatic(1), ...scatterPickables(2)];
+    for (const c of CLEARINGS.filter((c) => c.density === 0)) {
+      for (const inst of all) {
+        if (inst.kind === 'reed') continue; // the pump garden's concealment
+        expect(Math.hypot(inst.x - c.x, inst.z - c.z), inst.id).toBeGreaterThanOrEqual(c.r);
+      }
+    }
+  });
+
+  it('damps scatter density in the landmark approach rings', () => {
+    // Same seed with and without clearings: the damped annulus thins out.
+    const damped = [...scatterStatic(1), ...scatterPickables(2)];
+    const baseline = [...scatterStatic(1, []), ...scatterPickables(2, [])];
+    const inRing = (list: typeof damped, c: (typeof CLEARINGS)[number]): number =>
+      list.filter((i) => Math.hypot(i.x - c.x, i.z - c.z) < c.r).length;
+    for (const c of CLEARINGS.filter((c) => c.density > 0)) {
+      const before = inRing(baseline, c);
+      const after = inRing(damped, c);
+      expect(before).toBeGreaterThan(40); // the ring isn't empty to begin with
+      expect(after).toBeLessThan(before * (c.density + 0.25));
+    }
   });
 
   it('ids are unique and every kind has a definition', () => {

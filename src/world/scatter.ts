@@ -11,6 +11,7 @@
  */
 
 import { Rng } from '../physics/mujoco/rng';
+import { CLEARINGS, type Clearing } from './landmarks';
 import { WORLD_HALF, ZONES, zoneAt, type ZoneId } from './zones';
 
 export type ScatterKind =
@@ -230,8 +231,14 @@ export interface ScatterInstance {
 /** The lake water disc (no walking, no scatter except reeds at the rim). */
 export const LAKE = { x: 30, z: 165, radius: 52 };
 
-/** Keep the home pad and paths clear; respect the lake. */
-function placeable(kind: KindDef, x: number, z: number): boolean {
+/** Keep the home pad and paths clear; respect the lake and authored hearts. */
+function placeable(
+  kind: KindDef,
+  x: number,
+  z: number,
+  rng: Rng,
+  clearings: readonly Clearing[],
+): boolean {
   const r = Math.hypot(x, z);
   if (r > WORLD_HALF - 8) return false;
   // The pad and the very center stay clear; big props stay out of the glade,
@@ -240,6 +247,16 @@ function placeable(kind: KindDef, x: number, z: number): boolean {
   const lakeD = Math.hypot(x - LAKE.x, z - LAKE.z);
   if (kind.kind === 'reed') return lakeD > LAKE.radius - 2 && lakeD < LAKE.radius + 9;
   if (lakeD < LAKE.radius + (kind.collider > 0 ? 3 : 1)) return false;
+  // Landmark clearings: the activity ring stays clear so authored compositions
+  // never compete with generic scatter; the approach ring is damped (§5).
+  // (Reeds returned above on purpose — the lake-rim reed band IS the pump
+  // garden's concealment screen, per the plan.)
+  for (const c of clearings) {
+    if (Math.hypot(x - c.x, z - c.z) >= c.r) continue;
+    if (c.density <= 0) return false;
+    if (rng.next() >= c.density) return false;
+    break; // honour only the innermost containing circle
+  }
   return true;
 }
 
@@ -260,10 +277,14 @@ function samplePoint(rng: Rng, zoneId: ZoneId): { x: number; z: number } {
 /**
  * Scatter the static flora/furniture (world-seeded) — same forever.
  */
-export function scatterStatic(worldSeed: number): ScatterInstance[] {
+export function scatterStatic(
+  worldSeed: number,
+  clearings: readonly Clearing[] = CLEARINGS,
+): ScatterInstance[] {
   return scatter(
     worldSeed,
     KIND_DEFS.filter((k) => !k.pickable),
+    clearings,
   );
 }
 
@@ -271,14 +292,22 @@ export function scatterStatic(worldSeed: number): ScatterInstance[] {
  * Scatter today's pickable resources (daily-seeded) — gathering renews
  * each morning, in fresh places.
  */
-export function scatterPickables(dailySeed: number): ScatterInstance[] {
+export function scatterPickables(
+  dailySeed: number,
+  clearings: readonly Clearing[] = CLEARINGS,
+): ScatterInstance[] {
   return scatter(
     dailySeed ^ 0x9e3779b9,
     KIND_DEFS.filter((k) => k.pickable),
+    clearings,
   );
 }
 
-function scatter(seed: number, kinds: readonly KindDef[]): ScatterInstance[] {
+function scatter(
+  seed: number,
+  kinds: readonly KindDef[],
+  clearings: readonly Clearing[] = CLEARINGS,
+): ScatterInstance[] {
   const rng = new Rng(seed);
   const out: ScatterInstance[] = [];
   for (const kind of kinds) {
@@ -304,7 +333,7 @@ function scatter(seed: number, kinds: readonly KindDef[]): ScatterInstance[] {
         } else {
           p = samplePoint(rng, zoneId);
         }
-        if (!placeable(kind, p.x, p.z)) continue;
+        if (!placeable(kind, p.x, p.z, rng, clearings)) continue;
         // Meadow samples that landed inside a named zone are rejected so the
         // per-zone densities stay meaningful.
         if (zoneId === 'meadow' && zoneAt(p.x, p.z).id !== 'meadow') continue;
