@@ -14,7 +14,7 @@ import { applyStaticI18n, onLangChange, t, tDyn } from '../i18n';
 import type { Backpack } from '../game/Backpack';
 import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { Bench, type Outcome } from '../game/workshop/bench';
-import { itemSprite } from '../game/workshop/sprites';
+import { itemSpriteUrl } from '../game/workshop/sprites';
 import { parseItemId } from '../game/workshop/items';
 import { itemName } from '../game/workshop/items';
 import { MATERIAL_IDS, type MaterialId } from '../game/workshop/materials';
@@ -37,6 +37,20 @@ export interface WorkshopCallbacks {
 type Tab = 'bench' | 'tree' | 'notebook';
 
 const STYLE_ID = 'workshop-style';
+const DRAG_THRESHOLD = 6;
+
+interface MaterialDrag {
+  readonly pointerId: number;
+  readonly mat: MaterialId;
+  readonly source: HTMLButtonElement;
+  readonly ghost: HTMLDivElement;
+  readonly startX: number;
+  readonly startY: number;
+  readonly visited: Set<number>;
+  active: boolean;
+  hover: HTMLButtonElement | null;
+  pressTimer: number | null;
+}
 
 export class Workshop {
   private readonly root: HTMLDivElement;
@@ -46,7 +60,7 @@ export class Workshop {
 
   private tab: Tab = 'bench';
   private open = false;
-  private selectedMat: MaterialId | null = null;
+  private drag: MaterialDrag | null = null;
   private cells: HTMLButtonElement[] = [];
   private resultCard!: HTMLDivElement;
   private stripEl!: HTMLDivElement;
@@ -66,7 +80,7 @@ export class Workshop {
     // Keep the material strip live as the pack changes (e.g. Datou delivers a
     // forage haul, W6) while the window is open on the bench.
     backpack.onChange(() => {
-      if (this.open && this.tab === 'bench') this.refreshStrip();
+      if (this.open && this.tab === 'bench' && !this.drag) this.refreshStrip();
     });
   }
 
@@ -83,6 +97,7 @@ export class Workshop {
 
   hide(): void {
     if (!this.open) return;
+    this.finishMaterialDrag();
     this.open = false;
     this.root.hidden = true;
     // Refund anything left on the bench — nothing is ever lost on close.
@@ -168,7 +183,7 @@ export class Workshop {
       const cell = document.createElement('button');
       cell.type = 'button';
       cell.className = 'ws-cell';
-      cell.addEventListener('click', () => this.tapCell(i));
+      cell.dataset.cell = String(i);
       cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         this.removeFromCell(i);
@@ -198,15 +213,15 @@ export class Workshop {
     this.refreshResult();
   }
 
-  private tapCell(i: number): void {
-    if (!this.selectedMat) return;
-    if (this.bench.cellMaterial(i) && this.bench.cellMaterial(i) !== this.selectedMat) return;
-    if (!this.cb.takeOne(this.selectedMat)) return; // none left in pack
-    if (!this.bench.place(i, this.selectedMat)) {
-      this.cb.onRefund([this.selectedMat]); // cell full — give it back
-      return;
+  private placeInCell(i: number, mat: MaterialId): boolean {
+    if (this.bench.cellMaterial(i) && this.bench.cellMaterial(i) !== mat) return false;
+    if (!this.cb.takeOne(mat)) return false;
+    if (!this.bench.place(i, mat)) {
+      this.cb.onRefund([mat]);
+      return false;
     }
-    this.afterBenchChange();
+    this.afterBenchChange(false);
+    return true;
   }
 
   private removeFromCell(i: number): void {
@@ -217,9 +232,9 @@ export class Workshop {
     }
   }
 
-  private afterBenchChange(): void {
+  private afterBenchChange(refreshStrip = true): void {
     this.refreshCells();
-    this.refreshStrip();
+    if (refreshStrip) this.refreshStrip();
     this.refreshResult();
   }
 
@@ -261,7 +276,6 @@ export class Workshop {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'ws-mat';
-      b.classList.toggle('sel', this.selectedMat === mat);
       b.title = tDyn(`material.${mat}`);
       const img = document.createElement('img');
       img.src = matIcon(mat);
@@ -269,28 +283,109 @@ export class Workshop {
       const n = div('ws-mat-count');
       n.textContent = `×${this.cb.count(mat)}`;
       b.append(img, n);
-      b.addEventListener('click', () => {
-        this.selectedMat = this.selectedMat === mat ? null : mat;
-        this.refreshStrip();
-      });
       // Right-click / long-press a material → send Datou to forage for it (§7).
       b.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         this.cb.onPinForage(mat);
       });
-      let pressTimer: number | null = null;
-      b.addEventListener('pointerdown', () => {
-        pressTimer = window.setTimeout(() => this.cb.onPinForage(mat), 550);
-      });
-      const clearPress = (): void => {
-        if (pressTimer !== null) window.clearTimeout(pressTimer);
-        pressTimer = null;
-      };
-      b.addEventListener('pointerup', clearPress);
-      b.addEventListener('pointerleave', clearPress);
+      b.addEventListener('pointerdown', (e) => this.startMaterialDrag(e, mat, b));
+      b.addEventListener('pointermove', (e) => this.moveMaterialDrag(e));
+      b.addEventListener('pointerup', (e) => this.endMaterialDrag(e));
+      b.addEventListener('pointercancel', (e) => this.endMaterialDrag(e));
       b.title = `${tDyn(`material.${mat}`)} · ${t('workshop.pinForage')}`;
       this.stripEl.append(b);
     }
+  }
+
+  private startMaterialDrag(e: PointerEvent, mat: MaterialId, source: HTMLButtonElement): void {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    this.finishMaterialDrag();
+
+    const ghost = div('ws-drag-ghost');
+    ghost.hidden = true;
+    const img = document.createElement('img');
+    img.src = matIcon(mat);
+    img.alt = '';
+    ghost.append(img);
+    this.root.append(ghost);
+
+    this.drag = {
+      pointerId: e.pointerId,
+      mat,
+      source,
+      ghost,
+      startX: e.clientX,
+      startY: e.clientY,
+      visited: new Set(),
+      active: false,
+      hover: null,
+      pressTimer: window.setTimeout(() => {
+        if (!this.drag || this.drag.pointerId !== e.pointerId || this.drag.active) return;
+        this.cb.onPinForage(mat);
+        this.finishMaterialDrag();
+      }, 550),
+    };
+    source.setPointerCapture(e.pointerId);
+  }
+
+  private moveMaterialDrag(e: PointerEvent): void {
+    const drag = this.drag;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const distance = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+    if (!drag.active && distance < DRAG_THRESHOLD) return;
+    if (!drag.active) {
+      drag.active = true;
+      drag.source.classList.add('dragging');
+      drag.ghost.hidden = false;
+      this.clearPressTimer(drag);
+    }
+    e.preventDefault();
+    drag.ghost.style.transform = `translate(${e.clientX + 12}px, ${e.clientY + 12}px)`;
+    this.paintDragAt(e.clientX, e.clientY);
+  }
+
+  private endMaterialDrag(e: PointerEvent): void {
+    const drag = this.drag;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    if (drag.active && e.type === 'pointerup') this.paintDragAt(e.clientX, e.clientY);
+    this.finishMaterialDrag();
+  }
+
+  private paintDragAt(x: number, y: number): void {
+    const drag = this.drag;
+    if (!drag) return;
+    const target = document.elementFromPoint(x, y);
+    const cell = target?.closest<HTMLButtonElement>('.ws-cell') ?? null;
+    if (drag.hover !== cell) {
+      drag.hover?.classList.remove('drag-over');
+      drag.hover = cell && this.root.contains(cell) ? cell : null;
+      drag.hover?.classList.add('drag-over');
+    }
+    if (!drag.hover) return;
+    const i = Number(drag.hover.dataset.cell);
+    if (!Number.isInteger(i) || drag.visited.has(i)) return;
+    drag.visited.add(i);
+    this.placeInCell(i, drag.mat);
+  }
+
+  private finishMaterialDrag(): void {
+    const drag = this.drag;
+    if (!drag) return;
+    this.clearPressTimer(drag);
+    drag.hover?.classList.remove('drag-over');
+    drag.source.classList.remove('dragging');
+    if (drag.source.hasPointerCapture(drag.pointerId)) {
+      drag.source.releasePointerCapture(drag.pointerId);
+    }
+    drag.ghost.remove();
+    this.drag = null;
+    if (this.open && this.tab === 'bench') this.refreshStrip();
+  }
+
+  private clearPressTimer(drag: MaterialDrag): void {
+    if (drag.pressTimer !== null) window.clearTimeout(drag.pressTimer);
+    drag.pressTimer = null;
   }
 
   private refreshResult(): void {
@@ -315,7 +410,7 @@ export class Workshop {
       plate.textContent = '✦';
     } else {
       const img = document.createElement('img');
-      img.src = itemSprite(outcome.id).canvas.toDataURL();
+      img.src = itemSpriteUrl(outcome.id);
       img.alt = '';
       plate.append(img);
     }
@@ -362,7 +457,7 @@ function matIcon(mat: MaterialId): string {
   if (!url) {
     // A material chip: a small plate of the material rendered via its profile,
     // reusing the component family template for a neutral "lump" read.
-    url = itemSprite(`bundle:${mat}:S:plain`).canvas.toDataURL();
+    url = itemSpriteUrl(`bundle:${mat}:S:plain`);
     matIconCache.set(mat, url);
   }
   return url;
@@ -405,6 +500,7 @@ const WORKSHOP_CSS = `
   background:rgba(255,255,255,0.55);box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);transition:transform var(--fast),background var(--fast);}
 .ws-cell:hover{background:rgba(255,255,255,0.9);}
 .ws-cell.filled{background:var(--surface-strong);box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.ws-cell.drag-over{box-shadow:inset 0 0 0 2px var(--accent);background:rgba(255,255,255,0.95);}
 .ws-cell:active{transform:scale(0.96);}
 .ws-cell img{width:78%;height:78%;object-fit:contain;position:absolute;left:11%;top:11%;}
 .ws-stack{position:absolute;right:6px;bottom:5px;font-size:11px;font-weight:600;color:var(--text-secondary);
@@ -417,11 +513,15 @@ const WORKSHOP_CSS = `
 .ws-strip{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:380px;}
 .ws-strip-empty{font-size:12px;color:var(--text-tertiary);padding:10px;}
 .ws-mat{position:relative;width:56px;height:56px;border:none;border-radius:var(--radius-s);cursor:pointer;padding:6px;
-  background:var(--bg);transition:transform var(--fast),box-shadow var(--fast);}
+  background:var(--bg);transition:transform var(--fast),box-shadow var(--fast);touch-action:none;}
 .ws-mat:hover{transform:translateY(-1px);}
-.ws-mat.sel{box-shadow:0 0 0 2px var(--accent);background:var(--surface-strong);}
+.ws-mat.dragging{opacity:0.55;transform:scale(0.96);cursor:grabbing;}
 .ws-mat img{width:100%;height:100%;object-fit:contain;}
 .ws-mat-count{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:600;color:var(--text-secondary);}
+.ws-drag-ghost{position:fixed;left:0;top:0;z-index:2;width:52px;height:52px;padding:5px;border-radius:var(--radius-s);
+  background:var(--surface-strong);box-shadow:var(--shadow-soft);pointer-events:none;will-change:transform;}
+.ws-drag-ghost[hidden]{display:none;}
+.ws-drag-ghost img{width:100%;height:100%;object-fit:contain;}
 
 /* Result easel */
 .ws-result{width:200px;min-height:240px;background:var(--bg);border-radius:var(--radius-m);padding:18px 16px;

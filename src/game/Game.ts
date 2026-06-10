@@ -43,7 +43,6 @@ import { Backpack, type CraftedId, type ResourceId } from './Backpack';
 import { Bond } from './Bond';
 import { CameraRig } from './CameraRig';
 import { Companion, type CompanionEvents, type WantKind } from './Companion';
-import { craft, recipe } from './Crafting';
 import { CROP_KINDS, Farm, MATURE, TEND_RANGE, type CropKind, type PlotState } from './Farm';
 import { Fetch } from './Fetch';
 import { Forage } from './Forage';
@@ -62,6 +61,7 @@ import { rollInspiration, type InspoContext, type Mood } from './workshop/inspir
 import { weatherFor, seasonFor, tintFor } from './workshop/weather';
 import { zoneAt } from '../world/zones';
 import { NodeState } from './workshop/NodeState';
+import { PersonalityModel } from './workshop/personality';
 import { Tools } from './workshop/tools';
 import { Harvest } from './workshop/Harvest';
 import { NODE_DEFS, NODE_PLACEMENTS, type NodePlacement } from './workshop/nodes';
@@ -147,6 +147,7 @@ export class Game {
   private placingItem: string | null = null;
   // Resource nodes & tools (W8).
   private readonly nodeState = new NodeState();
+  private readonly personality = new PersonalityModel();
   private readonly tools = new Tools();
   private readonly harvest: Harvest;
   private readonly nodeVisuals = new Map<string, { cut: Cutout; state: string }>();
@@ -261,7 +262,6 @@ export class Game {
     this.ui = new Console(this.memories, this.backpack, {
       onLeashToggle: () => this.toggleLeash(),
       onUseItem: (id) => this.useItem(id),
-      onCraft: (id) => this.craftItem(id),
     });
     this.ui.setFoundToday(this.spots.foundCount, this.spots.spots.length);
     this.ui.setTrust(this.bond.level / TRUST_FULL);
@@ -436,7 +436,10 @@ export class Game {
   private handleHoldEnd(duration: number): void {
     if (!this.comforting) return;
     this.comforting = false;
-    if (duration >= 0.8) this.events.comforted = true;
+    if (duration >= 0.8) {
+      this.events.comforted = true;
+      this.personality.note('care');
+    }
     if (duration >= COMFORT_MEMORY_SECONDS) {
       this.memories.add({
         ts: Date.now(),
@@ -477,12 +480,6 @@ export class Game {
     this.ui.toast(t('gather.toast', { thing: tDyn(`thing.${kind}`) }));
     void x;
     void z;
-  }
-
-  private craftItem(id: CraftedId): void {
-    if (craft(recipe(id), this.backpack)) {
-      this.ui.toast(tDyn(`thing.${id}`));
-    }
   }
 
   private useItem(id: CraftedId): void {
@@ -643,7 +640,7 @@ export class Game {
       season: seasonFor(now),
       mood,
       bond: this.bond.level,
-      personality: 'balanced', // personality axes land in W7 gating
+      personality: this.personality.axis(),
       tick: this.inspoTickId,
       date: now,
     };
@@ -835,6 +832,7 @@ export class Game {
   private handleForageDeliver(items: string[]): void {
     for (const kind of items) this.backpack.add(kind as ResourceId);
     this.bond.add('discovery', items.length);
+    this.personality.note('work');
     this.physics.applyPet();
     this.datouRig.pulse();
     // Reflect whichever loop is still running (0 when both stand down).
@@ -870,6 +868,7 @@ export class Game {
 
   private handleFetchComplete(): void {
     this.bond.add('play');
+    this.personality.note('play');
     this.physics.applyPet();
     this.datouRig.pulse();
     this.memories.add({
@@ -901,6 +900,7 @@ export class Game {
   private handleDiscover(spot: Spot): void {
     if (!this.spots.markFound(spot.id) && spot.found !== true) return;
     this.world.revealSpot(spot);
+    this.personality.note('explore');
     this.physics.applyPet();
     this.datouRig.pulse();
     this.datouRig.reach();

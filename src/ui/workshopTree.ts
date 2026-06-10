@@ -12,12 +12,55 @@
 import { t, tDyn } from '../i18n';
 import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { FORM_IDS, FORMS, type FormFamily, type FormId } from '../game/workshop/forms';
-import { allItemIds, materialsAcceptedBy, parseItemId, sizesFor, finishesFor, itemId } from '../game/workshop/items';
-import { itemSprite } from '../game/workshop/sprites';
+import {
+  materialsAcceptedBy,
+  parseItemId,
+  isValid,
+  sizesFor,
+  finishesFor,
+  itemId,
+  type ItemId,
+} from '../game/workshop/items';
+import { cachedItemSpriteUrl, itemSpriteUrl } from '../game/workshop/sprites';
 import { EXACT_PATTERNS } from '../game/workshop/patterns';
 import { canonical } from '../game/workshop/pattern';
 
 const FAMILY_ORDER: FormFamily[] = ['component', 'furnishing', 'structure', 'datou', 'keepsake', 'tool'];
+const FORMS_BY_FAMILY = new Map(
+  FAMILY_ORDER.map((family) => [
+    family,
+    FORM_IDS.filter((id) => FORMS[id].family === family),
+  ]),
+);
+const VARIANT_COUNTS = new Map(
+  FORM_IDS.map((form) => [
+    form,
+    materialsAcceptedBy(form).length * sizesFor(form).length * finishesFor(form).length,
+  ]),
+);
+const REPRESENTATIVE_ITEMS = new Map(
+  FORM_IDS.map((form) => {
+    const material = materialsAcceptedBy(form)[0];
+    return [
+      form,
+      itemId({
+        form,
+        material,
+        size: sizesFor(form)[0],
+        finish: finishesFor(form)[0],
+      }),
+    ];
+  }),
+);
+const FAMILY_VARIANT_COUNTS = new Map(
+  FAMILY_ORDER.map((family) => [
+    family,
+    (FORMS_BY_FAMILY.get(family) ?? []).reduce(
+      (total, form) => total + (VARIANT_COUNTS.get(form) ?? 0),
+      0,
+    ),
+  ]),
+);
 
 function div(cls: string): HTMLDivElement {
   const d = document.createElement('div');
@@ -25,32 +68,20 @@ function div(cls: string): HTMLDivElement {
   return d;
 }
 
-/** Variants of a form that the player has made. */
-function madeVariants(state: WorkshopState, form: FormId): string[] {
-  return allItemIds().filter((id) => id.startsWith(form + ':') && state.hasMade(id));
-}
-
-/** Total reachable variants of a form. */
-function variantCount(form: FormId): number {
-  return materialsAcceptedBy(form).length * sizesFor(form).length * finishesFor(form).length;
-}
-
-/** A representative item id for a form (for the silhouette plate). */
-function repItem(form: FormId): string {
-  const mat = materialsAcceptedBy(form)[0];
-  return itemId({ form, material: mat, size: sizesFor(form)[0], finish: finishesFor(form)[0] });
-}
-
 export function renderTree(state: WorkshopState): HTMLDivElement {
   const wrap = div('ws-tree');
+  const madeByForm = groupMadeItems(state.madeIds());
+  const hinted = hintedForms(state);
+  const taughtTiers = taughtFamilyTiers(madeByForm);
+  const pendingSprites: Array<{ img: HTMLImageElement; id: ItemId }> = [];
 
   for (const family of FAMILY_ORDER) {
-    const forms = FORM_IDS.filter((id) => FORMS[id].family === family);
+    const forms = FORMS_BY_FAMILY.get(family) ?? [];
     if (forms.length === 0) continue;
 
     const branch = div('ws-branch');
-    const totalVariants = forms.reduce((n, f) => n + variantCount(f), 0);
-    const madeVariantCount = forms.reduce((n, f) => n + madeVariants(state, f).length, 0);
+    const totalVariants = FAMILY_VARIANT_COUNTS.get(family) ?? 0;
+    const madeVariantCount = forms.reduce((n, form) => n + (madeByForm.get(form)?.length ?? 0), 0);
 
     const head = div('ws-branch-head');
     head.append(document.createTextNode(t(`workshop.family.${family}` as never)));
@@ -64,23 +95,23 @@ export function renderTree(state: WorkshopState): HTMLDivElement {
 
     const items = div('ws-branch-items');
     for (const form of forms) {
-      const made = madeVariants(state, form);
-      const hinted = anyHintFor(state, form);
+      const made = madeByForm.get(form) ?? [];
+      const isHinted = hinted.has(form);
       // Show a form node if you've made any variant, OR it's hinted/neighbor-
       // taught. Otherwise it stays in the branch's "still to find" count.
-      if (made.length === 0 && !hinted && !neighborTaught(state, form)) continue;
+      if (made.length === 0 && !isHinted && !taughtTiers.has(familyTier(form))) continue;
       const node = div('ws-node');
       const plate = div('ws-node-plate');
       const img = document.createElement('img');
-      const repId = made[0] ?? repItem(form);
-      img.src = itemSprite(repId).canvas.toDataURL();
+      const repId = made[0] ?? REPRESENTATIVE_ITEMS.get(form)!;
+      const cachedUrl = cachedItemSpriteUrl(repId);
+      if (cachedUrl) img.src = cachedUrl;
+      else pendingSprites.push({ img, id: repId });
       img.alt = '';
       plate.append(img);
       const name = div('ws-node-name');
       if (made.length > 0) {
-        const spec = parseItemId(made[0]);
         name.textContent = tDyn(`form.${form}`);
-        void spec;
       } else {
         node.classList.add('silhouette');
         name.textContent = tDyn(`form.${form}`);
@@ -97,7 +128,48 @@ export function renderTree(state: WorkshopState): HTMLDivElement {
     }
     wrap.append(branch);
   }
+  hydrateSprites(wrap, pendingSprites);
   return wrap;
+}
+
+function groupMadeItems(ids: ItemId[]): Map<FormId, ItemId[]> {
+  const grouped = new Map<FormId, ItemId[]>();
+  for (const id of ids) {
+    const spec = parseItemId(id);
+    if (!spec || !isValid(spec)) continue;
+    const variants = grouped.get(spec.form);
+    if (variants) variants.push(id);
+    else grouped.set(spec.form, [id]);
+  }
+  return grouped;
+}
+
+function taughtFamilyTiers(madeByForm: ReadonlyMap<FormId, readonly ItemId[]>): Set<string> {
+  const taught = new Set<string>();
+  for (const form of madeByForm.keys()) taught.add(familyTier(form));
+  return taught;
+}
+
+function familyTier(form: FormId): string {
+  return `${FORMS[form].family}:${FORMS[form].tier}`;
+}
+
+function hydrateSprites(
+  wrap: HTMLDivElement,
+  pending: Array<{ img: HTMLImageElement; id: ItemId }>,
+): void {
+  if (pending.length === 0) return;
+  let cursor = 0;
+  const next = (): void => {
+    if (!wrap.isConnected) return;
+    const end = Math.min(cursor + 3, pending.length);
+    for (; cursor < end; cursor++) {
+      const { img, id } = pending[cursor];
+      if (img.isConnected) img.src = itemSpriteUrl(id);
+    }
+    if (cursor < pending.length) window.requestAnimationFrame(next);
+  };
+  window.requestAnimationFrame(next);
 }
 
 /** Forms with at least one banked-hint pattern (built once per render). */
@@ -108,23 +180,4 @@ function hintedForms(state: WorkshopState): Set<FormId> {
     if (banked.has(canonical(p))) out.add(p.result as FormId);
   }
   return out;
-}
-
-/** Is any exact pattern that yields this form currently hinted? */
-function anyHintFor(state: WorkshopState, form: FormId): boolean {
-  return hintedForms(state).has(form);
-}
-
-/**
- * Neighbor-teaching (§4): making any form reveals the silhouette of forms one
- * step away in the SAME family (the tree grows outward from what you've done).
- */
-function neighborTaught(state: WorkshopState, form: FormId): boolean {
-  const fam = FORMS[form].family;
-  const famForms = FORM_IDS.filter((id) => FORMS[id].family === fam);
-  // If you've made any item in this family, its same-tier neighbors light up.
-  const madeInFamily = famForms.some((f) => madeVariants(state, f).length > 0);
-  if (!madeInFamily) return false;
-  const tier = FORMS[form].tier;
-  return famForms.some((f) => FORMS[f].tier === tier && madeVariants(state, f).length > 0);
 }

@@ -28,6 +28,7 @@ import { FORM_TEMPLATES } from './formTemplates';
 const SIZE_SCALE = { S: 0.7, M: 1, L: 1.4 } as const;
 
 const spriteCache = new Map<ItemId, PropSprite>();
+const spriteUrlCache = new Map<ItemId, string>();
 const textureCache = new Map<ItemId, THREE.Texture>();
 
 /** Stable per-item seed for the hand-wobble. */
@@ -54,6 +55,21 @@ export function itemSprite(id: ItemId): PropSprite {
     : compileSprite(familyTemplate('component'), seedOf(id));
   spriteCache.set(id, sprite);
   return sprite;
+}
+
+/** Encoded sprite plate for DOM images (cached because canvas encoding is synchronous). */
+export function itemSpriteUrl(id: ItemId): string {
+  let url = spriteUrlCache.get(id);
+  if (!url) {
+    url = itemSprite(id).canvas.toDataURL();
+    spriteUrlCache.set(id, url);
+  }
+  return url;
+}
+
+/** Read a cached DOM image URL without forcing sprite compilation. */
+export function cachedItemSpriteUrl(id: ItemId): string | undefined {
+  return spriteUrlCache.get(id);
 }
 
 /** Three.js texture for an item plate (cached). */

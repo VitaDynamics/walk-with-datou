@@ -133,6 +133,50 @@ export const EXACT_PATTERNS: readonly ExactPattern[] = [
   pat('wayfinder', [_, F, _, S, F, S, _, _, _], [0, 1, 0, 1, 2, 1, 0, 0, 0]),
   // Two lenses joined by a light tube → a field glass.
   pat('field-glass', [F, _, _, _, W, _, _, _, F], [1, 0, 0, 0, 2, 0, 0, 0, 1]),
+
+  // --- Second signatures (W7 density pass) ----------------------------------
+  // Alternate, still-readable recipes — a heavier build, a different material
+  // grain, a mirrored emphasis — so a form has more than one path to discover
+  // and the exact space rewards experimentation. All distinct under V₄.
+
+  // Components — heavier / alternate grains.
+  pat('post', [_, W, _, _, W, _, _, W, _], [0, 3, 0, 0, 3, 0, 0, 3, 0]), // a tall post
+  pat('cord', [P, P, P, _, _, _, _, _, _], [2, 2, 2, 0, 0, 0, 0, 0, 0]), // a thick rope
+  pat('ring', [_, W, _, W, _, W, _, W, _], [0, 1, 0, 1, 0, 1, 0, 1, 0]), // a wood ring
+  pat('vessel', [F, _, F, F, _, F, F, F, F], [1, 0, 1, 1, 0, 1, 1, 1, 1]), // a found-metal vessel
+  pat('block', [S, S, S, S, S, S, S, S, S], [2, 2, 2, 2, 2, 2, 2, 2, 2]), // a full quarry block
+  pat('wheel', [_, W, _, W, F, W, _, W, _], [0, 1, 0, 1, 1, 1, 0, 1, 0]), // spoked wheel
+
+  // Furnishings — sizes / materials.
+  pat('bench', [_, _, _, S, S, S, S, _, S], [0, 0, 0, 1, 1, 1, 2, 0, 2]), // a stone bench
+  pat('stool', [_, S, _, S, _, S, _, _, _], [0, 1, 0, 2, 0, 2, 0, 0, 0]), // a stone stool
+  pat('table', [W, W, W, _, _, _, W, _, W], [2, 2, 2, 0, 0, 0, 3, 0, 3]), // a big table
+  pat('lamp', [_, F, _, _, W, _, _, W, _], [0, 3, 0, 0, 2, 0, 0, 3, 0]), // a tall lamp
+  pat('lantern', [_, P, _, P, F, P, _, W, _], [0, 1, 0, 1, 1, 1, 0, 2, 0]), // a woven lantern
+  pat('gate', [W, W, W, W, _, W, W, _, W], [2, 2, 2, 1, 0, 1, 2, 0, 2]), // a heavier gate
+  pat('trellis', [P, _, P, _, P, _, P, _, P], [1, 0, 1, 0, 1, 0, 1, 0, 1]), // a reed trellis
+  pat('planter', [S, _, S, S, P, S, S, S, S], [1, 0, 1, 1, 1, 1, 1, 1, 1]), // a stone planter
+  pat('basket', [W, _, W, W, _, W, W, W, W], [1, 0, 1, 1, 0, 1, 1, 1, 1]), // a wood basket
+  pat('mat', [_, _, _, P, P, P, _, _, _], [0, 0, 0, 2, 2, 2, 0, 0, 0]), // a thick mat
+  pat('mobile', [_, F, _, F, _, F, _, P, _], [0, 1, 0, 1, 0, 1, 0, 1, 0]), // a hanging mobile
+  pat('birdbath', [_, S, _, S, S, S, _, S, _], [0, 1, 0, 1, 1, 1, 0, 3, 0]), // a tall birdbath
+
+  // Datou & keepsakes — alternates.
+  pat('collar-charm', [_, F, _, _, F, _, _, _, _], [0, 1, 0, 0, 1, 0, 0, 0, 0]), // a metal charm
+  pat('cairn', [_, _, _, _, S, _, _, S, _], [0, 0, 0, 0, 2, 0, 0, 3, 0]), // a tall cairn
+  pat('memory-frame', [W, W, W, W, _, W, W, W, W], [2, 2, 2, 2, 0, 2, 2, 2, 2]), // a deep frame
+  pat('postcard-stand', [_, W, _, _, W, _, W, W, W], [0, 1, 0, 0, 1, 0, 1, 1, 1]), // a stand
+  pat('wind-vane', [_, F, _, _, F, _, _, W, _], [0, 2, 0, 0, 1, 0, 0, 2, 0]), // a found-metal vane
+  pat('music-post', [_, F, _, _, W, _, _, W, _], [0, 1, 0, 0, 2, 0, 0, 2, 0]), // a music post
+
+  // Structures — heavier / stone readings.
+  pat('shelter', [_, S, _, S, S, S, S, S, S], [0, 2, 0, 1, 1, 1, 2, 1, 2]), // a stone shelter
+  pat('archway', [S, S, S, S, _, S, S, _, S], [1, 1, 1, 2, 0, 2, 2, 0, 2]), // a stone arch
+  pat('pergola', [W, W, W, W, _, W, _, _, _], [3, 3, 3, 2, 0, 2, 0, 0, 0]), // a grand pergola
+  pat('lookout-perch', [W, W, W, _, W, _, _, W, _], [3, 3, 3, 0, 2, 0, 0, 2, 0]), // a low perch
+  pat('well', [S, S, S, S, _, S, S, S, S], [3, 1, 3, 1, 0, 1, 3, 3, 3]), // a deep stone well
+  pat('shrine', [W, W, W, W, S, W, _, W, _], [1, 1, 1, 1, 2, 1, 0, 1, 0]), // a wood shrine
+  pat('cold-frame', [W, W, W, S, P, S, S, S, S], [1, 1, 1, 2, 1, 2, 1, 1, 1]), // a framed cold-frame
 ];
 
 function pat(result: FormId, cells: ExactPattern['cells'], stacks: number[]): ExactPattern {

@@ -3,8 +3,8 @@
  *
  * Status capsule (name, mood, trust) top-left; three soft actions at the
  * bottom (leash · backpack · memories); a thought chip near Datou; the
- * backpack sheet (gathered things + a small recipe book) on the left and
- * memory cards on the right. Plain DOM over the canvas, baseline tokens.
+ * backpack sheet on the left and memory cards on the right. Plain DOM over
+ * the canvas, baseline tokens.
  */
 
 import { applyStaticI18n, onLangChange, t, tDyn } from '../i18n';
@@ -12,7 +12,7 @@ import type { DatouMood } from '../physics/PhysicsAdapter';
 import type { Memories, MemoryEntry } from '../game/Memories';
 import type { WantKind } from '../game/Companion';
 import type { Backpack, CraftedId, ItemId } from '../game/Backpack';
-import { RECIPES, canCraft } from '../game/Crafting';
+import { RECIPES } from '../game/Crafting';
 import { parseItemId, itemName } from '../game/workshop/items';
 import {
   drawArchway,
@@ -40,7 +40,6 @@ import {
 export interface ConsoleCallbacks {
   onLeashToggle(): void;
   onUseItem(id: CraftedId): void;
-  onCraft(id: CraftedId): void;
 }
 
 const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }> = {
@@ -83,7 +82,6 @@ export class Console {
   private readonly memoriesList = el<HTMLDivElement>('memories-list');
   private readonly packPanel = el<HTMLDivElement>('pack-panel');
   private readonly packItems = el<HTMLDivElement>('pack-items');
-  private readonly packRecipes = el<HTMLDivElement>('pack-recipes');
   private readonly btnLeash = el<HTMLButtonElement>('btn-leash');
 
   private readonly memories: Memories;
@@ -252,36 +250,6 @@ export class Console {
         btn.addEventListener('click', () => this.toast(t('craft.resourceHint')));
       }
       this.packItems.append(btn);
-    }
-
-    this.packRecipes.replaceChildren();
-    for (const tier of [1, 2, 3] as const) {
-      const head = document.createElement('div');
-      head.className = 'recipe-tier';
-      head.textContent = t(`craft.tier${tier}`);
-      this.packRecipes.append(head);
-      for (const recipe of RECIPES.filter((r) => r.tier === tier)) {
-        const btn = document.createElement('button');
-        btn.className = 'pack-recipe';
-        btn.type = 'button';
-        btn.disabled = !canCraft(recipe, this.backpack);
-        const img = document.createElement('img');
-        img.src = this.icon(recipe.id);
-        img.alt = '';
-        const text = document.createElement('span');
-        const name = document.createElement('div');
-        name.className = 'recipe-name';
-        name.textContent = tDyn(`thing.${recipe.id}`);
-        const needs = document.createElement('div');
-        needs.className = 'recipe-needs';
-        needs.textContent = Object.entries(recipe.needs)
-          .map(([res, n]) => `${tDyn(`thing.${res}`)} ×${n}`)
-          .join(' · ');
-        text.append(name, needs);
-        btn.append(img, text);
-        btn.addEventListener('click', () => this.callbacks.onCraft(recipe.id));
-        this.packRecipes.append(btn);
-      }
     }
   }
 
