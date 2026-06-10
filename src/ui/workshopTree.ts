@@ -14,6 +14,8 @@ import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { FORM_IDS, FORMS, type FormFamily, type FormId } from '../game/workshop/forms';
 import { allItemIds, materialsAcceptedBy, parseItemId, sizesFor, finishesFor, itemId } from '../game/workshop/items';
 import { itemSprite } from '../game/workshop/sprites';
+import { EXACT_PATTERNS } from '../game/workshop/patterns';
+import { canonical } from '../game/workshop/pattern';
 
 const FAMILY_ORDER: FormFamily[] = ['component', 'furnishing', 'structure', 'datou', 'keepsake', 'tool'];
 
@@ -98,14 +100,19 @@ export function renderTree(state: WorkshopState): HTMLDivElement {
   return wrap;
 }
 
+/** Forms with at least one banked-hint pattern (built once per render). */
+function hintedForms(state: WorkshopState): Set<FormId> {
+  const banked = new Set(state.hintList().map((h) => h.pattern));
+  const out = new Set<FormId>();
+  for (const p of EXACT_PATTERNS) {
+    if (banked.has(canonical(p))) out.add(p.result as FormId);
+  }
+  return out;
+}
+
 /** Is any exact pattern that yields this form currently hinted? */
 function anyHintFor(state: WorkshopState, form: FormId): boolean {
-  // Hints store a pattern key; we approximate "form is hinted" by checking the
-  // hint list against the form's patterns lazily in W5. For W4 we treat made-
-  // neighbors as the teaching source and leave hint coupling to W5.
-  void state;
-  void form;
-  return false;
+  return hintedForms(state).has(form);
 }
 
 /**

@@ -57,6 +57,9 @@ import { parseItemId, itemName } from './workshop/items';
 import { itemSprite, itemHeight } from './workshop/sprites';
 import type { MaterialId } from './workshop/materials';
 import { MATERIALS } from './workshop/materials';
+import { rollInspiration, type InspoContext, type Mood } from './workshop/inspiration';
+import { weatherFor, seasonFor, tintFor } from './workshop/weather';
+import { zoneAt } from '../world/zones';
 
 const MAX_DT = 1 / 30;
 const TRUST_FULL = 120;
@@ -135,6 +138,11 @@ export class Game {
   private readonly workshopState = new WorkshopState();
   private workshop!: Workshop;
   private placingItem: string | null = null;
+  // Inspiration cadence (§5.2): a slow tick, a cooldown, and a pity timer so at
+  // least one fires every ~2 sessions and never more than one per 10 min.
+  private inspoTickIn = 90;
+  private inspoCooldown = 0;
+  private inspoTickId = 0;
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
@@ -258,6 +266,7 @@ export class Game {
     this.physics.setColliders?.(this.world.colliders);
     this.physics.setPlayerPosition(this.player.x, this.player.z);
     this.applyStance();
+    this.applyWeather();
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', (e) => {
@@ -532,6 +541,59 @@ export class Game {
     return true;
   }
 
+  /**
+   * Today's weather/season as a quiet scene treatment (§5): a soft warm fog on
+   * rain/fog days (never a heavy effect — baseline forbids loud bloom), keyed
+   * to the seeded daily weather so it's a calendar return reason, not noise.
+   */
+  private applyWeather(): void {
+    const tint = tintFor();
+    if (tint.haze > 0.03) {
+      // Fog distance shortens with haze; color is the warm paper backdrop so it
+      // reads as soft atmosphere, not a grey wall.
+      const near = 18;
+      const far = 60 - tint.haze * 160;
+      this.scene.fog = new THREE.Fog(0xece5d6, near, Math.max(28, far));
+    } else {
+      this.scene.fog = null;
+    }
+  }
+
+  /**
+   * Slow inspiration tick (§5): roughly every 90 s, off-cooldown, Datou may
+   * get an idea — a hint toward an unfound exact pattern banked into the
+   * Notebook, announced by a quiet thought chip. All seeded → replay-safe.
+   */
+  private updateInspiration(dt: number, dx: number, dz: number, mood: Mood): void {
+    if (this.inspoCooldown > 0) this.inspoCooldown -= dt;
+    this.inspoTickIn -= dt;
+    if (this.inspoTickIn > 0 || this.inspoCooldown > 0) return;
+    this.inspoTickIn = 90;
+    this.inspoTickId += 1;
+
+    const now = new Date();
+    const ctx: InspoContext = {
+      zone: zoneAt(dx, dz).id,
+      weather: weatherFor(now),
+      season: seasonFor(now),
+      mood,
+      bond: this.bond.level,
+      personality: 'balanced', // personality axes land in W7 gating
+      tick: this.inspoTickId,
+      date: now,
+    };
+    const found = this.workshopState.foundPatternSet();
+    const hinted = new Set(this.workshopState.hintList().map((h) => h.pattern));
+    const hint = rollInspiration(ctx, found, hinted);
+    if (!hint) return;
+    if (this.workshopState.bankHint(hint)) {
+      this.inspoCooldown = 600; // ≥ 10 min between inspirations (§5.2)
+      this.datouRig.pulse();
+      this.datouRig.reach();
+      this.ui.toast(t('workshop.inspired'));
+    }
+  }
+
   private placeWorkshopItem(id: string, x: number, z: number, fresh: boolean): void {
     const spec = parseItemId(id);
     if (!spec) return;
@@ -751,6 +813,9 @@ export class Game {
       this.memories.add(entry);
       this.ui.toast(this.ui.memoryText(entry));
     }
+
+    // Datou's muse: a slow seeded inspiration tick (§5).
+    this.updateInspiration(dt, state.position.x, state.position.z, state.mood);
 
     // --- render layers ---
     const camYaw = this.cameraRig.azimuth;
