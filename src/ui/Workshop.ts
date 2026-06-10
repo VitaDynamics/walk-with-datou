@@ -30,6 +30,8 @@ export interface WorkshopCallbacks {
   count(mat: MaterialId): number;
   /** Take one material for the bench; false if none held. */
   takeOne(mat: MaterialId): boolean;
+  /** Pin a material for Datou to forage (right-click / long-press a chip). */
+  onPinForage(mat: MaterialId): void;
 }
 
 type Tab = 'bench' | 'tree' | 'notebook';
@@ -271,6 +273,22 @@ export class Workshop {
         this.selectedMat = this.selectedMat === mat ? null : mat;
         this.refreshStrip();
       });
+      // Right-click / long-press a material → send Datou to forage for it (§7).
+      b.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this.cb.onPinForage(mat);
+      });
+      let pressTimer: number | null = null;
+      b.addEventListener('pointerdown', () => {
+        pressTimer = window.setTimeout(() => this.cb.onPinForage(mat), 550);
+      });
+      const clearPress = (): void => {
+        if (pressTimer !== null) window.clearTimeout(pressTimer);
+        pressTimer = null;
+      };
+      b.addEventListener('pointerup', clearPress);
+      b.addEventListener('pointerleave', clearPress);
+      b.title = `${tDyn(`material.${mat}`)} · ${t('workshop.pinForage')}`;
       this.stripEl.append(b);
     }
   }

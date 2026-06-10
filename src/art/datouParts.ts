@@ -13,7 +13,7 @@
  */
 
 import { Rng } from '../physics/mujoco/rng';
-import { INK, ROBOT } from './palette';
+import { CLAY, INK, ROBOT, SAGE } from './palette';
 import { blob, blobPoints, paintBlob } from './strokes';
 import { createCanvas, ctx2d } from './textures';
 
@@ -424,4 +424,71 @@ export function drawArmForearm(seed: number): PropSprite {
     g.stroke();
   }
   return { canvas: c, aspect: 96 / 176 };
+}
+
+/**
+ * The back bucket — a small cream pannier rig plate on Datou's torso that the
+ * dorsal arm drops finds into over the shoulder (BUILDING_SYSTEM §7). Three
+ * visible sketch states by fill fraction: empty · half · full. Drawn facing
+ * right to sit on the shell's flank; the rig mounts it on the back.
+ */
+export function drawBucket(fill: number): PropSprite {
+  const { c, g } = sprite(112, 112);
+  const f = Math.max(0, Math.min(1, fill));
+  // Pannier body — a soft rounded tub.
+  g.beginPath();
+  g.moveTo(24, 44);
+  g.lineTo(30, 96);
+  g.quadraticCurveTo(56, 106, 82, 96);
+  g.lineTo(88, 44);
+  g.quadraticCurveTo(56, 36, 24, 44);
+  g.closePath();
+  g.fillStyle = ROBOT.shell;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Rim.
+  g.beginPath();
+  g.ellipse(56, 44, 32, 9, 0, 0, Math.PI * 2);
+  g.fillStyle = ROBOT.shellShade;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.stroke();
+  // Strap to the harness.
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(30, 50);
+  g.lineTo(20, 30);
+  g.moveTo(82, 50);
+  g.lineTo(92, 30);
+  g.stroke();
+  // Contents — small lumps rising with fill (clay/sage gathered finds).
+  if (f > 0.02) {
+    const lumps = f >= 0.66 ? 6 : f >= 0.33 ? 3 : 1;
+    const tones = [CLAY.mid, SAGE.deep, CLAY.light, SAGE.mid, CLAY.deep, SAGE.light];
+    const top = 44 - (f >= 0.66 ? 8 : 0);
+    for (let i = 0; i < lumps; i++) {
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      const x = 40 + col * 16 + (row % 2) * 6;
+      const y = top + 2 - row * 11;
+      g.beginPath();
+      g.ellipse(x, y, 9, 7, 0, 0, Math.PI * 2);
+      g.fillStyle = tones[i % tones.length];
+      g.fill();
+      g.strokeStyle = INK.soft;
+      g.lineWidth = 2.5;
+      g.stroke();
+    }
+  }
+  // Amber tag dot (the one small accent).
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.arc(56, 86, 4.5, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: c, aspect: 1 };
 }

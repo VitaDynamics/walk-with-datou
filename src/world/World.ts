@@ -278,6 +278,22 @@ export class World {
     return best;
   }
 
+  /** Nearest live pickable of a specific kind within range (forage, §7). */
+  nearestPickableOfKind(kind: string, x: number, z: number, maxDist: number): BatchInstance | null {
+    let best: BatchInstance | null = null;
+    let bestD = maxDist;
+    for (const item of this.instances.values()) {
+      if (!item.alive || item.kind !== kind) continue;
+      if (!kindDef(item.kind).pickable) continue;
+      const d = Math.hypot(item.x - x, item.z - z);
+      if (d <= bestD) {
+        bestD = d;
+        best = item;
+      }
+    }
+    return best;
+  }
+
   /** Remove a gathered/consumed instance from the world. */
   removeInstance(id: string): boolean {
     const item = this.instances.get(id);

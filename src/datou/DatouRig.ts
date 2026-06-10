@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import {
   drawArmForearm,
   drawArmUpper,
+  drawBucket,
   drawCalf,
   drawEyes,
   drawHead,
@@ -49,6 +50,8 @@ interface Pose {
   bodyY: number;
   headRot: number;
   headLift: number;
+  frontHipY: number;
+  rearHipY: number;
   frontThighBias: number;
   frontCalfBias: number;
   rearThighBias: number;
@@ -67,6 +70,8 @@ const REST_POSE: Pose = {
   bodyY: BODY_Y,
   headRot: 0,
   headLift: 0,
+  frontHipY: HIP_Y,
+  rearHipY: HIP_Y,
   frontThighBias: -0.45,
   frontCalfBias: 1.0,
   rearThighBias: -0.52,
@@ -87,12 +92,15 @@ const UP = new THREE.Vector3(0, 1, 0);
 const ARM_UPPER_LEN = 0.21;
 const ARM_FOREARM_LEN = 0.23;
 const ARM_BASE_X = -0.08; // shoulder mount on the back of the shell
+const ARM_BASE_Y = BODY_Y + 0.16;
 type ArmMode = 'folded' | 'reach' | 'carry';
 /** [upper, forearm] rotations per mode (facing right; + folds backward). */
 const ARM_POSES: Record<ArmMode, [number, number]> = {
-  folded: [-1.78, 2.62],
-  reach: [0.55, -0.5],
-  carry: [-0.5, -1.05],
+  // Both links form a low arch above the spine instead of disappearing
+  // through the torso plate.
+  folded: [-1.82, -2.56],
+  reach: [0.9, -0.6],
+  carry: [-1.75, -2.9],
 };
 
 function partPlane(
@@ -147,7 +155,13 @@ export class DatouRig {
   private readonly gripperTip = new THREE.Object3D();
   private armMode: ArmMode = 'folded';
   private reachLeft = 0;
+  private pickupLeft = 0;
+  private reachBlend = 0;
   private readonly gripperWork = new THREE.Vector3();
+  private bucket: THREE.Mesh | null = null;
+  private bucketFill = -1;
+  private bucketCapacity = 6;
+  private readonly bucketTextures = new Map<number, THREE.Texture>();
 
   constructor(shadowTexture: THREE.Texture) {
     // Legs: far pair drawn behind (small -z, slight tint), near pair in front.
@@ -204,10 +218,17 @@ export class DatouRig {
     this.gripperTip.position.y = -ARM_FOREARM_LEN;
     this.armForearm.add(this.gripperTip);
     this.armUpper.add(this.armForearm);
-    this.armUpper.position.set(ARM_BASE_X, BODY_Y + 0.1, -0.02);
+    this.armUpper.position.set(ARM_BASE_X, ARM_BASE_Y, 0.025);
     this.armUpper.rotation.z = ARM_POSES.folded[0];
     this.armForearm.rotation.z = ARM_POSES.folded[1];
     this.flip.add(this.armUpper);
+
+    // Back bucket (forage pannier) — mounted low on the rear of the shell,
+    // hidden until it holds something so the idle silhouette stays clean (§7).
+    this.bucket = partPlane(drawBucket(0), 0.2 * SCALE, 'center');
+    this.bucket.position.set(ARM_BASE_X - 0.02, BODY_Y - 0.06, -0.05);
+    this.bucket.visible = false;
+    this.flip.add(this.bucket);
 
     this.group.add(this.flip);
 
@@ -260,12 +281,40 @@ export class DatouRig {
 
   /** Hold something in the gripper (carry pose) or stow the arm. */
   setCarrying(on: boolean): void {
+    if (on && this.armMode !== 'carry') this.pickupLeft = 0.55;
     this.armMode = on ? 'carry' : 'folded';
   }
 
   /** One calm reach-down beat (picking / inspecting with the arm). */
   reach(seconds = 1.2): void {
     if (this.armMode !== 'carry') this.reachLeft = seconds;
+  }
+
+  /**
+   * Set how full the back bucket reads (BUILDING_SYSTEM §7). Snaps to three
+   * sketch states (empty/half/full) so it's a clear glanceable signal; hidden
+   * entirely at 0 so the resting silhouette stays clean. Cached per state.
+   */
+  setBucketFill(n: number, capacity = this.bucketCapacity): void {
+    this.bucketCapacity = Math.max(1, capacity);
+    if (n === this.bucketFill) return;
+    this.bucketFill = n;
+    if (!this.bucket) return;
+    if (n <= 0) {
+      this.bucket.visible = false;
+      return;
+    }
+    this.bucket.visible = true;
+    const frac = n / this.bucketCapacity;
+    const state = frac >= 0.66 ? 2 : frac >= 0.33 ? 1 : 0;
+    let tex = this.bucketTextures.get(state);
+    if (!tex) {
+      tex = canvasTexture(drawBucket(state === 2 ? 1 : state === 1 ? 0.5 : 0.18).canvas);
+      this.bucketTextures.set(state, tex);
+    }
+    const mat = this.bucket.material as THREE.MeshBasicMaterial;
+    mat.map = tex;
+    mat.needsUpdate = true;
   }
 
   private localToWorld(x: number, y: number): THREE.Vector3 {
@@ -291,28 +340,39 @@ export class DatouRig {
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
     const moving = speed > 0.06;
 
+    if (this.reachLeft > 0) this.reachLeft = Math.max(0, this.reachLeft - dt);
+    if (this.pickupLeft > 0) this.pickupLeft = Math.max(0, this.pickupLeft - dt);
+    const reaching = this.reachLeft > 0 || this.pickupLeft > 0;
+    this.reachBlend += ((reaching ? 1 : 0) - this.reachBlend) * (1 - Math.exp(-dt * 10));
+
     // --- Pose targets from expression + mood ---
     const target: Pose = { ...REST_POSE };
     switch (expression.kind) {
-      case 'attention': // sit: rear legs fold, chest up, head looks up at you
-        target.bodyRot = 0.3;
-        target.bodyY = BODY_Y - 0.08;
-        target.rearThighBias = 1.25;
-        target.rearCalfBias = -1.9;
-        target.frontThighBias = -0.35;
-        target.frontCalfBias = 0.85;
-        target.headRot = -0.16;
+      case 'attention':
+        // Stay on four supported feet while looking up. The old pose reversed
+        // the rear knee and made the thigh/calf cross at an impossible angle.
+        target.bodyRot = 0.045;
+        target.bodyY = BODY_Y - 0.015;
+        target.rearThighBias = -0.62;
+        target.rearCalfBias = 1.18;
+        target.frontThighBias = -0.38;
+        target.frontCalfBias = 0.88;
+        target.headRot = -0.14;
         target.headLift = 0.02;
         break;
-      case 'play': // play-bow: front legs fold, rump up, head low and eager
-        target.bodyRot = -0.24;
-        target.bodyY = BODY_Y - 0.05;
-        target.frontThighBias = 1.0;
-        target.frontCalfBias = -1.7;
-        target.rearThighBias = 0.15;
-        target.rearCalfBias = -0.3;
+      case 'play':
+        // A quadruped bow: front knees fold in the normal Z direction while
+        // the straighter rear legs keep the rump supported.
+        target.bodyRot = -0.16;
+        target.bodyY = BODY_Y - 0.035;
+        target.frontHipY = HIP_Y - 0.055;
+        target.rearHipY = HIP_Y + 0.015;
+        target.frontThighBias = -0.82;
+        target.frontCalfBias = 1.62;
+        target.rearThighBias = -0.35;
+        target.rearCalfBias = 0.82;
         target.headRot = 0.14;
-        target.headLift = -0.02;
+        target.headLift = -0.06;
         target.headBob = 0.04;
         break;
       case 'curious': {
@@ -335,6 +395,23 @@ export class DatouRig {
       target.headLift -= 0.03;
     }
 
+    if (this.reachBlend > 0.001) {
+      // Ground work is a whole-body motion, as on the real quadruped: lower
+      // the shoulders and front hips, keep the rear pair planted, then let the
+      // dorsal arm reach past the face.
+      const r = this.reachBlend;
+      target.bodyRot = THREE.MathUtils.lerp(target.bodyRot, -0.22, r);
+      target.bodyY = THREE.MathUtils.lerp(target.bodyY, BODY_Y - 0.045, r);
+      target.headRot = THREE.MathUtils.lerp(target.headRot, 0.12, r);
+      target.headLift = THREE.MathUtils.lerp(target.headLift, -0.1, r);
+      target.frontHipY = THREE.MathUtils.lerp(target.frontHipY, HIP_Y - 0.075, r);
+      target.rearHipY = THREE.MathUtils.lerp(target.rearHipY, HIP_Y + 0.01, r);
+      target.frontThighBias = THREE.MathUtils.lerp(target.frontThighBias, -0.95, r);
+      target.frontCalfBias = THREE.MathUtils.lerp(target.frontCalfBias, 1.9, r);
+      target.rearThighBias = THREE.MathUtils.lerp(target.rearThighBias, -0.38, r);
+      target.rearCalfBias = THREE.MathUtils.lerp(target.rearCalfBias, 0.88, r);
+    }
+
     // Smooth toward targets (calm easing, never snappy).
     const k = 1 - Math.exp(-dt * 7);
     for (const key of Object.keys(this.pose) as (keyof Pose)[]) {
@@ -351,6 +428,7 @@ export class DatouRig {
       const swing = Math.sin(this.gaitPhase + leg.phase) * this.legAmp;
       // The calf lags the thigh and folds on the back-swing — reads as a knee.
       const kneeSwing = Math.sin(this.gaitPhase + leg.phase + 1.1) * this.legAmp * 0.7;
+      leg.thigh.position.y = leg.front ? this.pose.frontHipY : this.pose.rearHipY;
       leg.thigh.rotation.z = thighBias + swing;
       leg.calf.rotation.z = calfBias + kneeSwing;
     }
@@ -370,13 +448,17 @@ export class DatouRig {
     this.headGroup.rotation.z = this.pose.headRot + (moving ? Math.sin(this.gaitPhase) * 0.02 : 0);
 
     // --- Dorsal arm: folded at rest, reaching or carrying when asked ---
-    if (this.reachLeft > 0) this.reachLeft -= dt;
     const armMode: ArmMode =
-      this.armMode === 'carry' ? 'carry' : this.reachLeft > 0 ? 'reach' : 'folded';
+      this.pickupLeft > 0.2 || this.reachLeft > 0
+        ? 'reach'
+        : this.armMode === 'carry'
+          ? 'carry'
+          : 'folded';
     const [upTarget, foreTarget] = ARM_POSES[armMode];
     const ka = 1 - Math.exp(-dt * 6);
     this.armUpper.rotation.z += (upTarget - this.armUpper.rotation.z) * ka;
     this.armForearm.rotation.z += (foreTarget - this.armForearm.rotation.z) * ka;
+    this.armUpper.position.y = ARM_BASE_Y + (this.pose.bodyY - BODY_Y) - this.reachBlend * 0.035;
 
     // --- Eyes: mood plate + blink ---
     let eye: EyeState =

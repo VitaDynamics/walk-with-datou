@@ -196,6 +196,7 @@ export class Console {
     if (entry.kind === 'want') {
       if (entry.key === 'fetch') return t('memory.fetch');
       if (entry.key === 'harvest') return t('memory.harvest');
+      if (entry.key === 'forage') return t('memory.forage');
       if (entry.key.startsWith('made:')) {
         const spec = parseItemId(entry.key.slice(5));
         return t('workshop.made', { thing: spec ? itemName(spec) : '' });

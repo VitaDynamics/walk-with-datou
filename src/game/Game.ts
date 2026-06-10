@@ -46,6 +46,7 @@ import { Companion, type CompanionEvents, type WantKind } from './Companion';
 import { craft, recipe } from './Crafting';
 import { CROP_KINDS, Farm, MATURE, TEND_RANGE, type CropKind, type PlotState } from './Farm';
 import { Fetch } from './Fetch';
+import { Forage } from './Forage';
 import { Keys } from './Keys';
 import { Memories } from './Memories';
 import { Pointer } from './Pointer';
@@ -127,6 +128,7 @@ export class Game {
   private readonly backpack = new Backpack();
   private readonly spots: SpotField;
   private readonly fetch: Fetch;
+  private readonly forage: Forage;
   private readonly ui: Console;
   private readonly pointer: Pointer;
   private readonly keys = new Keys();
@@ -206,6 +208,20 @@ export class Game {
       setTarget: (x, z) => this.physics.setTarget(x, z),
       onComplete: () => this.handleFetchComplete(),
     });
+    this.forage = new Forage({
+      setMode: (m) => this.physics.setMode(m),
+      setTarget: (x, z) => this.physics.setTarget(x, z),
+      findNearest: (kind, x, z, r) => {
+        const hit = this.world.nearestPickableOfKind(kind, x, z, r);
+        return hit ? { id: hit.id, kind: hit.kind, x: hit.x, z: hit.z } : null;
+      },
+      pick: (id) => this.world.removeInstance(id),
+      onPick: () => {
+        this.datouRig.reach();
+        this.datouRig.setBucketFill(this.forage.fill, this.forage.bucketCapacity);
+      },
+      onDeliver: (items) => this.handleForageDeliver(items),
+    });
 
     this.ui = new Console(this.memories, this.backpack, {
       onLeashToggle: () => this.toggleLeash(),
@@ -225,6 +241,7 @@ export class Game {
         for (const m of mats) this.backpack.add(m as ResourceId);
       },
       onMake: (outcome) => this.handleMake(outcome),
+      onPinForage: (mat) => this.startForage(mat),
     });
     document
       .getElementById('btn-workshop')
@@ -675,6 +692,41 @@ export class Game {
     }
   }
 
+  /** Datou dumped a forage haul into the pack (§7). */
+  private handleForageDeliver(items: string[]): void {
+    for (const kind of items) this.backpack.add(kind as ResourceId);
+    this.bond.add('discovery', items.length);
+    this.physics.applyPet();
+    this.datouRig.pulse();
+    this.datouRig.setBucketFill(this.forage.fill, this.forage.bucketCapacity);
+    this.ui.toast(t('forage.delivered', { n: String(items.length) }));
+    // A full haul brought solo is a little story worth keeping.
+    if (items.length >= this.forage.bucketCapacity) {
+      this.memories.add({
+        ts: Date.now(),
+        kind: 'want',
+        key: 'forage',
+        mood: this.physics.getDatouState().mood,
+      });
+    }
+  }
+
+  /** Pin a material → Datou forages for it (leash comes off). */
+  private startForage(mat: MaterialId): void {
+    if (!this.isPackResource(mat)) {
+      this.ui.toast(t('forage.cantFind'));
+      return;
+    }
+    if (this.leashOn) {
+      this.leashOn = false;
+      this.ui.setLeash(false);
+      this.saveRaw('wwd.leash', '0');
+      this.applyStance();
+    }
+    this.forage.pin(mat);
+    this.ui.toast(t('forage.pinned', { thing: tDyn(`material.${mat}`) }));
+  }
+
   private handleFetchComplete(): void {
     this.bond.add('play');
     this.physics.applyPet();
@@ -760,7 +812,10 @@ export class Game {
     const state = this.physics.getDatouState();
 
     this.fetch.update(dt, state, this.player);
-    if (!this.fetch.active) {
+    if (!this.fetch.active && this.forage.active) {
+      this.forage.update(dt, state, this.player);
+    }
+    if (!this.fetch.active && !this.forage.active) {
       this.companion.update(state, this.player, this.events, dt);
     }
     this.events.petted = false;
