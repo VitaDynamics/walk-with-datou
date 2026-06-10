@@ -40,29 +40,45 @@ function roundedRectPath(
 export function drawBody(seed: number): PropSprite {
   const rng = new Rng(seed);
   const { c, g } = sprite(360, 220);
-  // Shell.
+  // Shell — charcoal-dominant (a robot, not an animal hide).
   const pts = blobPoints(rng, 180, 110, 150, 78, 12, 0.035);
   paintBlob(g, pts, { fill: ROBOT.dark, outline: INK.line, lineWidth: 6 });
-  // Cream side panel (slightly inset).
-  const panel = blobPoints(rng, 180, 122, 112, 52, 12, 0.04);
-  paintBlob(g, panel, { fill: ROBOT.shell, outline: INK.soft, lineWidth: 3.5 });
-  // Panel seam + two fastener dots — quiet product detailing.
-  g.strokeStyle = ROBOT.shellShade;
+  // Soft top highlight so the shell reads rounded.
+  g.save();
+  g.globalAlpha = 0.18;
+  blob(g, rng, 168, 72, 100, 26, { fill: ROBOT.shell }, 10, 0.1);
+  g.restore();
+  // Small cream access panel low on the flank — quiet product detailing.
+  roundedRectPath(g, 128, 116, 104, 50, 18);
+  g.fillStyle = ROBOT.shell;
+  g.fill();
+  g.strokeStyle = ROBOT.darkShade;
   g.lineWidth = 3;
+  g.stroke();
+  // Panel seam + fastener dots.
+  g.strokeStyle = ROBOT.shellShade;
+  g.lineWidth = 2.5;
   g.beginPath();
-  g.moveTo(120, 100);
-  g.quadraticCurveTo(180, 88, 240, 100);
+  g.moveTo(140, 141);
+  g.lineTo(220, 141);
   g.stroke();
   g.fillStyle = ROBOT.shellShade;
-  for (const x of [104, 256]) {
+  for (const x of [144, 216]) {
     g.beginPath();
-    g.arc(x, 122, 5, 0, Math.PI * 2);
+    g.arc(x, 128, 4, 0, Math.PI * 2);
     g.fill();
   }
+  // Shoulder seam line.
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(252, 70);
+  g.quadraticCurveTo(262, 110, 252, 150);
+  g.stroke();
   // One small warm accent: a tiny status dot near the shoulder.
   g.fillStyle = ROBOT.accent;
   g.beginPath();
-  g.arc(282, 86, 7, 0, Math.PI * 2);
+  g.arc(276, 92, 7, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 2.5;
@@ -74,40 +90,55 @@ export function drawBody(seed: number): PropSprite {
 export function drawHead(seed: number): PropSprite {
   const rng = new Rng(seed);
   const { c, g } = sprite(256, 232);
-  // Ear nubs behind the shell.
+  // Antenna ears — slim, slightly leaned (sensors, not animal ears).
   for (const [x, lean] of [
-    [78, -0.18],
-    [178, 0.18],
+    [86, -0.22],
+    [170, 0.22],
   ] as const) {
     g.save();
-    g.translate(x, 64);
+    g.translate(x, 62);
     g.rotate(lean);
-    roundedRectPath(g, -16, -34, 32, 44, 14);
+    roundedRectPath(g, -9, -30, 18, 40, 9);
     g.fillStyle = ROBOT.dark;
     g.fill();
     g.strokeStyle = INK.line;
-    g.lineWidth = 5;
+    g.lineWidth = 4.5;
     g.stroke();
+    g.fillStyle = ROBOT.shellShade;
+    g.beginPath();
+    g.arc(0, -22, 4, 0, Math.PI * 2);
+    g.fill();
     g.restore();
   }
-  // Shell.
+  // Shell — charcoal, rounded.
   const pts = blobPoints(rng, 128, 130, 100, 88, 12, 0.03);
   paintBlob(g, pts, { fill: ROBOT.dark, outline: INK.line, lineWidth: 6 });
-  // Cream faceplate.
-  const face = blobPoints(rng, 128, 138, 80, 68, 12, 0.03);
-  paintBlob(g, face, { fill: ROBOT.shell, outline: INK.soft, lineWidth: 3.5 });
-  // Visor band — where the eyes plane sits.
-  roundedRectPath(g, 56, 104, 144, 60, 28);
+  // Soft crown highlight.
+  g.save();
+  g.globalAlpha = 0.16;
+  blob(g, rng, 122, 78, 64, 22, { fill: ROBOT.shell }, 10, 0.1);
+  g.restore();
+  // Visor — a generous near-black screen across the face (eyes live here).
+  roundedRectPath(g, 46, 94, 164, 78, 34);
   g.fillStyle = ROBOT.visor;
   g.fill();
   g.strokeStyle = INK.line;
-  g.lineWidth = 4;
+  g.lineWidth = 4.5;
   g.stroke();
-  // Small chin marker.
-  g.fillStyle = ROBOT.shellShade;
-  g.beginPath();
-  g.arc(128, 188, 6, 0, Math.PI * 2);
+  // Faint screen sheen.
+  g.save();
+  g.globalAlpha = 0.1;
+  roundedRectPath(g, 58, 102, 84, 22, 11);
+  g.fillStyle = ROBOT.shell;
   g.fill();
+  g.restore();
+  // Small cream chin plate.
+  roundedRectPath(g, 108, 184, 40, 14, 7);
+  g.fillStyle = ROBOT.shell;
+  g.fill();
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 2.5;
+  g.stroke();
   return { canvas: c, aspect: 256 / 232 };
 }
 
@@ -178,30 +209,33 @@ export function drawLeg(seed: number): PropSprite {
   const rng = new Rng(seed);
   const { c, g } = sprite(96, 192);
   void rng.next();
-  // Upper limb.
-  roundedRectPath(g, 28, 8, 40, 100, 20);
-  g.fillStyle = ROBOT.shell;
+  // Upper limb — charcoal like the shell, slimmer than before.
+  roundedRectPath(g, 32, 8, 32, 96, 16);
+  g.fillStyle = ROBOT.dark;
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 5;
   g.stroke();
-  // Joint dot.
-  g.fillStyle = ROBOT.shellShade;
+  // Cream knee-joint cap.
+  g.fillStyle = ROBOT.shell;
   g.beginPath();
-  g.arc(48, 96, 7, 0, Math.PI * 2);
+  g.arc(48, 98, 9, 0, Math.PI * 2);
   g.fill();
-  // Lower limb + foot.
-  roundedRectPath(g, 32, 96, 32, 70, 14);
-  g.fillStyle = ROBOT.shell;
-  g.fill();
-  g.strokeStyle = INK.line;
-  g.lineWidth = 5;
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 2.5;
   g.stroke();
-  roundedRectPath(g, 24, 152, 48, 28, 12);
+  // Lower limb, slightly narrower + dark foot pad.
+  roundedRectPath(g, 36, 102, 24, 62, 11);
   g.fillStyle = ROBOT.dark;
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 4.5;
+  g.stroke();
+  roundedRectPath(g, 28, 152, 40, 26, 12);
+  g.fillStyle = ROBOT.darkShade;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
   g.stroke();
   return { canvas: c, aspect: 0.5 };
 }

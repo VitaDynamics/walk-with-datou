@@ -64,4 +64,4 @@ export const GLOW = 'rgba(217, 178, 199, 0)';
 export const LAMP_WARM = 'rgba(233, 196, 124, 0.35)';
 
 /** Contact-shadow ink (soft, warm, low alpha gradient center). */
-export const SHADOW = 'rgba(58, 55, 47, 0.30)';
+export const SHADOW = 'rgba(58, 55, 47, 0.42)';

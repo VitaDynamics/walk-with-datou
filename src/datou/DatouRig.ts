@@ -92,10 +92,10 @@ export class DatouRig {
     const nearFront = partPlane(drawLeg(1), 0.38, 'top');
     const nearBack = partPlane(drawLeg(2), 0.38, 'top');
     for (const [leg, x, z] of [
-      [farFront, 0.2, -0.04],
-      [farBack, -0.24, -0.04],
-      [nearFront, 0.26, 0.04],
-      [nearBack, -0.18, 0.04],
+      [farFront, 0.17, -0.04],
+      [farBack, -0.21, -0.04],
+      [nearFront, 0.22, 0.04],
+      [nearBack, -0.16, 0.04],
     ] as const) {
       leg.position.set(x, 0.42, z);
       this.flip.add(leg);
@@ -107,7 +107,7 @@ export class DatouRig {
     this.legs.push(nearFront, nearBack, farFront, farBack);
 
     this.tail = partPlane(drawTail(5), 0.34, 'bottom');
-    this.tail.position.set(-0.36, 0.52, -0.02);
+    this.tail.position.set(-0.31, 0.47, -0.02);
     this.flip.add(this.tail);
 
     this.body = partPlane(drawBody(6), 0.5, 'center');
@@ -115,8 +115,8 @@ export class DatouRig {
     this.flip.add(this.body);
 
     const head = partPlane(drawHead(7), 0.44, 'center');
-    this.eyes = partPlane(drawEyes('neutral'), 0.115, 'center');
-    this.eyes.position.set(0.005, -0.015, 0.012);
+    this.eyes = partPlane(drawEyes('neutral'), 0.13, 'center');
+    this.eyes.position.set(0.005, -0.012, 0.012);
     this.eyeMat = this.eyes.material as THREE.MeshBasicMaterial;
     for (const s of ['neutral', 'happy', 'curious', 'sleepy', 'blink'] as const) {
       this.eyeTextures.set(s, canvasTexture(drawEyes(s).canvas));
@@ -129,11 +129,13 @@ export class DatouRig {
 
     // Contact shadow (not flipped, not billboarded).
     this.shadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.15, 0.7),
+      new THREE.PlaneGeometry(1.6, 1.0),
       new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false }),
     );
     this.shadow.rotation.x = -Math.PI / 2;
     this.shadow.position.y = 0.006;
+    // Above the (transparent) painted ground in render order, like prop shadows.
+    this.shadow.renderOrder = 0.5;
     this.group.add(this.shadow);
 
     // Invisible-but-raycastable tap target.
@@ -220,7 +222,7 @@ export class DatouRig {
 
     // --- Gait ---
     this.gaitPhase += dt * (4 + speed * 5);
-    const ampTarget = moving ? 0.5 : 0;
+    const ampTarget = moving ? 0.35 : 0;
     this.legAmp += (ampTarget - this.legAmp) * (1 - Math.exp(-dt * 10));
     const phases = [0, Math.PI, Math.PI, 0]; // diagonal pairs
     for (let i = 0; i < 4; i++) {

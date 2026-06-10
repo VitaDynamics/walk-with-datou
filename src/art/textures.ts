@@ -112,7 +112,7 @@ export function paintContactShadow(size = 128): HTMLCanvasElement {
   const g = ctx2d(c);
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   grad.addColorStop(0, SHADOW);
-  grad.addColorStop(0.65, 'rgba(58, 55, 47, 0.12)');
+  grad.addColorStop(0.6, 'rgba(58, 55, 47, 0.18)');
   grad.addColorStop(1, 'rgba(58, 55, 47, 0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
