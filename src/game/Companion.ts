@@ -1,46 +1,49 @@
+/**
+ * Companion — Datou's "brain" for the want/read loop, diorama edition.
+ *
+ * Datou periodically surfaces ONE want through body language; the player
+ * reads it and answers with a touch. No meters begging to be filled, no
+ * punishment for ignoring — wants expire gracefully and Datou goes back to
+ * its own life. The loop ties into the glade's hidden discoveries: curious
+ * wants gaze toward a real undiscovered spot, and guiding Datou there turns
+ * the want into a shared discovery (the heart of the exploration loop).
+ *
+ * Pure game logic: reads DatouState, acts only through the physics
+ * mode/target levers, never imports a backend. The renderer poses Datou
+ * from `expression`.
+ */
+
 import type { DatouMode, DatouState } from '../physics/PhysicsAdapter';
 import { Bond } from './Bond';
-import { POI_REACH_DIST, type PoiData, type PoiField } from './pois';
-import type { ZoneId } from './zones';
-import { zoneAt, ZONES } from './zones';
-
-/**
- * Companion — Datou's "brain" for the want/read loop (docs/GAMEPLAY_DESIGN.md
- * §F1, and the verb layer in docs/INTERACTION_VERBS.md).
- *
- * Instead of a happiness bar, Datou periodically surfaces ONE want through body
- * language; the player reads it and responds. This class owns that state
- * machine: it picks a want, runs a readable wind-up, opens a response window,
- * judges the player's response, grants Bond on success, and expires gracefully
- * (never punishing) if ignored.
- *
- * It is game-layer only: it reads DatouState (from the physics backend) + the
- * player position + the per-frame input, and acts on the world through the
- * physics *mode/target* levers it's given (a thin command sink), so it never
- * imports a concrete physics backend. The renderer reads `expression` to pose
- * Datou (play-bow, sit, gaze).
- */
+import type { Spot, SpotField } from '../world/Spots';
 
 export type WantKind = 'attention' | 'play' | 'curious';
 
-/** What the renderer needs to pose Datou for the current want. */
+/** What the rig needs to pose Datou for the current want. */
 export type Expression =
   | { kind: 'none' }
-  | { kind: 'attention' } // sitting, looking up at the player
+  | { kind: 'attention' } // sitting, looking up at you
   | { kind: 'play' } // play-bow
-  | { kind: 'curious'; dirX: number; dirZ: number }; // ears up, facing a point
+  | { kind: 'curious'; dirX: number; dirZ: number }; // gaze toward a point
 
-/** The command sink the Companion uses to make Datou act (the physics levers). */
+/** The command sink the Companion uses to make Datou act. */
 export interface CompanionActions {
   setMode(mode: DatouMode): void;
   setTarget(x: number, z: number): void;
-  /**
-   * Optional: the player + Datou reached a real POI together. The game reveals
-   * the marker, plays Datou's reaction, and grants a "discovery" bond moment.
-   * This is the hook that ties the want loop to the actual scene (F3 / the
-   * research doc's Scene Exploration Loop).
-   */
-  onDiscover?(poi: PoiData): void;
+  /** Datou reached a hidden spot — the game reveals it + writes the memory. */
+  onDiscover?(spot: Spot): void;
+  /** A want was answered — the game plays the warm feedback (mood, pulse). */
+  onWantSatisfied?(kind: WantKind): void;
+}
+
+/** What the player did this frame (from the pointer layer). */
+export interface CompanionEvents {
+  /** Tap landed on Datou. */
+  petted: boolean;
+  /** A comforting hold on Datou completed this frame. */
+  comforted: boolean;
+  /** Tap landed on the ground at this point (guide attention), or null. */
+  guidedTo: { x: number; z: number } | null;
 }
 
 interface Vec2 {
@@ -48,127 +51,126 @@ interface Vec2 {
   z: number;
 }
 
-type Phase = 'rest' | 'windup' | 'active' | 'cooldown';
+type Phase = 'rest' | 'windup' | 'active' | 'approach' | 'cooldown';
 
 interface ActiveWant {
   kind: WantKind;
-  /** For a curious want, the point of interest Datou is drawn toward. */
+  /** For a curious want, the point Datou is drawn toward. */
   poi?: Vec2;
-  /** The real POI this want points at, when it's anchored to one (vs a fallback
-   *  empty point in the rare case no POI is in range). */
-  poiData?: PoiData;
+  /** The real spot the want is anchored to, when one is undiscovered. */
+  spot?: Spot;
 }
 
 export class Companion {
-  // Timing (seconds). A want shows its tell during WINDUP before it "expects" a
-  // response, so an attentive player can always catch it (§F1 readability).
-  private static readonly REST_MIN = 6;
-  private static readonly REST_MAX = 14;
+  // Timing (seconds). The tell shows during WINDUP before a response is
+  // "expected", so an attentive player can always catch it.
+  private static readonly REST_MIN = 7;
+  private static readonly REST_MAX = 15;
   private static readonly WINDUP = 1.4;
-  private static readonly ACTIVE_WINDOW = 6;
+  private static readonly ACTIVE_WINDOW = 7;
   private static readonly COOLDOWN = 2.5;
-  /** Player within this distance counts as "near" for proximity + responses. */
-  private static readonly NEAR_DIST = 3.2;
-  /** How far Datou will look for a real POI to be curious about. POIs further
-   *  than this are too far to lead the player to in one want window. */
-  private static readonly CURIOUS_SEARCH_DIST = 40;
-  /** Min seconds between bond-granting investigates, so clicking can't farm it. */
-  private static readonly INVESTIGATE_COOLDOWN = 4;
+  /** Datou within this distance of the pad counts as "keeping company". */
+  private static readonly NEAR_DIST = 2.4;
+  /** A guide tap within this distance of a hidden spot counts as pointing at it. */
+  private static readonly GUIDE_SPOT_DIST = 1.2;
+  /** Datou within this distance of a spot reveals it. */
+  private static readonly REACH_DIST = 0.55;
+  /** Give up an approach after this long (blocked path etc.) — no punishment. */
+  private static readonly APPROACH_TIMEOUT = 10;
+  /** Min seconds between bond-granting pets, so tapping can't farm it. */
+  private static readonly PET_COOLDOWN = 1.5;
 
   private phase: Phase = 'rest';
   private timer: number;
   private want: ActiveWant | null = null;
   private expressionState: Expression = { kind: 'none' };
-  private investigateCooldown = 0;
+  private approachSpot: Spot | null = null;
+  private approachTarget: Vec2 | null = null;
+  private petCooldown = 0;
+
+  /** The stance the game restores after a want resolves (idle = its own life,
+   *  follow = staying close to the pad). Set by the console buttons. */
+  homeMode: DatouMode = 'idle';
 
   private readonly bond: Bond;
   private readonly actions: CompanionActions;
   private readonly rand: () => number;
-  /** Real POIs in the park. Optional so the want loop still runs (with random
-   *  curious points) when no field is supplied (e.g. in unit tests). */
-  private readonly pois: PoiField | null;
-  /** Seconds the player has spent in each zone this session — drives the
-   *  landmark/zone-aware want bias (under-visited zones are pulled toward). */
-  private readonly zoneTime: Record<ZoneId, number> = {
-    meadow: 0,
-    woods: 0,
-    lake: 0,
-    grove: 0,
-  };
+  private readonly spots: SpotField | null;
 
   constructor(
     bond: Bond,
     actions: CompanionActions,
     rand: () => number = Math.random,
-    pois: PoiField | null = null,
+    spots: SpotField | null = null,
   ) {
     this.bond = bond;
     this.actions = actions;
     this.rand = rand;
-    this.pois = pois;
+    this.spots = spots;
     this.timer = this.restDuration();
   }
 
-  /** Current expression for the renderer to pose Datou. */
   get expression(): Expression {
     return this.expressionState;
   }
 
-  /** The active want kind, or null. Used by the optional "?" onboarding bubble. */
   get activeWant(): WantKind | null {
     return this.phase === 'active' || this.phase === 'windup' ? (this.want?.kind ?? null) : null;
   }
 
-  /** The POI id the current curious want points at, or null. Lets the renderer
-   *  highlight exactly the marker Datou is interested in. */
-  get activePoiId(): number | null {
-    return this.activeWant === 'curious' ? (this.want?.poiData?.id ?? null) : null;
+  /** The spot id the current curious want gazes at, or null. */
+  get activeSpotId(): number | null {
+    return this.activeWant === 'curious' ? (this.want?.spot?.id ?? null) : null;
   }
 
   /**
-   * Player-initiated: send Datou over to investigate a point in the world (a
-   * named feature the player clicked). Cancels any active want, steers Datou
-   * there via the explore lever, and grants a small "examined it together"
-   * bond — turning a click on the scenery into a shared moment. Returns the
-   * bond actually granted (0 if a recent investigate is still on cooldown, so
-   * spamming clicks can't farm bond).
+   * Player-initiated guidance: a tap on the glade. Steers Datou there; if the
+   * tap points at (or near) a hidden spot, Datou approaches it and the find
+   * fires on arrival — discovery works even without an active curious want.
    */
-  investigate(x: number, z: number): number {
-    if (this.investigateCooldown > 0) {
-      // Still steer Datou (responsive feel), but don't grant bond again.
-      this.actions.setMode('explore');
-      this.actions.setTarget(x, z);
-      return 0;
+  investigate(x: number, z: number): void {
+    const spot = this.spots?.nearestUndiscovered(x, z, Companion.GUIDE_SPOT_DIST) ?? null;
+    this.approachSpot = null;
+    if (this.phase === 'active' || this.phase === 'windup') {
+      // Guiding during a curious want toward its spot answers the want.
+      if (this.want?.kind === 'curious' && this.want.spot && spot?.id === this.want.spot.id) {
+        this.satisfyCurious();
+        return;
+      }
+      this.endWant();
     }
-    this.investigateCooldown = Companion.INVESTIGATE_COOLDOWN;
-    if (this.phase === 'active' || this.phase === 'windup') this.endWant();
     this.actions.setMode('explore');
-    this.actions.setTarget(x, z);
-    return this.bond.add('discovery');
+    this.approachSpot = spot;
+    this.approachTarget = spot ? { x: spot.x, z: spot.z } : { x, z };
+    this.actions.setTarget(this.approachTarget.x, this.approachTarget.z);
+    this.phase = 'approach';
+    this.timer = Companion.APPROACH_TIMEOUT;
   }
 
   /**
-   * Advance the want machine one frame.
-   * @param datou  Datou's current state (position/mood/velocity).
-   * @param player The player's world position.
-   * @param petted True if the player petted Datou this frame (a tap landed).
-   * @param dt     Seconds since last frame.
+   * Advance one frame.
+   * @param datou  Datou's state from the physics backend.
+   * @param pad    The resting pad ("your spot") position.
+   * @param events What the player did this frame.
    */
-  update(datou: DatouState, player: Vec2, petted: boolean, dt: number): void {
-    const near = this.distTo(datou.position, player) <= Companion.NEAR_DIST;
+  update(datou: DatouState, pad: Vec2, events: CompanionEvents, dt: number): void {
+    if (this.petCooldown > 0) this.petCooldown -= dt;
 
-    // Track where the player spends time so wants can pull toward fresh ground.
-    this.zoneTime[zoneAt(player.x, player.z).id] += dt;
-    if (this.investigateCooldown > 0) this.investigateCooldown -= dt;
+    // Keeping company: Datou near the pad trickles bond passively.
+    if (this.distTo(datou.position, pad) <= Companion.NEAR_DIST) this.bond.proximity(dt);
 
-    // Passive companionship: being near trickles bond regardless of wants.
-    if (near) this.bond.proximity(dt);
+    // A comforting hold is always meaningful (and calms a want too).
+    if (events.comforted) this.bond.add('play', 2);
+
+    if (events.guidedTo) {
+      this.investigate(events.guidedTo.x, events.guidedTo.z);
+      return;
+    }
 
     switch (this.phase) {
       case 'rest':
         this.timer -= dt;
-        // A pet during rest is always welcome — small bond, no want needed.
-        if (petted) this.bond.add('pet');
+        if (events.petted) this.grantPet();
         if (this.timer <= 0) this.beginWant(datou);
         break;
 
@@ -184,17 +186,43 @@ export class Companion {
       case 'active':
         this.timer -= dt;
         this.poseForWant(datou);
-        if (this.judgeResponse(datou, player, petted, near)) {
+        if (this.judgeResponse(events)) {
           this.satisfy();
         } else if (this.timer <= 0) {
-          this.expire(datou);
+          this.expire();
         }
         break;
+
+      case 'approach': {
+        this.timer -= dt;
+        const goal = this.approachTarget;
+        const spot = this.approachSpot && !this.approachSpot.found ? this.approachSpot : null;
+        if (!goal) {
+          this.finishApproach();
+          break;
+        }
+        // Keep gazing toward the goal while trotting over.
+        const dx = goal.x - datou.position.x;
+        const dz = goal.z - datou.position.z;
+        const dist = Math.hypot(dx, dz);
+        const len = dist || 1;
+        this.expressionState = { kind: 'curious', dirX: dx / len, dirZ: dz / len };
+        if (dist <= Companion.REACH_DIST) {
+          if (spot) {
+            this.bond.add('discovery');
+            this.actions.onDiscover?.(spot);
+          }
+          this.finishApproach();
+        } else if (this.timer <= 0) {
+          this.finishApproach();
+        }
+        break;
+      }
 
       case 'cooldown':
         this.timer -= dt;
         this.expressionState = { kind: 'none' };
-        if (petted) this.bond.add('pet');
+        if (events.petted) this.grantPet();
         if (this.timer <= 0) {
           this.phase = 'rest';
           this.timer = this.restDuration();
@@ -205,62 +233,45 @@ export class Companion {
 
   // --- want lifecycle ---
 
+  private grantPet(): void {
+    if (this.petCooldown > 0) return;
+    this.petCooldown = Companion.PET_COOLDOWN;
+    this.bond.add('pet');
+  }
+
   private beginWant(datou: DatouState): void {
     const kind = this.pickWant();
     this.want = { kind };
     if (kind === 'curious') {
-      // Anchor the curious want on a REAL nearby undiscovered POI when one is
-      // in range — this is what makes the want loop about the actual park. The
-      // zone-time bias gently prefers POIs in under-visited zones so wants pull
-      // exploration toward fresh ground (landmark/zone-aware wants). Fall back
-      // to a random nearby point only when there's no POI to head for.
-      const poiData = this.pois?.nearestUndiscovered(
-        datou.position.x,
-        datou.position.z,
-        Companion.CURIOUS_SEARCH_DIST,
-        (zone) => this.zoneFreshness(zone),
-      );
-      if (poiData) {
-        this.want.poiData = poiData;
-        this.want.poi = { x: poiData.x, z: poiData.z };
+      // Anchor on a REAL undiscovered spot when one remains — this is what
+      // makes the want loop about the actual glade.
+      const spot = this.spots?.nearestUndiscovered(datou.position.x, datou.position.z, 100) ?? null;
+      if (spot) {
+        this.want.spot = spot;
+        this.want.poi = { x: spot.x, z: spot.z };
       } else {
         this.want.poi = this.pickCuriousPoint(datou);
       }
     }
+    // Pause for the tell: Datou stops to communicate.
+    this.actions.setMode('leashed');
+    this.actions.setTarget(datou.position.x, datou.position.z);
     this.phase = 'windup';
     this.timer = Companion.WINDUP;
   }
 
-  /** A zone's "freshness" in [0,1]: 1 = least-visited this session, 0 = most.
-   *  Drives the curious-want bias toward unexplored ground. */
-  private zoneFreshness(zone: ZoneId): number {
-    let max = 0;
-    for (const z of ZONES) max = Math.max(max, this.zoneTime[z.id]);
-    if (max <= 0) return 0.5; // nothing visited yet — neutral
-    return 1 - this.zoneTime[zone] / max;
-  }
-
-  /**
-   * Choose which want to surface. Biased by mood and by what's unlocked:
-   * - play needs the fetch-era bond (~30) to show often;
-   * - a tired Datou leans toward attention (wants comfort) over play.
-   */
   private pickWant(): WantKind {
     const r = this.rand();
     const playReady = this.bond.has('fetch');
-    if (!playReady) {
-      // Early game: attention vs curious only.
-      return r < 0.6 ? 'attention' : 'curious';
-    }
-    if (r < 0.4) return 'attention';
-    if (r < 0.75) return 'curious';
+    if (!playReady) return r < 0.55 ? 'attention' : 'curious';
+    if (r < 0.35) return 'attention';
+    if (r < 0.7) return 'curious';
     return 'play';
   }
 
-  /** Pick a nearby point of interest for a curious want to face/lead toward. */
   private pickCuriousPoint(datou: DatouState): Vec2 {
     const a = this.rand() * Math.PI * 2;
-    const dist = 8 + this.rand() * 14;
+    const dist = 2 + this.rand() * 3;
     return {
       x: datou.position.x + Math.cos(a) * dist,
       z: datou.position.z + Math.sin(a) * dist,
@@ -287,59 +298,71 @@ export class Companion {
     }
   }
 
-  /** Has the player given the correct response for the active want this frame? */
-  private judgeResponse(datou: DatouState, player: Vec2, petted: boolean, near: boolean): boolean {
+  /** Did the player answer the active want this frame? */
+  private judgeResponse(events: CompanionEvents): boolean {
     if (!this.want) return false;
     switch (this.want.kind) {
       case 'attention':
-        // Pet, or simply stay close through the window.
-        return petted || near;
+        return events.petted || events.comforted;
       case 'play':
-        // Engage the bow with a pet (a throw/fetch also counts, wired later).
-        return petted;
+        return events.petted;
       case 'curious': {
+        if (!events.guidedTo) return false;
         const poi = this.want.poi!;
-        if (this.want.poiData) {
-          // Anchored on a real POI: success is the player ARRIVING at it (the
-          // shared moment), not merely stepping past Datou. Reaching it fires
-          // the discovery in satisfy().
-          return this.distTo(player, poi) <= POI_REACH_DIST;
-        }
-        // Fallback (no real POI): follow the gaze — end up nearer it than Datou.
-        const playerToPoi = this.distTo(player, poi);
-        const datouToPoi = this.distTo(datou.position, poi);
-        return playerToPoi < datouToPoi - 1;
+        return this.distTo(events.guidedTo, poi) <= Companion.GUIDE_SPOT_DIST + 0.4;
       }
     }
   }
 
   private satisfy(): void {
-    if (this.want) {
-      this.bond.add(`want-${this.want.kind}` as const);
-      if (this.want.kind === 'curious' && this.want.poi) {
-        // Lead the shared approach: send Datou to the POI (explore lever) so it
-        // trots over to react where you arrived.
-        this.actions.setMode('explore');
-        this.actions.setTarget(this.want.poi.x, this.want.poi.z);
-        // A real POI reached together is a discovery moment: mark it found, let
-        // the game play Datou's reaction, and grant the bigger "discovery"
-        // bond — the heart of the Scene Exploration Loop.
-        if (this.want.poiData) {
-          this.bond.add('discovery');
-          this.actions.onDiscover?.(this.want.poiData);
-        }
-      }
+    if (!this.want) return;
+    const kind = this.want.kind;
+    this.bond.add(`want-${kind}` as const);
+    this.actions.onWantSatisfied?.(kind);
+    if (kind === 'curious' && this.want.poi) {
+      const spot = this.want.spot ?? null;
+      const poi = this.want.poi;
+      this.endWant();
+      this.beginApproach(poi, spot);
+      return;
     }
     this.endWant();
   }
 
-  /** Ignored want: no punishment — just settle back to following the player. */
-  private expire(datou: DatouState): void {
-    // Curiosity gently pulls Datou a little toward the POI even if unanswered,
-    // but the default is to resume following.
-    void datou;
-    this.actions.setMode('follow');
+  private satisfyCurious(): void {
+    if (this.want?.kind === 'curious') {
+      this.bond.add('want-curious');
+      this.actions.onWantSatisfied?.('curious');
+      const spot = this.want.spot ?? null;
+      const poi = this.want.poi ?? null;
+      this.endWant();
+      if (poi) this.beginApproach(poi, spot);
+    }
+  }
+
+  /** Trot to a point of interest; a real spot becomes a discovery on arrival. */
+  private beginApproach(goal: Vec2, spot: Spot | null): void {
+    this.actions.setMode('explore');
+    this.actions.setTarget(goal.x, goal.z);
+    this.approachTarget = goal;
+    this.approachSpot = spot;
+    this.phase = 'approach';
+    this.timer = Companion.APPROACH_TIMEOUT;
+  }
+
+  /** Ignored want: no punishment — settle back into the home stance. */
+  private expire(): void {
+    this.actions.setMode(this.homeMode);
     this.endWant();
+  }
+
+  private finishApproach(): void {
+    this.approachSpot = null;
+    this.approachTarget = null;
+    this.actions.setMode(this.homeMode);
+    this.expressionState = { kind: 'none' };
+    this.phase = 'cooldown';
+    this.timer = Companion.COOLDOWN;
   }
 
   private endWant(): void {
@@ -347,6 +370,7 @@ export class Companion {
     this.expressionState = { kind: 'none' };
     this.phase = 'cooldown';
     this.timer = Companion.COOLDOWN;
+    this.actions.setMode(this.homeMode);
   }
 
   private restDuration(): number {

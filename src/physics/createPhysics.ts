@@ -67,15 +67,13 @@ export async function createPhysics(search = window.location.search): Promise<Cr
   if (requested === 'mujoco') {
     try {
       // Lazy import so the placeholder path never pulls the WASM into the bundle.
-      const [{ MujocoAdapter }, { getPhysicsColliders }] = await Promise.all([
+      const [{ MujocoAdapter }, { gladeColliders }] = await Promise.all([
         import('./MujocoAdapter'),
-        import('../game/World'),
+        import('../world/layout'),
       ]);
-      // Build the simulation with the park's *major* obstacles so Datou collides
-      // with trees, rocks, logs, lampposts, landmarks, and the lake — but not the
-      // small reeds/mushrooms (flagged `minor`), which would bloat the model. The
-      // player still pushes out of those via the full getParkColliders() set.
-      const adapter = new MujocoAdapter({ scene: { colliders: getPhysicsColliders() } });
+      // Bake the glade's major obstacles (tree, rocks, bush, stump, lamp) into
+      // the model so Datou collides with them in simulation.
+      const adapter = new MujocoAdapter({ scene: { colliders: gladeColliders() } });
       await adapter.init();
       return { adapter, backend: 'mujoco' };
     } catch (err) {

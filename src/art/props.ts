@@ -48,7 +48,18 @@ export function drawTree(seed: number): PropSprite {
   // Bark detail strokes.
   for (let i = 0; i < 4; i++) {
     const x = cx - 14 + rng.next() * 28;
-    wobblyLine(g, rng, x, baseY - 16, x + (rng.next() * 10 - 5), topY + 60 + rng.next() * 80, 2.5, CLAY.deep, 2, 4);
+    wobblyLine(
+      g,
+      rng,
+      x,
+      baseY - 16,
+      x + (rng.next() * 10 - 5),
+      topY + 60 + rng.next() * 80,
+      2.5,
+      CLAY.deep,
+      2,
+      4,
+    );
   }
 
   // Canopy — overlapping blobs, dark below, light above (baked shading).
@@ -313,7 +324,17 @@ export function drawDiscovery(kind: DiscoveryArt, seed: number): PropSprite {
       g.strokeStyle = INK.line;
       g.lineWidth = 3;
       g.stroke();
-      blob(g, rng, 64, 70, 36, 22, { fill: CLAY.blossom, outline: INK.line, lineWidth: 3.5 }, 9, 0.08);
+      blob(
+        g,
+        rng,
+        64,
+        70,
+        36,
+        22,
+        { fill: CLAY.blossom, outline: INK.line, lineWidth: 3.5 },
+        9,
+        0.08,
+      );
       for (let i = 0; i < 3; i++) {
         g.fillStyle = CLAY.pale;
         g.beginPath();
@@ -323,7 +344,17 @@ export function drawDiscovery(kind: DiscoveryArt, seed: number): PropSprite {
       break;
     }
     case 'ladybug': {
-      blob(g, rng, 64, 92, 24, 17, { fill: CLAY.blossom, outline: INK.line, lineWidth: 3.5 }, 9, 0.06);
+      blob(
+        g,
+        rng,
+        64,
+        92,
+        24,
+        17,
+        { fill: CLAY.blossom, outline: INK.line, lineWidth: 3.5 },
+        9,
+        0.06,
+      );
       g.strokeStyle = INK.line;
       g.lineWidth = 2.5;
       g.beginPath();

@@ -25,9 +25,7 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "fetch:assets": "node scripts/fetch-assets.mjs",
-    "gen:manifest": "node scripts/gen-manifest.mjs"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "three": "^0.180.0"

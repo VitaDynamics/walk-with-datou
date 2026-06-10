@@ -23,6 +23,7 @@ import {
 } from '../art/props';
 import { canvasTexture, paintContactShadow, paintGlade } from '../art/textures';
 import { Cutout, setSharedShadowTexture } from './Cutout';
+import { MAJOR_PROPS, PAD_POSITION, SPOT_ANCHORS, gladeColliders } from './layout';
 import type { Spot, SpotAnchor } from './Spots';
 import type { WorldCollider } from '../physics/PhysicsAdapter';
 
@@ -41,9 +42,9 @@ interface RevealAnim {
 export class Diorama {
   readonly group = new THREE.Group();
   readonly groundMesh: THREE.Mesh;
-  readonly colliders: WorldCollider[] = [];
+  readonly colliders: WorldCollider[] = gladeColliders();
   readonly spotAnchors: readonly SpotAnchor[];
-  readonly padPosition = { x: 0, z: 3.2 };
+  readonly padPosition = PAD_POSITION;
 
   private readonly cutouts: Cutout[] = [];
   private readonly reveals: RevealAnim[] = [];
@@ -69,13 +70,20 @@ export class Diorama {
     this.groundMesh.rotation.x = -Math.PI / 2;
     this.group.add(this.groundMesh);
 
-    // --- Major plates (the ≤5 anchors of the scene) ---
-    this.place(drawTree(11), -3.6, -2.2, { height: 4.4, shadowRadius: 1.5 }, 0.45);
-    this.place(drawRock(21), 3.4, -1.6, { height: 1.05, shadowRadius: 0.95 }, 0.7);
-    this.place(drawRock(22), 4.15, -0.7, { height: 0.62, shadowRadius: 0.55 }, 0.4);
-    this.place(drawBush(31), -3.4, 1.7, { height: 1.0, shadowRadius: 1.05 }, 0.8);
-    this.place(drawStump(41), 2.2, -3.4, { height: 0.78, shadowRadius: 0.7 }, 0.45);
-    this.place(drawLamp(51), 1.7, 3.5, { height: 1.7, shadowRadius: 0.42 }, 0.22);
+    // --- Major plates (the ≤5 anchors of the scene, from the shared layout) ---
+    const draw = {
+      tree: drawTree,
+      rock: drawRock,
+      bush: drawBush,
+      stump: drawStump,
+      lamp: drawLamp,
+    };
+    for (const p of MAJOR_PROPS) {
+      this.place(draw[p.kind](p.seed), p.x, p.z, {
+        height: p.height,
+        shadowRadius: p.shadowRadius,
+      });
+    }
 
     // Your spot — the resting pad (flat decal, no collider: it's walkable).
     const pad = new Cutout(drawPad(61), { height: 1.5, decal: true });
@@ -102,15 +110,7 @@ export class Diorama {
     }
 
     // Hiding places for today's discoveries (near the landmarks).
-    this.spotAnchors = [
-      { place: 'under-tree', x: -2.6, z: -1.4 },
-      { place: 'behind-rock', x: 3.9, z: -2.4 },
-      { place: 'by-stump', x: 1.5, z: -2.8 },
-      { place: 'under-bush', x: -2.7, z: 2.4 },
-      { place: 'glade-east', x: 5.0, z: 0.9 },
-      { place: 'glade-north', x: 0.4, z: -4.7 },
-      { place: 'by-lamp', x: 2.6, z: 2.8 },
-    ];
+    this.spotAnchors = SPOT_ANCHORS;
   }
 
   private place(
@@ -118,13 +118,11 @@ export class Diorama {
     x: number,
     z: number,
     opts: { height: number; shadowRadius?: number },
-    colliderRadius?: number,
   ): Cutout {
     const cut = new Cutout(sprite, opts);
     cut.setPosition(x, z);
     this.group.add(cut.group);
     this.cutouts.push(cut);
-    if (colliderRadius) this.colliders.push({ x, z, radius: colliderRadius });
     return cut;
   }
 

@@ -22,7 +22,7 @@ export interface SceneCollider {
 export interface DatouSceneOptions {
   /** MuJoCo integration timestep in seconds. */
   timestep: number;
-  /** Half-extent of the (square) ground, metres. Matches the park in World.ts. */
+  /** Half-extent of the (square) ground, metres. Covers the glade with margin. */
   parkHalfExtent: number;
   /** Capsule radius (Datou body), metres. */
   bodyRadius: number;
@@ -34,11 +34,10 @@ export interface DatouSceneOptions {
 
 export const DEFAULT_SCENE_OPTIONS: DatouSceneOptions = {
   timestep: 0.005,
-  // Matches the 500×500 park (PARK_HALF 250 in game/World.ts), kept just inside
-  // the player bound like the placeholder's PARK_HALF_EXTENT.
-  parkHalfExtent: 245,
-  bodyRadius: 0.35,
-  bodyHalfLength: 0.45,
+  // Covers the glade diorama (GLADE_RADIUS 8 in world/Diorama.ts) with margin.
+  parkHalfExtent: 10,
+  bodyRadius: 0.22,
+  bodyHalfLength: 0.25,
   colliders: [],
 };
 
@@ -63,14 +62,10 @@ export function buildDatouSceneXml(opts: DatouSceneOptions = DEFAULT_SCENE_OPTIO
   const restHeight = opts.bodyRadius; // capsule resting on the ground (Z-up)
   return `<mujoco model="datou-puck">
   <option timestep="${opts.timestep}" gravity="0 0 -9.81" integrator="implicitfast"/>
-  <!-- The park emits one static cylinder geom per MAJOR obstacle (trees, rocks,
-       logs, lampposts, the full lake-shore ring, landmarks, placed features).
-       Small props (reeds, mushrooms) are flagged 'minor' in World and dropped
-       before they reach here (see getPhysicsColliders / createPhysics), keeping
-       this to ~1400 geoms instead of ~1800. They are all static, so static–
-       static contacts are skipped and only Datou-vs-nearby pairs cost anything,
-       but the model arrays still scale with geom count — 128M is ample. -->
-  <size memory="128M"/>
+  <!-- The glade emits one static cylinder geom per major obstacle (tree,
+       rocks, bush, stump, lamp — see world/layout.ts via createPhysics).
+       A handful of static geoms: 16M is ample. -->
+  <size memory="16M"/>
 
   <default>
     <geom condim="1" friction="1 0.005 0.0001"/>

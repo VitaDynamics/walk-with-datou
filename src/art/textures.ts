@@ -93,7 +93,12 @@ export function paintGlade(seed: number, size = 1024): HTMLCanvasElement {
     g.lineWidth = 1.5 + rng.next();
     g.beginPath();
     g.moveTo(x, y);
-    g.quadraticCurveTo(x + 2, y - 4 - rng.next() * 4, x + (rng.next() * 6 - 3), y - 7 - rng.next() * 5);
+    g.quadraticCurveTo(
+      x + 2,
+      y - 4 - rng.next() * 4,
+      x + (rng.next() * 6 - 3),
+      y - 7 - rng.next() * 5,
+    );
     g.stroke();
     g.restore();
   }

@@ -21,12 +21,12 @@ export interface ControllerConfig {
 }
 
 export const DEFAULT_CONTROLLER_CONFIG: ControllerConfig = {
-  speed: 2.8,
-  followMinDist: 1.8,
-  arriveDist: 0.4,
+  speed: 1.7,
+  followMinDist: 1.1,
+  arriveDist: 0.25,
   wanderIntervalMin: 3,
   wanderIntervalMax: 7,
-  parkHalfExtent: 22,
+  parkHalfExtent: 6,
 };
 
 export interface ControllerInputs {

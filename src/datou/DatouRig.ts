@@ -40,7 +40,11 @@ const REST_POSE: Pose = {
   tailSpeed: 2.2,
 };
 
-function partPlane(sprite: PropSprite, height: number, anchor: 'center' | 'top' | 'bottom'): THREE.Mesh {
+function partPlane(
+  sprite: PropSprite,
+  height: number,
+  anchor: 'center' | 'top' | 'bottom',
+): THREE.Mesh {
   const w = height * sprite.aspect;
   const geo = new THREE.PlaneGeometry(w, height);
   if (anchor === 'top') geo.translate(0, -height / 2, 0);

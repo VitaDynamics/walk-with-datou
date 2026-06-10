@@ -18,23 +18,22 @@ import type {
  *    drifts to 'curious' while moving, and to 'tired' if stationary too long.
  */
 export class PlaceholderPhysics implements PhysicsAdapter {
-  // Datou's top speed. Set a touch above the player's 7 m/s so follow mode can
-  // actually catch up over the larger 500×500 park (it eases to a stop within
-  // FOLLOW_MIN_DIST, so it doesn't overshoot).
-  private static readonly SPEED = 7.5; // m/s
-  private static readonly FOLLOW_MIN_DIST = 1.8;
-  private static readonly ARRIVE_DIST = 0.4;
+  // A robot-dog trot, scaled for the ~13 m glade diorama — companionable,
+  // never frantic (it eases to a stop within FOLLOW_MIN_DIST).
+  private static readonly SPEED = 1.7; // m/s
+  private static readonly FOLLOW_MIN_DIST = 1.1;
+  private static readonly ARRIVE_DIST = 0.25;
   private static readonly HAPPY_DURATION = 5; // seconds
   private static readonly WANDER_INTERVAL_MIN = 3;
   private static readonly WANDER_INTERVAL_MAX = 7;
-  // Wander/clamp bound, kept just inside the player's PARK_HALF (250, see
-  // game/World.ts — the world-size source of truth) so Datou never pushes
-  // against the very edge. The physics layer stays independent of the game
-  // layer, so this mirrors that value rather than importing it.
-  private static readonly PARK_HALF_EXTENT = 245;
+  // Clamp bound, kept just inside the glade's walkable radius (WALK_RADIUS
+  // 6.2 in world/Diorama.ts) so Datou never stands on the painted edge. The
+  // physics layer stays independent of the game layer, so this mirrors that
+  // value rather than importing it.
+  private static readonly HALF_EXTENT = 6.0;
 
   private state: DatouState = {
-    position: { x: 2, y: 0, z: 0 },
+    position: { x: 1.4, y: 0, z: 0.8 },
     yaw: 0,
     velocity: { x: 0, y: 0, z: 0 },
     mood: 'calm',
@@ -127,10 +126,10 @@ export class PlaceholderPhysics implements PhysicsAdapter {
             PlaceholderPhysics.WANDER_INTERVAL_MIN +
             Math.random() *
               (PlaceholderPhysics.WANDER_INTERVAL_MAX - PlaceholderPhysics.WANDER_INTERVAL_MIN);
-          const r = PlaceholderPhysics.PARK_HALF_EXTENT;
+          const r = PlaceholderPhysics.HALF_EXTENT;
           this.wanderTarget = {
-            x: (Math.random() - 0.5) * 2 * r * 0.7,
-            z: (Math.random() - 0.5) * 2 * r * 0.7,
+            x: (Math.random() - 0.5) * 2 * r * 0.6,
+            z: (Math.random() - 0.5) * 2 * r * 0.6,
           };
         }
         return this.wanderTarget;
@@ -170,7 +169,7 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   }
 
   private clampToPark(): void {
-    const r = PlaceholderPhysics.PARK_HALF_EXTENT;
+    const r = PlaceholderPhysics.HALF_EXTENT;
     if (this.state.position.x > r) this.state.position.x = r;
     if (this.state.position.x < -r) this.state.position.x = -r;
     if (this.state.position.z > r) this.state.position.z = r;
