@@ -49,6 +49,9 @@ export interface KindDef {
   /** Optional clumping: place in patches of `size` within `radius` metres —
    *  flower fields, berry patches, mushroom clumps read as destinations. */
   cluster?: { size: number; radius: number };
+  /** 'cross' = two crossed static planes (cheap, never billboarded) — for
+   *  small ground detail placed in the thousands. Default: billboard. */
+  render?: 'cross';
 }
 
 export const KIND_DEFS: readonly KindDef[] = [
@@ -59,7 +62,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.5,
     pickable: false,
     verb: 'sniff',
-    counts: { meadow: 200, woods: 120, lake: 34, trail: 40, home: 2 },
+    counts: { meadow: 380, woods: 170, lake: 60, trail: 70, home: 2 },
   },
   {
     kind: 'pine',
@@ -68,7 +71,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.5,
     pickable: false,
     verb: 'sniff',
-    counts: { woods: 170, meadow: 30 },
+    counts: { woods: 320, meadow: 70 },
   },
   {
     kind: 'bush',
@@ -77,7 +80,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.7,
     pickable: false,
     verb: 'rustle',
-    counts: { meadow: 130, woods: 60, trail: 40, lake: 26, home: 3 },
+    counts: { meadow: 330, woods: 130, trail: 90, lake: 60, home: 3 },
   },
   {
     kind: 'rock',
@@ -86,7 +89,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.6,
     pickable: false,
     verb: 'hop',
-    counts: { meadow: 90, woods: 44, lake: 36, trail: 20, home: 2 },
+    counts: { meadow: 200, woods: 90, lake: 80, trail: 40, home: 2 },
   },
   {
     kind: 'stump',
@@ -95,7 +98,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.45,
     pickable: false,
     verb: 'hop',
-    counts: { woods: 36, meadow: 22, home: 1 },
+    counts: { woods: 80, meadow: 50, home: 1 },
   },
   {
     kind: 'grass',
@@ -104,8 +107,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: false,
     verb: 'none',
-    counts: { meadow: 850, woods: 160, lake: 130, trail: 110, home: 12 },
-    cluster: { size: 8, radius: 4 },
+    counts: { meadow: 7000, woods: 1400, lake: 1100, trail: 900, home: 110 },
+    cluster: { size: 14, radius: 6 },
+    render: 'cross',
   },
   {
     kind: 'flower',
@@ -114,8 +118,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'sniff',
-    counts: { meadow: 300, trail: 60, home: 4, lake: 30 },
-    cluster: { size: 10, radius: 5 },
+    counts: { meadow: 1500, trail: 280, home: 30, lake: 160 },
+    cluster: { size: 16, radius: 6 },
+    render: 'cross',
   },
   {
     kind: 'reed',
@@ -124,7 +129,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: false,
     verb: 'watch',
-    counts: { lake: 150 },
+    counts: { lake: 520 },
+    cluster: { size: 8, radius: 5 },
+    render: 'cross',
   },
   {
     kind: 'mushroom',
@@ -133,8 +140,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'sniff',
-    counts: { woods: 110, meadow: 20 },
-    cluster: { size: 6, radius: 3.5 },
+    counts: { woods: 360, meadow: 60 },
+    cluster: { size: 8, radius: 4 },
+    render: 'cross',
   },
   {
     kind: 'lamp',
@@ -143,7 +151,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.22,
     pickable: false,
     verb: 'watch',
-    counts: { trail: 18, home: 1 },
+    counts: { trail: 26, home: 1 },
   },
   {
     kind: 'bench',
@@ -152,7 +160,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.8,
     pickable: false,
     verb: 'watch',
-    counts: { trail: 10, lake: 4, home: 1 },
+    counts: { trail: 14, lake: 6, home: 1 },
   },
   {
     kind: 'signpost',
@@ -161,7 +169,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.15,
     pickable: false,
     verb: 'watch',
-    counts: { trail: 8, woods: 3, lake: 3, meadow: 6 },
+    counts: { trail: 10, woods: 4, lake: 4, meadow: 8 },
   },
   {
     kind: 'twig',
@@ -170,8 +178,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'none',
-    counts: { woods: 130, meadow: 130, trail: 36, lake: 28 },
-    cluster: { size: 4, radius: 3 },
+    counts: { woods: 380, meadow: 380, trail: 110, lake: 80, home: 8 },
+    cluster: { size: 5, radius: 3 },
+    render: 'cross',
   },
   {
     kind: 'pebble',
@@ -180,7 +189,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'none',
-    counts: { meadow: 110, lake: 70, woods: 40, trail: 26 },
+    counts: { meadow: 330, lake: 220, woods: 120, trail: 80, home: 8 },
+    render: 'cross',
   },
   {
     kind: 'berry',
@@ -189,8 +199,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'sniff',
-    counts: { woods: 60, meadow: 60, trail: 20 },
-    cluster: { size: 5, radius: 4 },
+    counts: { woods: 170, meadow: 170, trail: 60 },
+    cluster: { size: 6, radius: 4 },
+    render: 'cross',
   },
   {
     kind: 'pinecone',
@@ -199,8 +210,9 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'none',
-    counts: { woods: 95, meadow: 24 },
-    cluster: { size: 5, radius: 3 },
+    counts: { woods: 280, meadow: 70 },
+    cluster: { size: 6, radius: 3 },
+    render: 'cross',
   },
 ];
 
@@ -222,8 +234,9 @@ export const LAKE = { x: 30, z: 165, radius: 52 };
 function placeable(kind: KindDef, x: number, z: number): boolean {
   const r = Math.hypot(x, z);
   if (r > WORLD_HALF - 8) return false;
-  // Home stays curated: only tiny detail scatter near the very center.
-  if (r < 12) return false;
+  // The pad and the very center stay clear; big props stay out of the glade,
+  // but small detail (grass, flowers, pickables) grows right up to home.
+  if (r < (kind.collider > 0 ? 9 : 4.5)) return false;
   const lakeD = Math.hypot(x - LAKE.x, z - LAKE.z);
   if (kind.kind === 'reed') return lakeD > LAKE.radius - 2 && lakeD < LAKE.radius + 9;
   if (lakeD < LAKE.radius + (kind.collider > 0 ? 3 : 1)) return false;
@@ -276,7 +289,7 @@ function scatter(seed: number, kinds: readonly KindDef[]): ScatterInstance[] {
       // Clumped kinds grow in patches around a wandering cluster center.
       let clusterCenter: { x: number; z: number } | null = null;
       let clusterLeft = 0;
-      while (placed < count && attempts < count * 8) {
+      while (placed < count && attempts < count * 14) {
         attempts++;
         let p: { x: number; z: number };
         if (kind.cluster) {

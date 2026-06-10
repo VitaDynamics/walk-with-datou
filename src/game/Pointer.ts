@@ -15,8 +15,8 @@ export interface PointerHandlers {
   onHoldStart(clientX: number, clientY: number): void;
   /** The hold was released; `duration` in seconds. */
   onHoldEnd(duration: number): void;
-  /** Horizontal drag, in pixels (turn the diorama). */
-  onDrag(dx: number): void;
+  /** Drag, in pixels (turn the world — or pan it in overview). */
+  onDrag(dx: number, dy: number): void;
   /** Zoom delta (wheel ticks / pinch), positive = zoom out. */
   onZoom(delta: number): void;
 }
@@ -33,6 +33,7 @@ export class Pointer {
   private downX = 0;
   private downY = 0;
   private lastX = 0;
+  private lastY = 0;
   private dragging = false;
   private holding = false;
   private holdStarted = 0;
@@ -47,6 +48,7 @@ export class Pointer {
     this.downX = e.clientX;
     this.downY = e.clientY;
     this.lastX = e.clientX;
+    this.lastY = e.clientY;
     this.dragging = false;
     this.holding = false;
     this.holdTimer = window.setTimeout(() => {
@@ -65,8 +67,9 @@ export class Pointer {
       this.clearHoldTimer();
     }
     if (this.dragging) {
-      this.handlers.onDrag(e.clientX - this.lastX);
+      this.handlers.onDrag(e.clientX - this.lastX, e.clientY - this.lastY);
       this.lastX = e.clientX;
+      this.lastY = e.clientY;
     }
   };
 

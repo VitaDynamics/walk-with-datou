@@ -14,7 +14,11 @@ import type { WantKind } from '../game/Companion';
 import type { Backpack, CraftedId, ItemId } from '../game/Backpack';
 import { RECIPES, canCraft } from '../game/Crafting';
 import {
+  drawArchway,
+  drawBench,
   drawBerry,
+  drawBirdbath,
+  drawBundle,
   drawCairn,
   drawCampfire,
   drawFence,
@@ -27,7 +31,9 @@ import {
   drawShelter,
   drawSoil,
   drawStick,
+  drawStonepile,
   drawTwig,
+  drawWindchime,
 } from '../art/props';
 
 export interface ConsoleCallbacks {
@@ -51,18 +57,13 @@ const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }>
   plot: drawSoil,
   campfire: drawCampfire,
   shelter: drawShelter,
+  bundle: drawBundle,
+  stonepile: drawStonepile,
+  bench: drawBench,
+  birdbath: drawBirdbath,
+  windchime: drawWindchime,
+  archway: drawArchway,
 };
-
-const CRAFTED: readonly CraftedId[] = [
-  'stick',
-  'cairn',
-  'garland',
-  'lantern',
-  'fence',
-  'plot',
-  'campfire',
-  'shelter',
-];
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -240,34 +241,47 @@ export class Console {
             : t(`use.${recipe.use}`);
         btn.append(use);
         btn.addEventListener('click', () => this.callbacks.onUseItem(recipe.id));
+      } else {
+        // Raw resources: clicking explains what they're for.
+        btn.addEventListener('click', () => this.toast(t('craft.resourceHint')));
       }
       this.packItems.append(btn);
     }
 
     this.packRecipes.replaceChildren();
-    for (const id of CRAFTED) {
-      const recipe = RECIPES.find((r) => r.id === id)!;
-      const btn = document.createElement('button');
-      btn.className = 'pack-recipe';
-      btn.type = 'button';
-      btn.disabled = !canCraft(recipe, this.backpack);
-      const img = document.createElement('img');
-      img.src = this.icon(id);
-      img.alt = '';
-      const text = document.createElement('span');
-      const name = document.createElement('div');
-      name.className = 'recipe-name';
-      name.textContent = tDyn(`thing.${id}`);
-      const needs = document.createElement('div');
-      needs.className = 'recipe-needs';
-      needs.textContent = Object.entries(recipe.needs)
-        .map(([res, n]) => `${tDyn(`thing.${res}`)} ×${n}`)
-        .join(' · ');
-      text.append(name, needs);
-      btn.append(img, text);
-      btn.addEventListener('click', () => this.callbacks.onCraft(id));
-      this.packRecipes.append(btn);
+    for (const tier of [1, 2, 3] as const) {
+      const head = document.createElement('div');
+      head.className = 'recipe-tier';
+      head.textContent = t(`craft.tier${tier}`);
+      this.packRecipes.append(head);
+      for (const recipe of RECIPES.filter((r) => r.tier === tier)) {
+        const btn = document.createElement('button');
+        btn.className = 'pack-recipe';
+        btn.type = 'button';
+        btn.disabled = !canCraft(recipe, this.backpack);
+        const img = document.createElement('img');
+        img.src = this.icon(recipe.id);
+        img.alt = '';
+        const text = document.createElement('span');
+        const name = document.createElement('div');
+        name.className = 'recipe-name';
+        name.textContent = tDyn(`thing.${recipe.id}`);
+        const needs = document.createElement('div');
+        needs.className = 'recipe-needs';
+        needs.textContent = Object.entries(recipe.needs)
+          .map(([res, n]) => `${tDyn(`thing.${res}`)} ×${n}`)
+          .join(' · ');
+        text.append(name, needs);
+        btn.append(img, text);
+        btn.addEventListener('click', () => this.callbacks.onCraft(recipe.id));
+        this.packRecipes.append(btn);
+      }
     }
+  }
+
+  /** Close the backpack sheet (e.g. when entering placement mode). */
+  closePack(): void {
+    this.packPanel.hidden = true;
   }
 
   private renderMemories(): void {

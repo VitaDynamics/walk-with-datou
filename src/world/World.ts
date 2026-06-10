@@ -45,6 +45,7 @@ import {
   type ScatterInstance,
   type ScatterKind,
 } from './scatter';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Spot } from './Spots';
 import type { WorldCollider } from '../physics/PhysicsAdapter';
 
@@ -78,6 +79,8 @@ interface BatchInstance extends ScatterInstance {
 interface Batch {
   mesh: THREE.InstancedMesh;
   items: BatchInstance[];
+  /** Cross batches are static — never re-billboarded. */
+  isCross: boolean;
 }
 
 interface RevealAnim {
@@ -90,6 +93,8 @@ export class World {
   readonly groundMesh: THREE.Mesh;
   readonly colliders: WorldCollider[];
   readonly padPosition = PAD_POSITION;
+  /** The painted floor canvas — the minimap draws from it. */
+  readonly paintCanvas: HTMLCanvasElement;
 
   /** Every scattered instance, queryable for interaction/gathering. */
   private readonly instances = new Map<string, BatchInstance>();
@@ -123,7 +128,8 @@ export class World {
       }
     }
     for (const p of MAJOR_PROPS) stamps.push({ x: p.x, z: p.z, r: p.shadowRadius });
-    const worldTex = canvasTexture(paintWorld(WORLD_SEED, stamps));
+    this.paintCanvas = paintWorld(WORLD_SEED, stamps);
+    const worldTex = canvasTexture(this.paintCanvas);
     this.groundMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(520, 520),
       new THREE.MeshBasicMaterial({ map: worldTex, transparent: true }),
@@ -197,9 +203,16 @@ export class World {
     }
     for (const [key, list] of groups) {
       const [kind, variantStr] = key.split(':') as [ScatterKind, string];
+      const isCross = kindDef(kind).render === 'cross';
       const sprite = DRAW[kind](WORLD_SEED + kind.length * 1000 + Number(variantStr) * 97);
-      const geo = new THREE.PlaneGeometry(sprite.aspect, 1);
-      geo.translate(0, 0.5, 0);
+      const plane = new THREE.PlaneGeometry(sprite.aspect, 1);
+      plane.translate(0, 0.5, 0);
+      let geo: THREE.BufferGeometry = plane;
+      if (isCross) {
+        // Two crossed planes — reads from every angle with NO per-frame work.
+        const second = plane.clone().rotateY(Math.PI / 2);
+        geo = mergeGeometries([plane, second])!;
+      }
       const mat = new THREE.MeshBasicMaterial({
         map: canvasTexture(sprite.canvas),
         transparent: true,
@@ -208,29 +221,37 @@ export class World {
         side: THREE.DoubleSide,
       });
       const mesh = new THREE.InstancedMesh(geo, mat, list.length);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      const batch: Batch = { mesh, items: [] };
+      if (!isCross) mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      const batch: Batch = { mesh, items: [], isCross };
       list.forEach((inst, slot) => {
         const item: BatchInstance = { ...inst, alive: true, batch, slot };
         batch.items.push(item);
         this.instances.set(inst.id, item);
+        if (isCross) this.writeMatrix(batch, item, (inst.seed % 628) / 100);
       });
+      mesh.instanceMatrix.needsUpdate = true;
       this.batches.push(batch);
       this.group.add(mesh);
       void pickable;
     }
   }
 
-  /** Billboard every batch to the camera yaw (only when it changed). */
-  private updateBatchMatrices(camYaw: number): void {
+  private writeMatrix(batch: Batch, item: BatchInstance, yaw: number): void {
+    this.dummy.position.set(item.x, 0, item.z);
+    this.dummy.rotation.set(0, yaw, 0);
+    const sc = item.alive ? item.height : 0.0001;
+    this.dummy.scale.set(sc, sc, sc);
+    this.dummy.updateMatrix();
+    batch.mesh.setMatrixAt(item.slot, this.dummy.matrix);
+  }
+
+  /** Billboard the dynamic batches to the camera yaw (only when it changed).
+   *  Cross batches refresh only when an instance was removed. */
+  private updateBatchMatrices(camYaw: number, crossToo: boolean): void {
     for (const batch of this.batches) {
+      if (batch.isCross && !crossToo) continue;
       for (const item of batch.items) {
-        this.dummy.position.set(item.x, 0, item.z);
-        this.dummy.rotation.set(0, camYaw, 0);
-        const s = item.alive ? item.height : 0.0001;
-        this.dummy.scale.set(s, s, 1);
-        this.dummy.updateMatrix();
-        batch.mesh.setMatrixAt(item.slot, this.dummy.matrix);
+        this.writeMatrix(batch, item, batch.isCross ? (item.seed % 628) / 100 : camYaw);
       }
       batch.mesh.instanceMatrix.needsUpdate = true;
     }
@@ -262,7 +283,8 @@ export class World {
     const item = this.instances.get(id);
     if (!item || !item.alive) return false;
     item.alive = false;
-    this.lastYaw = Infinity; // force a matrix refresh
+    this.writeMatrix(item.batch, item, 0);
+    item.batch.mesh.instanceMatrix.needsUpdate = true;
     return true;
   }
 
@@ -290,8 +312,9 @@ export class World {
   update(dt: number, camYaw: number): void {
     for (const c of this.cutouts) c.faceCamera(camYaw);
     if (Math.abs(camYaw - this.lastYaw) > 0.002) {
+      const first = this.lastYaw === Infinity;
       this.lastYaw = camYaw;
-      this.updateBatchMatrices(camYaw);
+      this.updateBatchMatrices(camYaw, first);
     }
     for (let i = this.reveals.length - 1; i >= 0; i--) {
       const r = this.reveals[i];

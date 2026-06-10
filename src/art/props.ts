@@ -7,7 +7,7 @@
  */
 
 import { Rng } from '../physics/mujoco/rng';
-import { CLAY, GROUND, INK, LAMP_WARM, ROBOT, SAGE } from './palette';
+import { CLAY, GROUND, INK, LAMP_WARM, ROBOT, SAGE, WATER } from './palette';
 import { blob, grassStroke, paintBlob, blobPoints, speckle, wobblyLine } from './strokes';
 import { createCanvas, ctx2d } from './textures';
 
@@ -790,6 +790,156 @@ function roundedRectPath(
   g.arcTo(x, y + h, x, y, r);
   g.arcTo(x, y, x + w, y, r);
   g.closePath();
+}
+
+/** A tied bundle of twigs (building component). */
+export function drawBundle(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(160, 112);
+  for (let i = 0; i < 4; i++) {
+    const y = 50 + i * 9 + rng.next() * 4;
+    wobblyLine(g, rng, 20, y + 8, 140, y - 6, 6, i % 2 ? CLAY.deep : CLAY.mid, 1.5, 4);
+  }
+  // Cord wraps.
+  g.strokeStyle = SAGE.shade;
+  g.lineWidth = 5;
+  for (const x of [52, 108]) {
+    g.beginPath();
+    g.moveTo(x - 4, 38);
+    g.lineTo(x + 4, 92);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 160 / 112 };
+}
+
+/** A neat little pile of stones (building component). */
+export function drawStonepile(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(144, 112);
+  blob(g, rng, 50, 84, 26, 18, { fill: CLAY.pale, outline: INK.line, lineWidth: 3.5 }, 8, 0.1);
+  blob(g, rng, 94, 86, 28, 17, { fill: CLAY.light, outline: INK.line, lineWidth: 3.5 }, 8, 0.1);
+  blob(g, rng, 72, 56, 24, 16, { fill: CLAY.pale, outline: INK.line, lineWidth: 3.5 }, 8, 0.1);
+  return { canvas: c, aspect: 144 / 112 };
+}
+
+/** Garden archway — two posts and a gentle arch, blossoms at the shoulders. */
+export function drawArchway(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(320, 416);
+  for (const x of [64, 256]) {
+    wobblyLine(g, rng, x, 400, x, 130, 15, CLAY.mid, 1.5, 5);
+  }
+  // Arch.
+  g.beginPath();
+  g.moveTo(52, 142);
+  g.quadraticCurveTo(160, 30, 268, 142);
+  g.strokeStyle = CLAY.mid;
+  g.lineWidth = 15;
+  g.lineCap = 'round';
+  g.stroke();
+  g.beginPath();
+  g.moveTo(52, 132);
+  g.quadraticCurveTo(160, 22, 268, 132);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.stroke();
+  // Climbing blossoms.
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const x = 60 + t * 200 + rng.next() * 10;
+    const y = 138 - Math.sin(t * Math.PI) * 100 + rng.next() * 10;
+    blob(g, rng, x, y, 10, 8, { fill: CLAY.blossom, outline: INK.soft, lineWidth: 2.5 }, 7, 0.12);
+    if (i % 2 === 0) {
+      blob(
+        g,
+        rng,
+        x + 10,
+        y + 8,
+        8,
+        6,
+        { fill: SAGE.light, outline: INK.soft, lineWidth: 2 },
+        7,
+        0.12,
+      );
+    }
+  }
+  return { canvas: c, aspect: 320 / 416 };
+}
+
+/** A stone birdbath — the meadow birds' favourite. */
+export function drawBirdbath(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(224, 288);
+  // Pedestal.
+  g.beginPath();
+  g.moveTo(96, 120);
+  g.quadraticCurveTo(88, 200, 76, 252);
+  g.lineTo(148, 252);
+  g.quadraticCurveTo(136, 200, 128, 120);
+  g.closePath();
+  g.fillStyle = CLAY.pale;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Base.
+  blob(g, rng, 112, 258, 52, 13, { fill: CLAY.light, outline: INK.line, lineWidth: 4 }, 8, 0.06);
+  // Bowl with water.
+  blob(g, rng, 112, 112, 84, 26, { fill: CLAY.pale, outline: INK.line, lineWidth: 5 }, 10, 0.04);
+  g.beginPath();
+  g.ellipse(112, 106, 62, 14, 0, 0, Math.PI * 2);
+  g.fillStyle = WATER.mid;
+  g.fill();
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  g.stroke();
+  // A little bird.
+  blob(g, rng, 150, 88, 14, 10, { fill: CLAY.blossom, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+  g.fillStyle = INK.line;
+  g.beginPath();
+  g.arc(160, 82, 2.5, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: c, aspect: 224 / 288 };
+}
+
+/** A wind chime on a small hook post — twig, cones and a flower. */
+export function drawWindchime(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 320);
+  // Post with hook.
+  wobblyLine(g, rng, 60, 304, 60, 70, 11, CLAY.deep, 1.5, 5);
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 9;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(60, 72);
+  g.quadraticCurveTo(110, 48, 140, 76);
+  g.stroke();
+  // Crossbar twig.
+  wobblyLine(g, rng, 108, 92, 172, 88, 6, CLAY.mid, 1.5, 3);
+  // Hanging strings + chimes.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  const drops: Array<[number, number]> = [
+    [118, 150],
+    [140, 176],
+    [162, 142],
+  ];
+  for (const [x, y] of drops) {
+    g.beginPath();
+    g.moveTo(x, 90);
+    g.lineTo(x, y);
+    g.stroke();
+  }
+  blob(g, rng, 118, 160, 9, 13, { fill: CLAY.mid, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+  blob(g, rng, 140, 188, 9, 13, { fill: CLAY.deep, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+  blob(g, rng, 162, 152, 11, 9, { fill: CLAY.blossom, outline: INK.soft, lineWidth: 2.5 }, 7, 0.12);
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.arc(162, 152, 3.5, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: c, aspect: 192 / 320 };
 }
 
 // --- Zone setpieces -----------------------------------------------------------

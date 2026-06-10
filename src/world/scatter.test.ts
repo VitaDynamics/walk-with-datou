@@ -16,10 +16,12 @@ describe('world scatter', () => {
 
   it('places a substantial, bounded world', () => {
     const all = [...scatterStatic(1), ...scatterPickables(2)];
-    expect(all.length).toBeGreaterThan(1500);
+    expect(all.length).toBeGreaterThan(8000);
     for (const inst of all) {
-      expect(Math.hypot(inst.x, inst.z)).toBeLessThanOrEqual(WORLD_HALF);
-      expect(Math.hypot(inst.x, inst.z)).toBeGreaterThanOrEqual(12 - 1e-9);
+      const r = Math.hypot(inst.x, inst.z);
+      expect(r).toBeLessThanOrEqual(WORLD_HALF);
+      // Small detail may grow close to home; solid props keep their distance.
+      expect(r).toBeGreaterThanOrEqual((kindDef(inst.kind).collider > 0 ? 9 : 4.5) - 1e-9);
     }
   });
 

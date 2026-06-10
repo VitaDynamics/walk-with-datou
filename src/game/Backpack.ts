@@ -6,14 +6,23 @@
 
 export type ResourceId = 'twig' | 'pebble' | 'berry' | 'flower' | 'mushroom' | 'pinecone';
 export type CraftedId =
+  // tier 1 — components & keepsakes
+  | 'bundle'
+  | 'stonepile'
   | 'stick'
-  | 'cairn'
   | 'garland'
-  | 'lantern'
+  // tier 2 — furnishings
   | 'fence'
-  | 'plot'
+  | 'cairn'
+  | 'lantern'
   | 'campfire'
-  | 'shelter';
+  | 'plot'
+  | 'bench'
+  | 'birdbath'
+  | 'windchime'
+  // tier 3 — structures
+  | 'shelter'
+  | 'archway';
 export type ItemId = ResourceId | CraftedId;
 
 export const RESOURCE_IDS: readonly ResourceId[] = [

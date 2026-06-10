@@ -12,6 +12,9 @@
 import * as THREE from 'three';
 import { canvasTexture, paintBackdrop, paintContactShadow } from '../art/textures';
 import {
+  drawArchway,
+  drawBench,
+  drawBirdbath,
   drawCairn,
   drawCampfire,
   drawCrop,
@@ -20,6 +23,7 @@ import {
   drawShelter,
   drawSoil,
   drawStick,
+  drawWindchime,
 } from '../art/props';
 import { DatouRig } from '../datou/DatouRig';
 import { HumanRig } from '../human/HumanRig';
@@ -28,6 +32,7 @@ import { Leash } from '../human/Leash';
 import { Player } from '../human/Player';
 import type { PhysicsAdapter } from '../physics/PhysicsAdapter';
 import { Console } from '../ui/Console';
+import { Minimap } from '../ui/Minimap';
 import { Cutout } from '../world/Cutout';
 import { SPOT_ANCHORS } from '../world/layout';
 import { kindDef, type ScatterKind } from '../world/scatter';
@@ -52,7 +57,16 @@ const COMFORT_MEMORY_SECONDS = 2.5;
 const GATHER_REACH = 1.9;
 const REACT_COOLDOWN = 6;
 
-type BuildableKind = 'cairn' | 'lantern' | 'fence' | 'campfire' | 'shelter';
+type BuildableKind =
+  | 'cairn'
+  | 'lantern'
+  | 'fence'
+  | 'campfire'
+  | 'shelter'
+  | 'bench'
+  | 'birdbath'
+  | 'windchime'
+  | 'archway';
 
 interface BuiltItem {
   kind: BuildableKind;
@@ -67,6 +81,10 @@ const BUILD_LOOK: Record<BuildableKind, { height: number; shadowRadius: number }
   fence: { height: 0.95, shadowRadius: 0.55 },
   campfire: { height: 1.0, shadowRadius: 0.7 },
   shelter: { height: 1.5, shadowRadius: 1.0 },
+  bench: { height: 0.9, shadowRadius: 1.0 },
+  birdbath: { height: 1.2, shadowRadius: 0.5 },
+  windchime: { height: 1.5, shadowRadius: 0.3 },
+  archway: { height: 2.5, shadowRadius: 0.9 },
 };
 
 interface PlotVisual {
@@ -99,6 +117,7 @@ export class Game {
   private readonly stickCutout: Cutout;
   private readonly farm = new Farm();
   private readonly plotVisuals = new Map<number, PlotVisual>();
+  private minimap: Minimap | null = null;
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
@@ -177,8 +196,30 @@ export class Game {
       onTap: (x, y) => this.handleTap(x, y),
       onHoldStart: (x, y) => this.handleHoldStart(x, y),
       onHoldEnd: (duration) => this.handleHoldEnd(duration),
-      onDrag: (dx) => this.cameraRig.addDrag(dx),
+      onDrag: (dx, dy) => this.cameraRig.addDrag(dx, dy),
       onZoom: (d) => this.cameraRig.addZoom(d),
+    });
+
+    // Minimap: click to walk there (Datou comes along).
+    try {
+      this.minimap = new Minimap(this.world.paintCanvas, (x, z) => {
+        const p = this.clampToWorld(x, z);
+        this.player.walkTo(p.x, p.z);
+        this.ui.notifyInteracted();
+      });
+    } catch {
+      this.minimap = null; // markup missing — game still runs
+    }
+
+    // Overview mode: the ⌖ button or M.
+    const mapButton = document.getElementById('map-button');
+    const toggleOverview = (): void => {
+      const on = this.cameraRig.toggleOverview();
+      mapButton?.classList.toggle('active', on);
+    };
+    mapButton?.addEventListener('click', toggleOverview);
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyM' && !e.repeat) toggleOverview();
     });
 
     this.player.setColliders(this.world.colliders);
@@ -187,6 +228,12 @@ export class Game {
     this.applyStance();
 
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.placing) {
+        this.placing = null;
+        this.ui.toast(t('place.cancelled'));
+      }
+    });
     window.addEventListener('beforeunload', () =>
       this.saveRaw('wwd.bond', String(this.bond.level)),
     );
@@ -350,13 +397,15 @@ export class Game {
         this.saveRaw('wwd.garland', this.garlandWorn ? '1' : '0');
         break;
       }
-      case 'cairn':
-      case 'lantern':
-      case 'fence':
-      case 'campfire':
-      case 'shelter':
-      case 'plot': {
-        this.placing = id;
+      case 'bundle':
+      case 'stonepile':
+        // Components: explain rather than do.
+        this.ui.toast(t('craft.componentHint'));
+        break;
+      default: {
+        // Every other craftable goes into the world on the next ground tap.
+        this.placing = id as BuildableKind | 'plot';
+        this.ui.closePack();
         this.ui.toast(t('place.hint'));
         break;
       }
@@ -372,6 +421,10 @@ export class Game {
       fence: drawFence,
       campfire: drawCampfire,
       shelter: drawShelter,
+      bench: drawBench,
+      birdbath: drawBirdbath,
+      windchime: drawWindchime,
+      archway: drawArchway,
     }[item.kind];
     const cut = new Cutout(drawBuild(seed), BUILD_LOOK[item.kind]);
     this.world.placeCutout(cut, item.x, item.z);
@@ -591,7 +644,10 @@ export class Game {
     this.datouRig.update(dt, state, this.companion.expression, camYaw);
     this.humanRig.update(dt, this.player.x, this.player.z, this.player.vx, this.player.vz, camYaw);
 
-    this.leash.setVisible(this.leashOn && !this.fetch.active);
+    // Hide the rope when they're improbably far apart (spawn/teleport) —
+    // a 2 m leash stretched across the meadow reads wrong.
+    const pairDist = Math.hypot(state.position.x - this.player.x, state.position.z - this.player.z);
+    this.leash.setVisible(this.leashOn && !this.fetch.active && pairDist < 6);
     this.leash.update(dt, this.humanRig.handPosition, this.datouRig.harnessPosition);
 
     const stickPos = this.fetch.stickPosition();
@@ -610,6 +666,13 @@ export class Game {
 
     const focus = new THREE.Vector3(this.player.x, 0, this.player.z);
     this.cameraRig.update(dt, focus);
+
+    this.minimap?.update(
+      dt,
+      this.player,
+      { x: state.position.x, z: state.position.z },
+      this.spots.spots.filter((sp) => sp.found),
+    );
 
     // --- console sync ---
     this.ui.setMood(state.mood);

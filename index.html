@@ -382,6 +382,13 @@
         height: 34px;
         object-fit: contain;
       }
+      .recipe-tier {
+        margin: 6px 2px 2px;
+        font-size: 10.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+      }
       .pack-recipe .recipe-name {
         font-size: 12.5px;
         color: var(--text-primary);
@@ -480,6 +487,50 @@
         color: var(--text-tertiary);
         text-align: center;
         line-height: 1.6;
+      }
+
+      /* --- Minimap (bottom-right) --- */
+      #minimap {
+        position: absolute;
+        right: 20px;
+        bottom: 26px;
+        z-index: 5;
+        width: 168px;
+        height: 168px;
+        border-radius: 18px;
+        box-shadow: var(--shadow-card);
+        background: var(--surface);
+        cursor: pointer;
+      }
+
+      /* --- Overview (map) button, under settings --- */
+      #map-button {
+        position: absolute;
+        top: 68px;
+        right: 20px;
+        z-index: 6;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        border: none;
+        border-radius: 50%;
+        background: var(--surface);
+        color: var(--text-secondary);
+        box-shadow: var(--shadow-card);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+        user-select: none;
+        transition: background var(--fast) ease;
+      }
+      #map-button:hover {
+        background: var(--surface-strong);
+      }
+      #map-button.active {
+        background: var(--accent);
+        color: #fff;
       }
 
       /* --- Settings (cog + popover) --- */
@@ -644,6 +695,12 @@
       <div id="memories-list"></div>
     </div>
 
+    <!-- Minimap -->
+    <canvas id="minimap" width="336" height="336" title="Map"></canvas>
+
+    <!-- Overview toggle (M) -->
+    <button id="map-button" type="button" title="Overview (M)" aria-label="Overview">⌖</button>
+
     <!-- Settings -->
     <button
       id="settings-button"
@@ -665,7 +722,12 @@
 
       <div class="panel-title" data-i18n="settings.walker">Walker</div>
       <div id="avatar-toggle" class="lang-toggle">
-        <button type="button" class="lang-btn avatar-btn" data-avatar="boy" data-i18n="settings.boy">
+        <button
+          type="button"
+          class="lang-btn avatar-btn"
+          data-avatar="boy"
+          data-i18n="settings.boy"
+        >
           Boy
         </button>
         <button
