@@ -245,25 +245,23 @@ export function drawEyes(state: EyeState): PropSprite {
   return { canvas: c, aspect: 200 / 100 };
 }
 
-/** Thigh — chubby cream upper segment (sticker-plump). Pivot = top center. */
+/**
+ * Thigh — the real VITA thigh is a broad drumstick: a big rounded shell over
+ * the hip actuator that sweeps and tapers down to a slim knee. Much more
+ * massive than the calf. Pivot = top center (the hip axis).
+ */
 export function drawThigh(seed: number): PropSprite {
   const rng = new Rng(seed);
   void rng.next();
   const { c, g } = sprite(104, 176);
-  // Hip joint cap behind.
-  g.fillStyle = ROBOT.dark;
+  // Drumstick shell — round dome over the hip, tapering to the knee.
   g.beginPath();
-  g.arc(52, 26, 24, 0, Math.PI * 2);
-  g.fill();
-  g.strokeStyle = INK.line;
-  g.lineWidth = 5;
-  g.stroke();
-  // Thigh body — plump, rounding gently toward the knee.
-  g.beginPath();
-  g.moveTo(24, 22);
-  g.quadraticCurveTo(16, 92, 36, 154);
-  g.lineTo(68, 154);
-  g.quadraticCurveTo(88, 92, 80, 22);
+  g.moveTo(16, 52);
+  g.quadraticCurveTo(12, 8, 52, 6);
+  g.quadraticCurveTo(92, 8, 88, 52);
+  g.quadraticCurveTo(84, 104, 66, 150);
+  g.lineTo(40, 150);
+  g.quadraticCurveTo(22, 104, 16, 52);
   g.closePath();
   g.fillStyle = ROBOT.shell;
   g.fill();
@@ -271,12 +269,21 @@ export function drawThigh(seed: number): PropSprite {
   g.lineWidth = 5;
   g.lineJoin = 'round';
   g.stroke();
-  // Seam.
+  // Hip actuator disc — the round boss on the real thigh shell.
   g.strokeStyle = ROBOT.shellShade;
   g.lineWidth = 3;
   g.beginPath();
-  g.moveTo(36, 60);
-  g.lineTo(68, 60);
+  g.arc(52, 34, 18, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = ROBOT.darkShade;
+  g.beginPath();
+  g.arc(52, 34, 5, 0, Math.PI * 2);
+  g.fill();
+  // Seam following the taper.
+  g.beginPath();
+  g.strokeStyle = ROBOT.shellShade;
+  g.moveTo(32, 96);
+  g.quadraticCurveTo(44, 124, 56, 142);
   g.stroke();
   return { canvas: c, aspect: 104 / 176 };
 }
