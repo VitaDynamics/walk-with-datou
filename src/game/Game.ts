@@ -61,6 +61,11 @@ import { MATERIALS } from './workshop/materials';
 import { rollInspiration, type InspoContext, type Mood } from './workshop/inspiration';
 import { weatherFor, seasonFor, tintFor } from './workshop/weather';
 import { zoneAt } from '../world/zones';
+import { NodeState } from './workshop/NodeState';
+import { Tools } from './workshop/tools';
+import { Harvest } from './workshop/Harvest';
+import { NODE_DEFS, NODE_PLACEMENTS, type NodePlacement } from './workshop/nodes';
+import { drawNode } from '../art/nodes';
 
 const MAX_DT = 1 / 30;
 const TRUST_FULL = 120;
@@ -140,6 +145,11 @@ export class Game {
   private readonly workshopState = new WorkshopState();
   private workshop!: Workshop;
   private placingItem: string | null = null;
+  // Resource nodes & tools (W8).
+  private readonly nodeState = new NodeState();
+  private readonly tools = new Tools();
+  private readonly harvest: Harvest;
+  private readonly nodeVisuals = new Map<string, { cut: Cutout; state: string }>();
   // Inspiration cadence (§5.2): a slow tick, a cooldown, and a pity timer so at
   // least one fires every ~2 sessions and never more than one per 10 min.
   private inspoTickIn = 90;
@@ -222,6 +232,31 @@ export class Game {
       },
       onDeliver: (items) => this.handleForageDeliver(items),
     });
+    this.harvest = new Harvest({
+      setMode: (m) => this.physics.setMode(m),
+      setTarget: (x, z) => this.physics.setTarget(x, z),
+      charges: (id) => this.nodeState.charges(id),
+      spend: (id) => this.nodeState.spend(id),
+      toolMultiplier: () => {
+        const eq = this.tools.equippedTool();
+        return eq ? this.tools.yieldMultiplier(eq.id) : 0;
+      },
+      swing: () => {
+        const eq = this.tools.equippedTool();
+        if (eq) this.tools.swing(eq.id);
+      },
+      bucketCapacity: () => this.forage.bucketCapacity,
+      tooTired: () => this.physics.getDatouState().mood === 'tired',
+      onBeat: (id, gained) => {
+        this.datouRig.reach();
+        this.datouRig.setBucketFill(this.harvest.fill, this.forage.bucketCapacity);
+        this.replateNode(id);
+        void gained;
+      },
+      onDeliver: (items) => this.handleForageDeliver(items),
+      onNeedTool: () => this.ui.toast(t('node.needTool')),
+      onRefuse: () => this.ui.toast(t('node.refused')),
+    });
 
     this.ui = new Console(this.memories, this.backpack, {
       onLeashToggle: () => this.toggleLeash(),
@@ -248,6 +283,7 @@ export class Game {
       ?.addEventListener('click', () => this.workshop.toggle());
     for (const b of this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []))
       this.placeWorkshopItem(b.id, b.x, b.z, false);
+    this.placeNodes();
 
     this.pointer = new Pointer(canvas, {
       onTap: (x, y) => this.handleTap(x, y),
@@ -366,6 +402,13 @@ export class Game {
         this.player.walkTo(pickable.x, pickable.z);
         this.pendingGather = pickable.id;
       }
+      return;
+    }
+
+    // A resource node → Datou trots over and works it (W8).
+    const node = this.nodeNear(p.x, p.z);
+    if (node) {
+      this.tapNode(node);
       return;
     }
 
@@ -551,7 +594,12 @@ export class Game {
       this.memories.add(entry);
       this.ui.toast(t('workshop.made', { thing: itemName(spec) }));
     }
-    // Hand the made item to the world: close the window and place on next tap.
+    // Tools equip into the dorsal gripper rather than placing in the world.
+    if (spec.form === 'axe' || spec.form === 'pickaxe' || spec.form === 'shears' || spec.form === 'scoop') {
+      this.equipTool(id);
+      return true;
+    }
+    // Everything else: close the window and place on the next ground tap.
     this.placingItem = id;
     this.workshop.hide();
     this.ui.toast(t('place.hint'));
@@ -609,6 +657,97 @@ export class Game {
       this.datouRig.reach();
       this.ui.toast(t('workshop.inspired'));
     }
+  }
+
+  // --- Resource nodes (W8) ---
+
+  /** World plate height (m) per node type — landmark-sized (§8.1). */
+  private nodeHeight(type: NodePlacement['type']): number {
+    return {
+      'great-tree': 9,
+      'old-boulder': 3.2,
+      'clay-seam': 1.2,
+      'flint-lode': 1.8,
+      'bolt-cache': 2.4,
+    }[type];
+  }
+
+  private placeNodes(): void {
+    for (const p of NODE_PLACEMENTS) {
+      const state = this.nodeState.state_(p.id);
+      const seed = (Math.round(p.x * 31 + p.z * 7) ^ 0x4a0d) >>> 0;
+      const cut = new Cutout(drawNode(p.type, state, seed), {
+        height: this.nodeHeight(p.type),
+        shadowRadius: this.nodeHeight(p.type) * 0.22,
+      });
+      this.world.placeCutout(cut, p.x, p.z);
+      this.nodeVisuals.set(p.id, { cut, state });
+    }
+  }
+
+  /** Re-draw a node's plate if its harvest state changed (depletion/regrow). */
+  private replateNode(nodeId: string): void {
+    const p = NODE_PLACEMENTS.find((n) => n.id === nodeId);
+    const vis = this.nodeVisuals.get(nodeId);
+    if (!p || !vis) return;
+    const state = this.nodeState.state_(nodeId);
+    if (state === vis.state) return;
+    const seed = (Math.round(p.x * 31 + p.z * 7) ^ 0x4a0d) >>> 0;
+    vis.cut.group.removeFromParent();
+    vis.cut.dispose();
+    const cut = new Cutout(drawNode(p.type, state, seed), {
+      height: this.nodeHeight(p.type),
+      shadowRadius: this.nodeHeight(p.type) * 0.22,
+    });
+    this.world.placeCutout(cut, p.x, p.z);
+    this.nodeVisuals.set(nodeId, { cut, state });
+  }
+
+  /** Tapped near a node: send Datou to work it with the equipped tool (§8.3). */
+  private tapNode(p: NodePlacement): void {
+    if (this.harvest.active) {
+      this.harvest.stop();
+      return;
+    }
+    const def = NODE_DEFS[p.type];
+    const eq = this.tools.equippedTool();
+    if (!eq || eq.kind !== def.tool || eq.tier < def.minTier) {
+      this.ui.toast(t('node.needTool'));
+      return;
+    }
+    if (this.nodeState.charges(p.id) <= 0) {
+      this.ui.toast(t('node.spent'));
+      return;
+    }
+    if (this.leashOn) {
+      this.leashOn = false;
+      this.ui.setLeash(false);
+      this.saveRaw('wwd.leash', '0');
+      this.applyStance();
+    }
+    this.datouRig.setCarrying(true); // tool rides in the gripper
+    this.harvest.start(p, dailySeed());
+  }
+
+  /** Nearest node within range of a world point (for tap routing). */
+  private nodeNear(x: number, z: number, r = 3.5): NodePlacement | null {
+    let best: NodePlacement | null = null;
+    let bestD = r;
+    for (const p of NODE_PLACEMENTS) {
+      const d = Math.hypot(p.x - x, p.z - z);
+      if (d <= bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  /** Equip a made tool from the Workshop (clamps into the dorsal gripper). */
+  private equipTool(id: string): void {
+    this.tools.equip(id);
+    this.datouRig.setCarrying(true);
+    this.ui.toast(t('tool.equipped'));
   }
 
   private placeWorkshopItem(id: string, x: number, z: number, fresh: boolean): void {
@@ -692,15 +831,17 @@ export class Game {
     }
   }
 
-  /** Datou dumped a forage haul into the pack (§7). */
+  /** Datou dumped a forage OR harvest haul into the pack (§7/§8). */
   private handleForageDeliver(items: string[]): void {
     for (const kind of items) this.backpack.add(kind as ResourceId);
     this.bond.add('discovery', items.length);
     this.physics.applyPet();
     this.datouRig.pulse();
-    this.datouRig.setBucketFill(this.forage.fill, this.forage.bucketCapacity);
+    // Reflect whichever loop is still running (0 when both stand down).
+    const fill = this.harvest.active ? this.harvest.fill : this.forage.fill;
+    this.datouRig.setBucketFill(fill, this.forage.bucketCapacity);
+    if (!this.harvest.active && !this.forage.active) this.datouRig.setCarrying(false);
     this.ui.toast(t('forage.delivered', { n: String(items.length) }));
-    // A full haul brought solo is a little story worth keeping.
     if (items.length >= this.forage.bucketCapacity) {
       this.memories.add({
         ts: Date.now(),
@@ -812,10 +953,11 @@ export class Game {
     const state = this.physics.getDatouState();
 
     this.fetch.update(dt, state, this.player);
-    if (!this.fetch.active && this.forage.active) {
+    if (!this.fetch.active && this.harvest.active) {
+      this.harvest.update(dt, state, this.player);
+    } else if (!this.fetch.active && this.forage.active) {
       this.forage.update(dt, state, this.player);
-    }
-    if (!this.fetch.active && !this.forage.active) {
+    } else if (!this.fetch.active) {
       this.companion.update(state, this.player, this.events, dt);
     }
     this.events.petted = false;
