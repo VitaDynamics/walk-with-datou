@@ -13,13 +13,13 @@ import { canonical, filledCount, type Arrangement } from './pattern';
 import { matchExact, patternKeys } from './patterns';
 import { grammarResult, type GrammarResult } from './grammar';
 import { groupOf, type MaterialId } from './materials';
-import { finishesFor, itemId, sizesFor, type ItemId } from './items';
+import { accepts, finishesFor, itemId, sizesFor, type ItemId } from './items';
 import type { FormId } from './forms';
 
 export const MAX_STACK = 3;
 
 export type Outcome =
-  | { kind: 'exact'; form: FormId; id: ItemId }
+  | { kind: 'exact'; form: FormId; id: ItemId; patternKey: string }
   | { kind: 'grammar'; id: ItemId }
   | { kind: 'curio'; tone: number }
   | { kind: 'empty' };
@@ -80,7 +80,7 @@ export class Bench {
     const exact = matchExact(key);
     if (exact) {
       const id = resolveExactItem(exact, a);
-      if (id) return { kind: 'exact', form: exact, id };
+      if (id) return { kind: 'exact', form: exact, id, patternKey: key };
     }
     const g: GrammarResult = grammarResult(a);
     if (g.kind === 'curio') return { kind: 'curio', tone: g.tone };
@@ -111,14 +111,17 @@ export class Bench {
  * by mass and finished plain (exact makes read clean).
  */
 function resolveExactItem(form: FormId, a: Arrangement): ItemId | null {
-  // Heaviest-weighted material whose group the form accepts.
+  // Heaviest-weighted material the form accepts.
   let bestMat: MaterialId | null = null;
   let best = -1;
   for (let i = 0; i < 9; i++) {
     const m = a.materials?.[i];
-    if (!m) continue;
+    if (!m || !accepts(form, m)) continue;
     const w = Math.max(1, a.stacks[i]);
-    if (w > best) ((best = w), (bestMat = m));
+    if (w > best) {
+      best = w;
+      bestMat = m;
+    }
   }
   if (!bestMat) return null;
   const mass = a.stacks.reduce((n, s) => n + s, 0);

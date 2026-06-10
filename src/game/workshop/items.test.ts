@@ -11,7 +11,7 @@ import {
   parseItemId,
   sizesFor,
 } from './items';
-import { FORMS, FORM_IDS, type FormId } from './forms';
+import { FORMS, FORM_IDS, type Form, type FormId } from './forms';
 import { MATERIALS, MATERIAL_IDS, materialsInGroup } from './materials';
 import { setLang } from '../../i18n';
 
@@ -75,10 +75,14 @@ describe('ItemId scheme', () => {
     expect(parseItemId('bench:twig:M:sparkly')).toBeNull(); // bad finish
   });
 
-  it('eligibility is exactly group membership', () => {
+  it('eligibility follows group membership and optional material whitelists', () => {
     for (const f of FORM_IDS) {
       for (const m of MATERIAL_IDS) {
-        expect(accepts(f, m)).toBe(FORMS[f].accepts.includes(MATERIALS[m].group));
+        const def: Form = FORMS[f];
+        const expected =
+          def.accepts.includes(MATERIALS[m].group) &&
+          (!def.materials || def.materials.includes(m));
+        expect(accepts(f, m)).toBe(expected);
       }
     }
   });
@@ -87,6 +91,33 @@ describe('ItemId scheme', () => {
     for (const f of FORM_IDS) {
       expect(sizesFor(f).length).toBe(FORMS[f].sizes ? 3 : 1);
       expect(finishesFor(f).length).toBe(FORMS[f].finishes ? 3 : 1);
+    }
+  });
+});
+
+describe('Minecraft-inspired companion forms', () => {
+  const ids = [
+    'brush',
+    'wayfinder',
+    'field-glass',
+    'play-ball',
+    'cache-box',
+    'drinking-bowl',
+    'bug-hotel',
+    'raft',
+  ] as const satisfies readonly FormId[];
+
+  it('carry complete authoring metadata and sensible material lists', () => {
+    for (const id of ids) {
+      const def: Form = FORMS[id];
+      expect(def.materials?.length, id).toBeGreaterThanOrEqual(3);
+      expect(def.materials?.length, id).toBeLessThanOrEqual(12);
+      expect(def.companionshipHook?.length, id).toBeGreaterThan(20);
+      expect(def.inspiration?.length, id).toBeGreaterThan(10);
+      expect(def.world, id).toBeDefined();
+      for (const material of def.materials ?? []) {
+        expect(def.accepts, `${id}:${material}`).toContain(MATERIALS[material].group);
+      }
     }
   });
 });

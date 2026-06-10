@@ -57,6 +57,17 @@ describe('canonical (V₄ flip/180° invariance, orientation-preserving)', () =>
 });
 
 describe('exact pattern table', () => {
+  const authoredAdditions = [
+    'brush',
+    'wayfinder',
+    'field-glass',
+    'play-ball',
+    'cache-box',
+    'drinking-bowl',
+    'bug-hotel',
+    'raft',
+  ] as const;
+
   it('every pattern result is a real form', () => {
     for (const p of EXACT_PATTERNS) expect(p.result in FORMS, p.result).toBe(true);
   });
@@ -76,5 +87,15 @@ describe('exact pattern table', () => {
 
   it('exposes its keys for near-miss search', () => {
     expect(patternKeys().length).toBe(EXACT_PATTERNS.length);
+  });
+
+  it('gives each new companion form one recipe within its tier cell budget', () => {
+    for (const id of authoredAdditions) {
+      const recipes = EXACT_PATTERNS.filter((pattern) => pattern.result === id);
+      expect(recipes, id).toHaveLength(1);
+      const cells = filledCount(recipes[0]);
+      expect(cells, id).toBeLessThanOrEqual(FORMS[id].tier === 1 ? 4 : 7);
+      if (FORMS[id].tier === 2) expect(cells, id).toBeGreaterThanOrEqual(4);
+    }
   });
 });

@@ -19,7 +19,7 @@
 import { canonical, type ExactPattern } from './pattern';
 import type { FormId } from './forms';
 
-export const PATTERNS_VERSION = 1;
+export const PATTERNS_VERSION = 2;
 
 const W = 'wood';
 const S = 'stone';
@@ -77,12 +77,20 @@ export const EXACT_PATTERNS: readonly ExactPattern[] = [
   pat('sign', [W, W, W, _, W, _, _, W, _], [1, 1, 1, 0, 2, 0, 0, 2, 0]),
   // A woven open basket → a basket.
   pat('basket', [P, _, P, P, _, P, P, P, P], [1, 0, 1, 1, 0, 1, 1, 1, 1]),
+  // A lidded box with a small found latch → a cache box.
+  pat('cache-box', [W, W, W, W, F, W, _, W, _], [1, 1, 1, 1, 1, 1, 0, 2, 0]),
+  // A low open stone curve → a drinking bowl.
+  pat('drinking-bowl', [S, _, S, S, S, S, _, _, _], [1, 0, 1, 2, 1, 2, 0, 0, 0]),
+  // A timber frame divided into plant-filled nesting rooms → a bug hotel.
+  pat('bug-hotel', [W, W, W, W, P, W, _, P, _], [1, 1, 1, 2, 1, 2, 0, 1, 0]),
 
   // --- For Datou & keepsakes (tier 1) ---------------------------------------
   // A garland: a sweeping arc of flowers.
   pat('garland', [P, _, _, _, P, _, _, _, P], [2, 0, 0, 0, 2, 0, 0, 0, 2]),
   // A small found+plant trinket → a collar charm.
   pat('collar-charm', [_, F, _, _, P, _, _, _, _], [0, 1, 0, 0, 1, 0, 0, 0, 0]),
+  // Four wrapped plant pads → a soft play ball.
+  pat('play-ball', [_, P, _, P, _, P, _, P, _], [0, 2, 0, 2, 0, 2, 0, 2, 0]),
   // A balanced stack of stones → a cairn.
   pat('cairn', [_, _, _, _, S, _, _, S, _], [0, 0, 0, 0, 1, 0, 0, 2, 0]),
   // Two twigs lashed → the fetch stick.
@@ -107,6 +115,8 @@ export const EXACT_PATTERNS: readonly ExactPattern[] = [
   pat('well', [S, S, S, S, _, S, S, S, S], [2, 1, 2, 1, 0, 1, 2, 2, 2]),
   // A glazed box over earth → a cold-frame.
   pat('cold-frame', [S, S, S, W, P, W, W, W, W], [1, 1, 1, 2, 1, 2, 1, 1, 1]),
+  // A bound deck of wood → a small lake raft.
+  pat('raft', [_, P, _, W, W, W, W, W, W], [0, 2, 0, 1, 1, 1, 2, 2, 2]),
 
   // --- Tools (§8.2 — discovered on the bench like everything else) ----------
   // A wedge head on a handle, edge out → an axe.
@@ -117,6 +127,12 @@ export const EXACT_PATTERNS: readonly ExactPattern[] = [
   pat('shears', [F, _, F, _, F, _, _, W, _], [1, 0, 1, 0, 1, 0, 0, 1, 0]),
   // A cupped head on a handle → a scoop.
   pat('scoop', [W, _, _, W, _, _, _, W, _], [1, 0, 0, 1, 0, 0, 0, 1, 0]),
+  // Soft bristles bound to a short handle → a brush.
+  pat('brush', [_, P, _, _, W, _, _, _, _], [0, 1, 0, 0, 2, 0, 0, 0, 0]),
+  // A short cardinal pointer around a weighted center → a wayfinder.
+  pat('wayfinder', [_, F, _, S, F, S, _, _, _], [0, 1, 0, 1, 2, 1, 0, 0, 0]),
+  // Two lenses joined by a light tube → a field glass.
+  pat('field-glass', [F, _, _, _, W, _, _, _, F], [1, 0, 0, 0, 2, 0, 0, 0, 1]),
 ];
 
 function pat(result: FormId, cells: ExactPattern['cells'], stacks: number[]): ExactPattern {

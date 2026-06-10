@@ -19,9 +19,9 @@
  * bumps when the table changes so saves can migrate discovered knowledge.
  */
 
-import type { MaterialGroup } from './materials';
+import type { MaterialGroup, MaterialId } from './materials';
 
-export const FORMS_VERSION = 1;
+export const FORMS_VERSION = 2;
 
 /** Tree-tab branches (BUILDING_SYSTEM §2.2 groupings). */
 export type FormFamily = 'component' | 'furnishing' | 'structure' | 'datou' | 'keepsake' | 'tool';
@@ -41,12 +41,25 @@ export interface Form {
   readonly family: FormFamily;
   /** Material groups this form accepts. A material is eligible iff its group is listed. */
   readonly accepts: readonly MaterialGroup[];
+  /** Optional authoring-template whitelist for forms that need tighter physical eligibility. */
+  readonly materials?: readonly MaterialId[];
   readonly use: FormUse;
   readonly tier: 1 | 2 | 3;
   /** Does size vary this form? (Most do; a few one-size keepsakes don't.) */
   readonly sizes?: boolean;
   /** Does finish vary this form? */
   readonly finishes?: boolean;
+  /** What the player and Datou concretely do with this form. */
+  readonly companionshipHook?: string;
+  /** Context in which Datou can hint at the form. */
+  readonly inspiration?: string;
+  /** Placement metadata authored with the sprite form. */
+  readonly world?: {
+    readonly heightM: number;
+    readonly shadowRadiusM: number;
+    readonly colliderM: number;
+    readonly placement: 'billboard' | 'decal';
+  };
   /**
    * Name of an existing `src/art/props.ts` draw fn this form already has art
    * for (the ~25 mapped in W1). Absent ⇒ template still to author (W3/W7).
@@ -89,6 +102,27 @@ export const FORMS = {
   sign: { family: 'furnishing', accepts: ['wood'], use: 'place', tier: 1, sizes: true, legacySprite: 'drawSignpost' },
   mat: { family: 'furnishing', accepts: ['plant'], use: 'place', tier: 1, sizes: true, finishes: true, legacySprite: 'drawPad' },
   basket: { family: 'furnishing', accepts: ['plant', 'wood'], use: 'place', tier: 2, sizes: true },
+  'cache-box': {
+    family: 'furnishing', accepts: ['wood', 'stone'], materials: ['plank', 'driftwood', 'bark', 'log', 'stone-block', 'clay-lump'],
+    use: 'place', tier: 2, sizes: true, finishes: true,
+    companionshipHook: 'Datou drops gathered finds into the box while you sort and remember the walk together.',
+    inspiration: 'home + clear + any season + calm mood, bond 30+',
+    world: { heightM: 0.72, shadowRadiusM: 0.58, colliderM: 0.45, placement: 'billboard' },
+  },
+  'drinking-bowl': {
+    family: 'furnishing', accepts: ['stone', 'found'], materials: ['flat-stone', 'stone-block', 'clay-lump', 'shell'],
+    use: 'place', tier: 2, sizes: true, finishes: true,
+    companionshipHook: 'You refill the bowl after a long walk and Datou pauses beside you for a drink.',
+    inspiration: 'lake + clear + summer + tired mood, bond 30+',
+    world: { heightM: 0.32, shadowRadiusM: 0.38, colliderM: 0.22, placement: 'billboard' },
+  },
+  'bug-hotel': {
+    family: 'furnishing', accepts: ['wood', 'plant'], materials: ['twig', 'bark', 'pine-branch', 'log', 'reed', 'pinecone'],
+    use: 'place', tier: 2, sizes: true, finishes: true,
+    companionshipHook: 'You and Datou return to quietly watch which tiny visitors have moved into its rooms.',
+    inspiration: 'meadow + breeze + spring + curious mood, bond 30+',
+    world: { heightM: 1.1, shadowRadiusM: 0.48, colliderM: 0.3, placement: 'billboard' },
+  },
 
   // --- Structures (§2.2) — the big keepsakes, consume bulk stock -------------
   shelter: { family: 'structure', accepts: ['wood', 'stone'], use: 'place', tier: 3, sizes: true, legacySprite: 'drawShelter' },
@@ -100,6 +134,13 @@ export const FORMS = {
   well: { family: 'structure', accepts: ['stone'], use: 'place', tier: 3, sizes: true },
   'cold-frame': { family: 'structure', accepts: ['wood', 'stone'], use: 'place', tier: 3, sizes: true },
   campfire: { family: 'structure', accepts: ['wood', 'stone'], use: 'place', tier: 2, legacySprite: 'drawCampfire' },
+  raft: {
+    family: 'structure', accepts: ['wood', 'plant'], materials: ['plank', 'driftwood', 'log', 'reed'],
+    use: 'place', tier: 2, sizes: true, finishes: true,
+    companionshipHook: 'You step onto the raft together and Datou scans the quiet shoreline from the bow.',
+    inspiration: 'lake + clear + summer + Explorer personality, bond 45+',
+    world: { heightM: 0.28, shadowRadiusM: 1.05, colliderM: 0.85, placement: 'decal' },
+  },
 
   // --- For Datou (§2.2) -----------------------------------------------------
   garland: { family: 'datou', accepts: ['plant'], use: 'wear', tier: 1, finishes: true, legacySprite: 'drawGarland' },
@@ -107,6 +148,13 @@ export const FORMS = {
   ramp: { family: 'datou', accepts: ['wood', 'stone'], use: 'place', tier: 2, sizes: true },
   tunnel: { family: 'datou', accepts: ['wood', 'plant'], use: 'place', tier: 2, sizes: true },
   'ball-run': { family: 'datou', accepts: ['wood'], use: 'place', tier: 2, sizes: true },
+  'play-ball': {
+    family: 'datou', accepts: ['wood', 'plant', 'found'], materials: ['bark', 'grass-wisp', 'reed', 'flower', 'feather'],
+    use: 'throw', tier: 1, sizes: true, finishes: true,
+    companionshipHook: 'Datou chases, nudges, and brings the soft ball back for another shared turn.',
+    inspiration: 'home + clear + any season + playful mood, bond 15+',
+    world: { heightM: 0.3, shadowRadiusM: 0.22, colliderM: 0.12, placement: 'billboard' },
+  },
 
   // --- Keepsakes (§2.2) -----------------------------------------------------
   'memory-frame': { family: 'keepsake', accepts: ['wood'], use: 'place', tier: 1, finishes: true },
@@ -121,6 +169,27 @@ export const FORMS = {
   pickaxe: { family: 'tool', accepts: ['wood', 'stone', 'found'], use: 'tool', tier: 1 },
   shears: { family: 'tool', accepts: ['stone', 'found'], use: 'tool', tier: 2 },
   scoop: { family: 'tool', accepts: ['wood', 'stone', 'found'], use: 'tool', tier: 1 },
+  brush: {
+    family: 'tool', accepts: ['wood', 'plant', 'found'], materials: ['twig', 'grass-wisp', 'reed', 'feather'],
+    use: 'tool', tier: 1,
+    companionshipHook: 'You brush trail dust from Datou while it leans into the slow, familiar care.',
+    inspiration: 'home + clear + any season + calm mood, bond 10+',
+    world: { heightM: 0.48, shadowRadiusM: 0.22, colliderM: 0, placement: 'billboard' },
+  },
+  wayfinder: {
+    family: 'tool', accepts: ['wood', 'stone', 'found'], materials: ['driftwood', 'flat-stone', 'shell', 'old-bolt'],
+    use: 'tool', tier: 1,
+    companionshipHook: 'You mark a favorite route, and Datou later recognizes the way back to its shared memory.',
+    inspiration: 'trail + fog + autumn + Explorer personality, bond 20+',
+    world: { heightM: 0.42, shadowRadiusM: 0.24, colliderM: 0, placement: 'billboard' },
+  },
+  'field-glass': {
+    family: 'tool', accepts: ['wood', 'plant', 'found'], materials: ['driftwood', 'reed', 'shell', 'old-bolt'],
+    use: 'tool', tier: 1,
+    companionshipHook: 'You point out a distant detail and Datou turns its visor toward the same discovery.',
+    inspiration: 'meadow + clear + any season + curious mood, bond 25+',
+    world: { heightM: 0.5, shadowRadiusM: 0.28, colliderM: 0, placement: 'billboard' },
+  },
 } as const satisfies Record<string, Form>;
 
 export type FormId = keyof typeof FORMS;

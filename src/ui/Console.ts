@@ -13,6 +13,7 @@ import type { Memories, MemoryEntry } from '../game/Memories';
 import type { WantKind } from '../game/Companion';
 import type { Backpack, CraftedId, ItemId } from '../game/Backpack';
 import { RECIPES, canCraft } from '../game/Crafting';
+import { parseItemId, itemName } from '../game/workshop/items';
 import {
   drawArchway,
   drawBench,
@@ -195,6 +196,10 @@ export class Console {
     if (entry.kind === 'want') {
       if (entry.key === 'fetch') return t('memory.fetch');
       if (entry.key === 'harvest') return t('memory.harvest');
+      if (entry.key.startsWith('made:')) {
+        const spec = parseItemId(entry.key.slice(5));
+        return t('workshop.made', { thing: spec ? itemName(spec) : '' });
+      }
       return tDyn(`memory.want.${entry.key}`);
     }
     if (entry.kind === 'comfort') return t('memory.comfort');

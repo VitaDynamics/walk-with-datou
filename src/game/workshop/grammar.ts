@@ -20,6 +20,7 @@
  */
 
 import {
+  accepts,
   finishesFor,
   isValid,
   itemId,
@@ -156,7 +157,12 @@ export function dominantMaterial(a: Arrangement): {
   }
   let material: MaterialId | null = null;
   let best = -1;
-  for (const [m, w] of weight) if (w > best) ((best = w), (material = m));
+  for (const [m, w] of weight) {
+    if (w > best) {
+      best = w;
+      material = m;
+    }
+  }
 
   const sortedGroups = [...groupWeight.entries()].sort((x, y) => y[1] - x[1]);
   const primaryGroup = material ? groupOf(material) : (sortedGroups[0]?.[0] ?? null);
@@ -197,18 +203,18 @@ function finishFromSecondary(secondary: MaterialGroup | null): Finish {
  * Registry order makes this deterministic and gives lower-tier forms priority
  * (they come first), which suits the "any try yields something sensible" goal.
  */
-function pickForm(shape: ShapeClass, group: MaterialGroup): FormId | null {
+function pickForm(shape: ShapeClass, material: MaterialId): FormId | null {
   const families = SHAPE_FAMILY[shape];
   for (const fam of families) {
     for (const id of FORM_IDS) {
       const f = formDef(id);
-      if (f.family === fam && f.accepts.includes(group) && f.use !== 'tool') return id;
+      if (f.family === fam && accepts(id, material) && f.use !== 'tool') return id;
     }
   }
-  // Fallback: any form that accepts the group at all.
+  // Fallback: any form that accepts the material at all.
   for (const id of FORM_IDS) {
     const f = formDef(id);
-    if (f.accepts.includes(group) && f.use !== 'tool') return id;
+    if (accepts(id, material) && f.use !== 'tool') return id;
   }
   return null;
 }
@@ -237,8 +243,7 @@ export function grammarResult(a: Arrangement): GrammarResult {
   }
 
   const shape = classify(a);
-  const group = groupOf(material);
-  const form = pickForm(shape, group);
+  const form = pickForm(shape, material);
   if (!form) return { kind: 'curio', tone: (mass(a) * 7 + n * 3) % 5 };
 
   const spec = snapSpec(
@@ -248,7 +253,7 @@ export function grammarResult(a: Arrangement): GrammarResult {
     finishFromSecondary(secondaryGroup),
   );
   // Guard: the snapped spec must be valid (form accepts material, size/finish
-  // in range). pickForm already ensures group acceptance, so this holds; we
+  // in range). pickForm already ensures material acceptance, so this holds; we
   // keep the check so a future table edit can't silently emit a bad id.
   if (!isValid(spec)) return { kind: 'curio', tone: (mass(a) * 7 + n * 3) % 5 };
   return { kind: 'item', id: itemId(spec), spec };

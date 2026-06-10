@@ -53,7 +53,10 @@ export function parseItemId(id: ItemId): ItemSpec | null {
 
 /** Does this form accept this material's group? */
 export function accepts(form: FormId, material: MaterialId): boolean {
-  return formDef(form).accepts.includes(MATERIALS[material].group);
+  const def = formDef(form);
+  if (!def.accepts.includes(MATERIALS[material].group)) return false;
+  // A form may further restrict to a whitelist of physically-sensible materials.
+  return def.materials ? def.materials.includes(material) : true;
 }
 
 /**

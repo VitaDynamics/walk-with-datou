@@ -50,6 +50,13 @@ import { Keys } from './Keys';
 import { Memories } from './Memories';
 import { Pointer } from './Pointer';
 import { t, tDyn } from '../i18n';
+import { Workshop } from '../ui/Workshop';
+import { WorkshopState } from './workshop/WorkshopState';
+import type { Outcome } from './workshop/bench';
+import { parseItemId, itemName } from './workshop/items';
+import { itemSprite, itemHeight } from './workshop/sprites';
+import type { MaterialId } from './workshop/materials';
+import { MATERIALS } from './workshop/materials';
 
 const MAX_DT = 1 / 30;
 const TRUST_FULL = 120;
@@ -70,6 +77,13 @@ type BuildableKind =
 
 interface BuiltItem {
   kind: BuildableKind;
+  x: number;
+  z: number;
+}
+
+/** A placed Workshop item (any of the generative ItemIds). */
+interface WorkshopBuilt {
+  id: string;
   x: number;
   z: number;
 }
@@ -118,6 +132,9 @@ export class Game {
   private readonly farm = new Farm();
   private readonly plotVisuals = new Map<number, PlotVisual>();
   private minimap: Minimap | null = null;
+  private readonly workshopState = new WorkshopState();
+  private workshop!: Workshop;
+  private placingItem: string | null = null;
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
@@ -192,6 +209,21 @@ export class Game {
     this.ui.setLeash(this.leashOn);
     this.ui.setGarlandWorn(this.garlandWorn);
 
+    // The Workshop window — make things on the 3×3 bench (W2/W3).
+    this.workshop = new Workshop(this.workshopState, this.backpack, {
+      count: (mat) => this.materialCount(mat),
+      takeOne: (mat) => this.backpack.take(mat as ResourceId),
+      onRefund: (mats) => {
+        for (const m of mats) this.backpack.add(m as ResourceId);
+      },
+      onMake: (outcome) => this.handleMake(outcome),
+    });
+    document
+      .getElementById('btn-workshop')
+      ?.addEventListener('click', () => this.workshop.toggle());
+    for (const b of this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []))
+      this.placeWorkshopItem(b.id, b.x, b.z, false);
+
     this.pointer = new Pointer(canvas, {
       onTap: (x, y) => this.handleTap(x, y),
       onHoldStart: (x, y) => this.handleHoldStart(x, y),
@@ -229,8 +261,9 @@ export class Game {
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.placing) {
+      if (e.key === 'Escape' && (this.placing || this.placingItem)) {
         this.placing = null;
+        this.placingItem = null;
         this.ui.toast(t('place.cancelled'));
       }
     });
@@ -265,7 +298,12 @@ export class Game {
     if (!hit) return;
     const p = this.clampToWorld(hit.x, hit.z);
 
-    // Placement mode: the next ground tap drops the crafted keepsake.
+    // Placement mode: the next ground tap drops the made item into the world.
+    if (this.placingItem) {
+      this.placeWorkshopItem(this.placingItem, p.x, p.z, true);
+      this.placingItem = null;
+      return;
+    }
     if (this.placing) {
       if (this.placing === 'plot') {
         if (this.backpack.take('plot')) this.farm.addPlot(p.x, p.z);
@@ -432,6 +470,80 @@ export class Game {
       const built = this.loadJson<BuiltItem[]>('wwd.built', []);
       built.push(item);
       this.saveJson('wwd.built', built);
+    }
+  }
+
+  // --- Workshop ---
+
+  /** Materials the player has for the bench. Backpack resources double as materials. */
+  private materialCount(mat: MaterialId): number {
+    if (mat in MATERIALS && this.isPackResource(mat)) return this.backpack.count(mat as ResourceId);
+    return 0;
+  }
+
+  private isPackResource(mat: string): boolean {
+    return (
+      mat === 'twig' ||
+      mat === 'pebble' ||
+      mat === 'berry' ||
+      mat === 'flower' ||
+      mat === 'mushroom' ||
+      mat === 'pinecone'
+    );
+  }
+
+  /**
+   * The bench confirmed a make. Materials were already pulled from the pack as
+   * they were placed on cells, so here we just record knowledge, stamp the
+   * first-make memory, and drop the player into placement mode for the item.
+   * Curios bank quietly into the Notebook (a tiny success, never nothing).
+   */
+  private handleMake(outcome: Outcome): boolean {
+    if (outcome.kind === 'empty') return false;
+    if (outcome.kind === 'curio') {
+      this.workshopState.addCurio(outcome.tone);
+      this.bond.add('discovery', 1);
+      this.datouRig.pulse();
+      return true;
+    }
+    // exact / grammar → a real item id.
+    const id = outcome.id;
+    const spec = parseItemId(id);
+    if (!spec) return false;
+    const firstMake = this.workshopState.recordMake(id);
+    if (outcome.kind === 'exact') this.workshopState.recordPattern(outcome.patternKey);
+    this.bond.add('discovery', 2);
+    this.datouRig.pulse();
+    this.datouRig.reach();
+    if (firstMake) {
+      const entry = {
+        ts: Date.now(),
+        kind: 'want' as const,
+        key: 'made:' + id,
+        mood: this.physics.getDatouState().mood,
+      };
+      this.memories.add(entry);
+      this.ui.toast(t('workshop.made', { thing: itemName(spec) }));
+    }
+    // Hand the made item to the world: close the window and place on next tap.
+    this.placingItem = id;
+    this.workshop.hide();
+    this.ui.toast(t('place.hint'));
+    return true;
+  }
+
+  private placeWorkshopItem(id: string, x: number, z: number, fresh: boolean): void {
+    const spec = parseItemId(id);
+    if (!spec) return;
+    const cut = new Cutout(itemSprite(id), {
+      height: itemHeight(spec),
+      shadowRadius: itemHeight(spec) * 0.45,
+    });
+    this.world.placeCutout(cut, x, z);
+    if (fresh) {
+      const built = this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []);
+      built.push({ id, x, z });
+      this.saveJson('wwd.workshopBuilt', built);
     }
   }
 
