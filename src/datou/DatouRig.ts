@@ -36,7 +36,9 @@ const HIP_X = 0.181 * SCALE;
 const THIGH_LEN = 0.1985 * SCALE;
 const CALF_LEN = 0.214 * SCALE;
 const BODY_Y = 0.42 * SCALE;
-const HEAD_BASE_Y = 0.51 * SCALE; // neck root on the front-top of the shell
+// Head pivot sits INSIDE the shell so the dome visibly rests on the body —
+// one connected creature, no floating head (the neck stem stays hidden).
+const HEAD_BASE_Y = 0.4 * SCALE;
 const HEAD_BASE_X = 0.2 * SCALE;
 
 /** Smoothed pose targets — everything expressions/moods drive. */

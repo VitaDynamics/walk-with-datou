@@ -15,6 +15,7 @@ export interface ControllerConfig {
   speed: number; // m/s near a target
   speedFar: number; // trot when the waypoint is far
   farDist: number; // beyond this, trot
+  farDistFollow: number; // follow-mode trot threshold (the leash is short)
   followMinDist: number; // stop this far from the player in follow mode
   arriveDist: number; // stop this close to an explicit target
   wanderIntervalMin: number; // seconds
@@ -26,8 +27,10 @@ export interface ControllerConfig {
 
 export const DEFAULT_CONTROLLER_CONFIG: ControllerConfig = {
   speed: 1.8,
-  speedFar: 4.9,
+  speedFar: 5.8,
   farDist: 6,
+  /** Follow mode trots as soon as the 2 m leash slack is gone. */
+  farDistFollow: 1.9,
   followMinDist: 1.3,
   arriveDist: 0.25,
   wanderIntervalMin: 3,
@@ -113,7 +116,8 @@ export class Controller {
     if (dist <= stopDist) {
       return { vx: 0, vz: 0 };
     }
-    const speed = dist > this.cfg.farDist ? this.cfg.speedFar : this.cfg.speed;
+    const farDist = inp.mode === 'follow' ? this.cfg.farDistFollow : this.cfg.farDist;
+    const speed = dist > farDist ? this.cfg.speedFar : this.cfg.speed;
     return {
       vx: (dx / dist) * speed,
       vz: (dz / dist) * speed,

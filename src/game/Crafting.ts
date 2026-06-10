@@ -18,6 +18,10 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'cairn', needs: { pebble: 3 }, use: 'place' },
   { id: 'garland', needs: { flower: 3 }, use: 'wear' },
   { id: 'lantern', needs: { twig: 2, pinecone: 1 }, use: 'place' },
+  { id: 'fence', needs: { twig: 2 }, use: 'place' },
+  { id: 'plot', needs: { twig: 2, pebble: 2 }, use: 'place' },
+  { id: 'campfire', needs: { twig: 3, pebble: 2 }, use: 'place' },
+  { id: 'shelter', needs: { twig: 4, pebble: 2, pinecone: 1 }, use: 'place' },
 ];
 
 export function recipe(id: CraftedId): Recipe {

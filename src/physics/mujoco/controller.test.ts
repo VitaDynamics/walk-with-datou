@@ -16,7 +16,8 @@ describe('Controller', () => {
     const far = c.compute(inputs({ player: { x: 10, z: 0 } }), 0.016);
     expect(far.vx).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speedFar, 6);
     expect(far.vz).toBeCloseTo(0, 6);
-    const near = c.compute(inputs({ player: { x: 3, z: 0 } }), 0.016);
+    // Within the 2 m leash slack (followMinDist..farDistFollow) it walks.
+    const near = c.compute(inputs({ player: { x: 1.7, z: 0 } }), 0.016);
     expect(near.vx).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speed, 6);
   });
 

@@ -13,14 +13,17 @@ import { PAPER } from '../art/palette';
 import {
   drawBench,
   drawBerry,
+  drawBulletin,
   drawBush,
   drawDiscovery,
   drawFlower,
   drawGrassTuft,
+  drawJetty,
   drawLamp,
   drawMushroom,
   drawPad,
   drawPebble,
+  drawPicnicTable,
   drawPine,
   drawPinecone,
   drawReed,
@@ -140,7 +143,7 @@ export class World {
     glade.position.y = 0.004;
     this.group.add(glade);
 
-    // Unique landmark plates.
+    // Unique landmark plates + zone setpieces.
     const draw = {
       tree: drawTree,
       rock: drawRock,
@@ -150,11 +153,16 @@ export class World {
       pine: drawPine,
       bench: drawBench,
       signpost: drawSignpost,
+      jetty: drawJetty,
+      picnic: drawPicnicTable,
+      bulletin: drawBulletin,
+      mushroom: drawMushroom,
     };
     for (const p of MAJOR_PROPS) {
       const cut = new Cutout(draw[p.kind](p.seed), {
         height: p.height,
         shadowRadius: p.shadowRadius,
+        decal: p.decal,
       });
       cut.setPosition(p.x, p.z);
       this.group.add(cut.group);

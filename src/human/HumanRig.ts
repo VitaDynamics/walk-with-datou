@@ -7,12 +7,15 @@
 import * as THREE from 'three';
 import { drawHumanHead, drawHumanLeg, drawHumanTorso } from '../art/humanParts';
 import { canvasTexture } from '../art/textures';
+import type { AvatarStyle } from '../art/humanParts';
 import type { PropSprite } from '../art/props';
 
 const LEG_LEN = 0.78;
 const HIP_Y = 0.78;
 const TORSO_H = 0.74;
 const HEAD_H = 0.46;
+// Head pivot sunk into the sweater collar so the drawn neck overlaps it.
+const HEAD_Y = HIP_Y - 0.06 + TORSO_H - 0.18;
 
 function partPlane(
   sprite: PropSprite,
@@ -51,7 +54,7 @@ export class HumanRig {
   private facing = 1;
   private time = 0;
 
-  constructor(shadowTexture: THREE.Texture) {
+  constructor(shadowTexture: THREE.Texture, avatar: AvatarStyle = 'boy') {
     this.farLeg = partPlane(drawHumanLeg(2), LEG_LEN + 0.08, 'top', 0.82);
     this.farLeg.position.set(-0.05, HIP_Y, -0.03);
     this.nearLeg = partPlane(drawHumanLeg(1), LEG_LEN + 0.08, 'top');
@@ -62,8 +65,8 @@ export class HumanRig {
     this.torso.position.set(0, HIP_Y - 0.06, 0.01);
     this.flip.add(this.torso);
 
-    this.head = partPlane(drawHumanHead(4), HEAD_H, 'bottom');
-    this.head.position.set(0.02, HIP_Y - 0.06 + TORSO_H - 0.1, 0.02);
+    this.head = partPlane(drawHumanHead(4, avatar), HEAD_H, 'bottom');
+    this.head.position.set(0.02, HEAD_Y, 0.02);
     this.flip.add(this.head);
 
     this.group.add(this.flip);
@@ -76,6 +79,14 @@ export class HumanRig {
     this.shadow.position.y = 0.006;
     this.shadow.renderOrder = 0.5;
     this.group.add(this.shadow);
+  }
+
+  /** Swap the walker's look live (head plate only — body is shared). */
+  setAvatar(style: AvatarStyle): void {
+    const mat = this.head.material as THREE.MeshBasicMaterial;
+    mat.map?.dispose();
+    mat.map = canvasTexture(drawHumanHead(4, style).canvas);
+    mat.needsUpdate = true;
   }
 
   /** World position of the leash hand (for the rope). */
@@ -109,7 +120,7 @@ export class HumanRig {
     const bob = moving ? Math.abs(Math.sin(this.gait)) * 0.04 : 0;
     const breath = moving ? 0 : Math.sin((this.time * Math.PI * 2) / 3.1) * 0.006;
     this.torso.position.y = HIP_Y - 0.06 + bob + breath;
-    this.head.position.y = HIP_Y - 0.06 + TORSO_H - 0.1 + bob * 1.1 + breath;
+    this.head.position.y = HEAD_Y + bob * 1.1 + breath;
     this.torso.rotation.z = moving ? Math.sin(this.gait) * 0.02 : 0;
   }
 }

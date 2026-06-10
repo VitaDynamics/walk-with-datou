@@ -16,12 +16,16 @@ import { RECIPES, canCraft } from '../game/Crafting';
 import {
   drawBerry,
   drawCairn,
+  drawCampfire,
+  drawFence,
   drawFlower,
   drawGarland,
   drawLamp,
   drawMushroom,
   drawPebble,
   drawPinecone,
+  drawShelter,
+  drawSoil,
   drawStick,
   drawTwig,
 } from '../art/props';
@@ -43,9 +47,22 @@ const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }>
   cairn: drawCairn,
   garland: drawGarland,
   lantern: drawLamp,
+  fence: drawFence,
+  plot: drawSoil,
+  campfire: drawCampfire,
+  shelter: drawShelter,
 };
 
-const CRAFTED: readonly CraftedId[] = ['stick', 'cairn', 'garland', 'lantern'];
+const CRAFTED: readonly CraftedId[] = [
+  'stick',
+  'cairn',
+  'garland',
+  'lantern',
+  'fence',
+  'plot',
+  'campfire',
+  'shelter',
+];
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -176,6 +193,7 @@ export class Console {
     }
     if (entry.kind === 'want') {
       if (entry.key === 'fetch') return t('memory.fetch');
+      if (entry.key === 'harvest') return t('memory.harvest');
       return tDyn(`memory.want.${entry.key}`);
     }
     if (entry.kind === 'comfort') return t('memory.comfort');

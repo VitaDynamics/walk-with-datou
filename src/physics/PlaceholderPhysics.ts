@@ -21,8 +21,10 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   // Companionable walking pace near a target, with a real trot when it has
   // ground to cover (the human walks 3.1 / runs 5.4 m/s — Datou keeps up).
   private static readonly SPEED_NEAR = 1.8; // m/s
-  private static readonly SPEED_FAR = 4.9;
-  private static readonly FAR_DIST = 6; // beyond this, trot
+  private static readonly SPEED_FAR = 5.8; // a touch above the human's run
+  private static readonly FAR_DIST = 6; // beyond this, trot (explore/idle)
+  // In follow mode the leash is only 2 m — trot as soon as the slack is gone.
+  private static readonly FAR_DIST_FOLLOW = 1.9;
   private static readonly FOLLOW_MIN_DIST = 1.3;
   private static readonly ARRIVE_DIST = 0.25;
   private static readonly HAPPY_DURATION = 5; // seconds
@@ -156,10 +158,9 @@ export class PlaceholderPhysics implements PhysicsAdapter {
       this.mode === 'follow' ? PlaceholderPhysics.FOLLOW_MIN_DIST : PlaceholderPhysics.ARRIVE_DIST;
 
     if (dist > stopDist) {
-      const speed =
-        dist > PlaceholderPhysics.FAR_DIST
-          ? PlaceholderPhysics.SPEED_FAR
-          : PlaceholderPhysics.SPEED_NEAR;
+      const farDist =
+        this.mode === 'follow' ? PlaceholderPhysics.FAR_DIST_FOLLOW : PlaceholderPhysics.FAR_DIST;
+      const speed = dist > farDist ? PlaceholderPhysics.SPEED_FAR : PlaceholderPhysics.SPEED_NEAR;
       const vx = (dx / dist) * speed;
       const vz = (dz / dist) * speed;
       this.state.position.x += vx * dt;

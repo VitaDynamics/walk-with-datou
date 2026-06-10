@@ -98,9 +98,10 @@ export function drawTorso(seed: number): PropSprite {
     g.stroke();
   }
   // The amber logo dot + small wordmark tick (Vbot plate on the flank).
+  // Mid-back, clear of the big head dome that now overlaps the front shell.
   g.fillStyle = ROBOT.accent;
   g.beginPath();
-  g.arc(294, 90, 10, 0, Math.PI * 2);
+  g.arc(176, 88, 10, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 2.5;
@@ -108,8 +109,8 @@ export function drawTorso(seed: number): PropSprite {
   g.strokeStyle = ROBOT.shellShade;
   g.lineWidth = 3.5;
   g.beginPath();
-  g.moveTo(314, 90);
-  g.lineTo(346, 90);
+  g.moveTo(196, 88);
+  g.lineTo(228, 88);
   g.stroke();
   return { canvas: c, aspect: 440 / 220 };
 }

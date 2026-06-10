@@ -551,6 +551,370 @@ export function drawGarland(seed: number): PropSprite {
   return { canvas: c, aspect: 2 };
 }
 
+// --- Farm & building ----------------------------------------------------------
+
+/** Tilled garden plot (flat ground decal with till rows). */
+export function drawSoil(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(256, 208);
+  const pts = blobPoints(rng, 128, 104, 112, 84, 11, 0.06);
+  paintBlob(g, pts, { fill: CLAY.deep, outline: INK.line, lineWidth: 5 });
+  const inner = blobPoints(rng, 128, 104, 96, 70, 11, 0.06);
+  paintBlob(g, inner, { fill: CLAY.mid });
+  // Till rows.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 5;
+  g.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const y = 56 + i * 28;
+    g.beginPath();
+    g.moveTo(56 + rng.next() * 8, y);
+    g.quadraticCurveTo(128, y + 6, 200 - rng.next() * 8, y);
+    g.stroke();
+  }
+  speckle(g, rng, 50, 40, 156, 130, 40, INK.grain, 0.15, 1.6);
+  return { canvas: c, aspect: 256 / 208 };
+}
+
+/** A crop at a growth stage: 0 sprout · 1 young · 2 growing · 3 mature. */
+export function drawCrop(
+  crop: 'berry' | 'flower' | 'mushroom',
+  stage: number,
+  seed: number,
+): PropSprite {
+  const rng = new Rng(seed + stage * 101);
+  const { c, g } = sprite(160, 160);
+  const baseY = 148;
+  const s = Math.max(0, Math.min(3, stage));
+  if (s === 0) {
+    // Sprout — shared across crops.
+    g.strokeStyle = SAGE.shade;
+    g.lineWidth = 4.5;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(80, baseY);
+    g.quadraticCurveTo(78, 120, 80, 104);
+    g.stroke();
+    blob(g, rng, 64, 98, 16, 9, { fill: SAGE.light, outline: INK.soft, lineWidth: 2.5 }, 8, 0.12);
+    blob(g, rng, 96, 94, 16, 9, { fill: SAGE.mid, outline: INK.soft, lineWidth: 2.5 }, 8, 0.12);
+    return { canvas: c, aspect: 1 };
+  }
+  const grown = s / 3;
+  switch (crop) {
+    case 'berry': {
+      blob(g, rng, 80, baseY - 36 * grown - 18, 30 + 28 * grown, 22 + 20 * grown, {
+        fill: SAGE.mid,
+        outline: INK.line,
+        lineWidth: 4,
+      });
+      const berries = s === 3 ? 7 : s === 2 ? 3 : 0;
+      for (let i = 0; i < berries; i++) {
+        g.fillStyle = CLAY.blossom;
+        g.beginPath();
+        g.arc(48 + rng.next() * 64, baseY - 30 - rng.next() * 40, 6.5, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = INK.soft;
+        g.lineWidth = 2;
+        g.stroke();
+      }
+      break;
+    }
+    case 'flower': {
+      const stems = s;
+      for (let i = 0; i < stems; i++) {
+        const x = 50 + i * 30 + rng.next() * 8;
+        grassStroke(g, rng, x, baseY, 50 + 26 * grown, (rng.next() * 2 - 1) * 14, 4, SAGE.shade);
+        if (s >= 2) {
+          blob(g, rng, x + 2, baseY - 56 - 22 * grown + rng.next() * 10, 13, 11, {
+            fill: CLAY.blossom,
+            outline: INK.soft,
+            lineWidth: 2.5,
+          });
+          g.fillStyle = ROBOT.accent;
+          g.beginPath();
+          g.arc(x + 2, baseY - 56 - 22 * grown, 4.5, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+      break;
+    }
+    case 'mushroom': {
+      const caps = s;
+      for (let i = 0; i < caps; i++) {
+        const x = 48 + i * 32 + rng.next() * 8;
+        const h = 26 + 22 * grown;
+        g.fillStyle = CLAY.pale;
+        g.fillRect(x - 7, baseY - h, 14, h);
+        g.strokeStyle = INK.line;
+        g.lineWidth = 3;
+        g.strokeRect(x - 7, baseY - h, 14, h);
+        blob(g, rng, x, baseY - h, 20 + 8 * grown, 13 + 5 * grown, {
+          fill: CLAY.blossom,
+          outline: INK.line,
+          lineWidth: 3.5,
+        });
+      }
+      break;
+    }
+  }
+  return { canvas: c, aspect: 1 };
+}
+
+/** Fence segment — two posts, two rails, hand-hewn. */
+export function drawFence(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(320, 192);
+  for (const x of [44, 276]) {
+    wobblyLine(g, rng, x, 180, x + 2, 36, 14, CLAY.mid, 1.5, 4);
+    g.strokeStyle = INK.line;
+  }
+  for (const y of [70, 124]) {
+    g.beginPath();
+    g.moveTo(20, y + rng.next() * 6);
+    g.lineTo(300, y - 4 + rng.next() * 6);
+    g.lineWidth = 13;
+    g.strokeStyle = CLAY.light;
+    g.lineCap = 'round';
+    g.stroke();
+    g.lineWidth = 4;
+    g.strokeStyle = INK.line;
+    g.beginPath();
+    g.moveTo(20, y - 7 + rng.next() * 4);
+    g.lineTo(300, y - 11 + rng.next() * 4);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 320 / 192 };
+}
+
+/** Campfire — stone ring, crossed logs, a quiet hand-drawn flame + warm halo. */
+export function drawCampfire(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(256, 224);
+  // Baked warm halo (soft, not bloom).
+  const halo = g.createRadialGradient(128, 150, 8, 128, 150, 110);
+  halo.addColorStop(0, LAMP_WARM);
+  halo.addColorStop(1, 'rgba(233, 196, 124, 0)');
+  g.fillStyle = halo;
+  g.fillRect(0, 30, 256, 194);
+  // Crossed logs.
+  wobblyLine(g, rng, 70, 196, 186, 168, 13, CLAY.deep, 1.5, 4);
+  wobblyLine(g, rng, 74, 168, 182, 198, 13, CLAY.mid, 1.5, 4);
+  // Flame — layered teardrops, warm amber over clay.
+  g.beginPath();
+  g.moveTo(128, 84);
+  g.quadraticCurveTo(160, 128, 148, 158);
+  g.quadraticCurveTo(140, 172, 128, 174);
+  g.quadraticCurveTo(116, 172, 108, 158);
+  g.quadraticCurveTo(96, 128, 128, 84);
+  g.closePath();
+  g.fillStyle = ROBOT.accent;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.stroke();
+  g.beginPath();
+  g.moveTo(128, 116);
+  g.quadraticCurveTo(142, 140, 134, 158);
+  g.quadraticCurveTo(128, 166, 122, 158);
+  g.quadraticCurveTo(114, 140, 128, 116);
+  g.closePath();
+  g.fillStyle = '#f2d9a0';
+  g.fill();
+  // Stone ring.
+  for (let i = 0; i < 7; i++) {
+    const a = Math.PI * (0.05 + (i / 6) * 0.9);
+    const x = 128 + Math.cos(a) * 78;
+    const y = 196 + Math.sin(a) * -14;
+    blob(g, rng, x, y, 15, 11, { fill: CLAY.pale, outline: INK.line, lineWidth: 3.5 }, 7, 0.1);
+  }
+  return { canvas: c, aspect: 256 / 224 };
+}
+
+/** Datou's shelter — a little gabled kennel in robot cream + charcoal. */
+export function drawShelter(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(320, 288);
+  // Body.
+  roundedRectPath(g, 52, 124, 216, 140, 14);
+  g.fillStyle = ROBOT.shell;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5.5;
+  g.stroke();
+  // Roof.
+  g.beginPath();
+  g.moveTo(34, 132);
+  g.lineTo(160, 44);
+  g.lineTo(286, 132);
+  g.closePath();
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.lineJoin = 'round';
+  g.stroke();
+  // Doorway.
+  g.beginPath();
+  g.moveTo(120, 264);
+  g.lineTo(120, 196);
+  g.quadraticCurveTo(160, 156, 200, 196);
+  g.lineTo(200, 264);
+  g.closePath();
+  g.fillStyle = ROBOT.visor;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.stroke();
+  // Amber name dot over the door.
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.arc(160, 142, 9, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  g.stroke();
+  void rng;
+  return { canvas: c, aspect: 320 / 288 };
+}
+
+function roundedRectPath(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+// --- Zone setpieces -----------------------------------------------------------
+
+/** Lakeside jetty — planks reaching into the water (flat decal). */
+export function drawJetty(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(224, 448);
+  for (let i = 0; i < 7; i++) {
+    const y = 24 + i * 60;
+    g.beginPath();
+    g.moveTo(40 + rng.next() * 6, y);
+    g.lineTo(184 - rng.next() * 6, y + 4);
+    g.lineTo(182 - rng.next() * 6, y + 46);
+    g.lineTo(42 + rng.next() * 6, y + 42);
+    g.closePath();
+    g.fillStyle = i % 2 ? CLAY.light : CLAY.mid;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4.5;
+    g.lineJoin = 'round';
+    g.stroke();
+  }
+  // Side rails.
+  for (const x of [34, 190]) {
+    wobblyLine(g, rng, x, 12, x, 436, 7, CLAY.deep, 1.5, 6);
+  }
+  return { canvas: c, aspect: 0.5 };
+}
+
+/** Picnic table for the trail rest stop. */
+export function drawPicnicTable(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 256);
+  // Legs (A-frame).
+  for (const [x0, x1] of [
+    [96, 60],
+    [288, 324],
+  ] as const) {
+    wobblyLine(g, rng, x0, 130, x1, 232, 12, CLAY.deep, 1.5, 3);
+    wobblyLine(g, rng, x0, 130, x0 * 2 - x1, 232, 12, CLAY.deep, 1.5, 3);
+  }
+  // Bench planks.
+  for (const x of [30, 270]) {
+    g.fillStyle = CLAY.light;
+    g.fillRect(x, 176, 84, 18);
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.strokeRect(x, 176, 84, 18);
+  }
+  // Table top.
+  g.beginPath();
+  g.moveTo(70, 110);
+  g.lineTo(314, 106);
+  g.lineTo(322, 142);
+  g.lineTo(62, 146);
+  g.closePath();
+  g.fillStyle = CLAY.light;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.stroke();
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(80, 128);
+  g.lineTo(308, 124);
+  g.stroke();
+  return { canvas: c, aspect: 384 / 256 };
+}
+
+/** Community bulletin board — small roofed notice board. */
+export function drawBulletin(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(288, 352);
+  // Posts.
+  for (const x of [76, 212]) {
+    wobblyLine(g, rng, x, 336, x, 120, 13, CLAY.deep, 1.5, 4);
+  }
+  // Board.
+  roundedRectPath(g, 40, 96, 208, 150, 12);
+  g.fillStyle = CLAY.pale;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5.5;
+  g.stroke();
+  // Little roof.
+  g.beginPath();
+  g.moveTo(24, 96);
+  g.lineTo(144, 50);
+  g.lineTo(264, 96);
+  g.closePath();
+  g.fillStyle = SAGE.deep;
+  g.fill();
+  g.lineJoin = 'round';
+  g.stroke();
+  // Pinned notes.
+  for (const [x, y, w, h, lean] of [
+    [66, 118, 56, 64, -0.06],
+    [136, 124, 50, 52, 0.05],
+    [196, 116, 40, 58, 0.1],
+  ] as const) {
+    g.save();
+    g.translate(x + w / 2, y + h / 2);
+    g.rotate(lean);
+    g.fillStyle = '#fbf7ec';
+    g.fillRect(-w / 2, -h / 2, w, h);
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.strokeRect(-w / 2, -h / 2, w, h);
+    g.beginPath();
+    for (let i = 0; i < 3; i++) {
+      g.moveTo(-w / 2 + 8, -h / 2 + 14 + i * 13);
+      g.lineTo(w / 2 - 8, -h / 2 + 14 + i * 13);
+    }
+    g.stroke();
+    g.fillStyle = CLAY.blossom;
+    g.beginPath();
+    g.arc(0, -h / 2 + 5, 4, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  return { canvas: c, aspect: 288 / 352 };
+}
+
 // --- Discovery reveal icons -------------------------------------------------
 
 export type DiscoveryArt = 'sprout' | 'shiny' | 'feather' | 'mushroom' | 'ladybug';

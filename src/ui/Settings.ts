@@ -3,6 +3,7 @@ import {
   saveBackendPreference,
   type PhysicsBackend,
 } from '../physics/createPhysics';
+import { readSavedAvatar, saveAvatarPreference, type AvatarStyle } from '../human/avatar';
 import { applyStaticI18n, getLang, onLangChange, setLang, t, type Lang } from '../i18n';
 
 /**
@@ -19,6 +20,8 @@ import { applyStaticI18n, getLang, onLangChange, setLang, t, type Lang } from '.
 export interface SettingsOptions {
   /** The backend actually running this session (after any fallback). */
   activeBackend: PhysicsBackend;
+  /** Applies the walker's look live (no reload needed). */
+  onAvatarChange?: (style: AvatarStyle) => void;
 }
 
 /** i18n key for each backend's short "now running" label. */
@@ -35,7 +38,12 @@ export function mountSettings(opts: SettingsOptions): void {
   );
   const note = document.getElementById('settings-note');
   const activeTag = document.getElementById('settings-active');
-  const langButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.lang-btn'));
+  const langButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.lang-btn[data-lang]'),
+  );
+  const avatarButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.avatar-btn[data-avatar]'),
+  );
 
   if (!button || !panel || radios.length === 0) return;
 
@@ -65,6 +73,30 @@ export function mountSettings(opts: SettingsOptions): void {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       setLang(b.dataset.lang as Lang);
+    });
+  }
+
+  // Walker avatar — saved and applied live.
+  let avatar = readSavedAvatar();
+  const refreshAvatarButtons = (): void => {
+    for (const b of avatarButtons) b.classList.toggle('active', b.dataset.avatar === avatar);
+  };
+  refreshAvatarButtons();
+  for (const b of avatarButtons) {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const style: AvatarStyle = b.dataset.avatar === 'girl' ? 'girl' : 'boy';
+      if (style === avatar) return;
+      avatar = style;
+      saveAvatarPreference(style);
+      // Drop any one-off ?avatar= override so the saved choice sticks.
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('avatar')) {
+        url.searchParams.delete('avatar');
+        window.history.replaceState(null, '', url);
+      }
+      refreshAvatarButtons();
+      opts.onAvatarChange?.(style);
     });
   }
 

@@ -20,9 +20,8 @@ createPhysics()
     const tag = document.getElementById('physics-tag');
     if (tag) tag.textContent = `physics: ${backend}`;
 
-    mountSettings({ activeBackend: backend });
-
     const game = new Game(canvas, adapter);
+    mountSettings({ activeBackend: backend, onAvatarChange: (s) => game.setAvatar(s) });
     // Minimal debug handle (used by automated checks and the console).
     (window as unknown as { game?: Game }).game = game;
     game.start();

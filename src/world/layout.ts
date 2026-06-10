@@ -9,13 +9,27 @@ import { LAKE, scatterStatic, kindDef } from './scatter';
 import type { WorldCollider } from '../physics/PhysicsAdapter';
 
 export interface MajorProp {
-  kind: 'tree' | 'rock' | 'bush' | 'stump' | 'lamp' | 'pine' | 'bench' | 'signpost';
+  kind:
+    | 'tree'
+    | 'rock'
+    | 'bush'
+    | 'stump'
+    | 'lamp'
+    | 'pine'
+    | 'bench'
+    | 'signpost'
+    | 'jetty'
+    | 'picnic'
+    | 'bulletin'
+    | 'mushroom';
   x: number;
   z: number;
   height: number;
   shadowRadius: number;
   colliderRadius?: number;
   seed: number;
+  /** Lay flat on the ground (the jetty planks). */
+  decal?: boolean;
 }
 
 /** Curated home base + one hero anchor per zone. */
@@ -71,6 +85,61 @@ export const MAJOR_PROPS: readonly MajorProp[] = [
     seed: 72,
   },
   { kind: 'tree', x: 36, z: 96, height: 5.4, shadowRadius: 1.8, colliderRadius: 0.55, seed: 81 }, // lakeshore tree
+  // Setpieces — destinations that reward the walk.
+  { kind: 'jetty', x: 21, z: 122, height: 9, shadowRadius: 0, seed: 91, decal: true }, // planks into the lake
+  {
+    kind: 'picnic',
+    x: 138,
+    z: -44,
+    height: 1.15,
+    shadowRadius: 1.3,
+    colliderRadius: 0.95,
+    seed: 92,
+  },
+  {
+    kind: 'bulletin',
+    x: 121,
+    z: -22,
+    height: 1.95,
+    shadowRadius: 0.6,
+    colliderRadius: 0.3,
+    seed: 93,
+  },
+  // Mushroom fairy-ring in the woods.
+  { kind: 'mushroom', x: -104, z: -98.4, height: 0.52, shadowRadius: 0.3, seed: 94 },
+  { kind: 'mushroom', x: -102.0, z: -97.2, height: 0.46, shadowRadius: 0.3, seed: 95 },
+  { kind: 'mushroom', x: -101.6, z: -94.8, height: 0.5, shadowRadius: 0.3, seed: 96 },
+  { kind: 'mushroom', x: -103.4, z: -93.2, height: 0.44, shadowRadius: 0.3, seed: 97 },
+  { kind: 'mushroom', x: -105.8, z: -93.6, height: 0.52, shadowRadius: 0.3, seed: 98 },
+  { kind: 'mushroom', x: -106.6, z: -96.0, height: 0.46, shadowRadius: 0.3, seed: 99 },
+  // Ruin stones in the far north-east — a reason to cross the whole meadow.
+  {
+    kind: 'rock',
+    x: 168,
+    z: -162,
+    height: 2.6,
+    shadowRadius: 1.6,
+    colliderRadius: 0.95,
+    seed: 101,
+  },
+  {
+    kind: 'rock',
+    x: 171,
+    z: -158.5,
+    height: 1.9,
+    shadowRadius: 1.2,
+    colliderRadius: 0.75,
+    seed: 102,
+  },
+  {
+    kind: 'rock',
+    x: 165.5,
+    z: -159,
+    height: 1.5,
+    shadowRadius: 1.0,
+    colliderRadius: 0.6,
+    seed: 103,
+  },
 ];
 
 /** The resting pad — "your spot" at home. Walkable (no collider). */
@@ -93,9 +162,11 @@ export const SPOT_ANCHORS = [
   // Lake
   { place: 'lakeshore', x: 38, z: 101 },
   { place: 'reed-bank', x: -6, z: 132 },
+  { place: 'jetty-end', x: 21, z: 125 },
   // Meadow wilds
   { place: 'lone-boulder', x: -70, z: 70 },
   { place: 'high-meadow', x: 60, z: -110 },
+  { place: 'ruin-stones', x: 167, z: -160 },
 ] as const;
 
 /**

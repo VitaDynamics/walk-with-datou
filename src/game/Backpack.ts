@@ -5,7 +5,15 @@
  */
 
 export type ResourceId = 'twig' | 'pebble' | 'berry' | 'flower' | 'mushroom' | 'pinecone';
-export type CraftedId = 'stick' | 'cairn' | 'garland' | 'lantern';
+export type CraftedId =
+  | 'stick'
+  | 'cairn'
+  | 'garland'
+  | 'lantern'
+  | 'fence'
+  | 'plot'
+  | 'campfire'
+  | 'shelter';
 export type ItemId = ResourceId | CraftedId;
 
 export const RESOURCE_IDS: readonly ResourceId[] = [

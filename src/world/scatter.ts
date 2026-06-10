@@ -46,6 +46,9 @@ export interface KindDef {
   verb: 'sniff' | 'rustle' | 'hop' | 'watch' | 'drink' | 'none';
   /** Per-zone target counts. */
   counts: Partial<Record<ZoneId, number>>;
+  /** Optional clumping: place in patches of `size` within `radius` metres —
+   *  flower fields, berry patches, mushroom clumps read as destinations. */
+  cluster?: { size: number; radius: number };
 }
 
 export const KIND_DEFS: readonly KindDef[] = [
@@ -56,7 +59,7 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0.5,
     pickable: false,
     verb: 'sniff',
-    counts: { meadow: 170, woods: 110, lake: 30, trail: 36, home: 2 },
+    counts: { meadow: 200, woods: 120, lake: 34, trail: 40, home: 2 },
   },
   {
     kind: 'pine',
@@ -101,7 +104,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: false,
     verb: 'none',
-    counts: { meadow: 600, woods: 130, lake: 110, trail: 90, home: 12 },
+    counts: { meadow: 850, woods: 160, lake: 130, trail: 110, home: 12 },
+    cluster: { size: 8, radius: 4 },
   },
   {
     kind: 'flower',
@@ -110,7 +114,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'sniff',
-    counts: { meadow: 220, trail: 50, home: 4, lake: 24 },
+    counts: { meadow: 300, trail: 60, home: 4, lake: 30 },
+    cluster: { size: 10, radius: 5 },
   },
   {
     kind: 'reed',
@@ -128,7 +133,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'sniff',
-    counts: { woods: 90, meadow: 16 },
+    counts: { woods: 110, meadow: 20 },
+    cluster: { size: 6, radius: 3.5 },
   },
   {
     kind: 'lamp',
@@ -164,7 +170,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'none',
-    counts: { woods: 110, meadow: 110, trail: 30, lake: 24 },
+    counts: { woods: 130, meadow: 130, trail: 36, lake: 28 },
+    cluster: { size: 4, radius: 3 },
   },
   {
     kind: 'pebble',
@@ -182,7 +189,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'sniff',
-    counts: { woods: 50, meadow: 50, trail: 18 },
+    counts: { woods: 60, meadow: 60, trail: 20 },
+    cluster: { size: 5, radius: 4 },
   },
   {
     kind: 'pinecone',
@@ -191,7 +199,8 @@ export const KIND_DEFS: readonly KindDef[] = [
     collider: 0,
     pickable: true,
     verb: 'none',
-    counts: { woods: 80, meadow: 20 },
+    counts: { woods: 95, meadow: 24 },
+    cluster: { size: 5, radius: 3 },
   },
 ];
 
@@ -264,9 +273,24 @@ function scatter(seed: number, kinds: readonly KindDef[]): ScatterInstance[] {
     for (const [zoneId, count] of Object.entries(kind.counts) as [ZoneId, number][]) {
       let placed = 0;
       let attempts = 0;
+      // Clumped kinds grow in patches around a wandering cluster center.
+      let clusterCenter: { x: number; z: number } | null = null;
+      let clusterLeft = 0;
       while (placed < count && attempts < count * 8) {
         attempts++;
-        const p = samplePoint(rng, zoneId);
+        let p: { x: number; z: number };
+        if (kind.cluster) {
+          if (clusterLeft <= 0 || !clusterCenter) {
+            clusterCenter = samplePoint(rng, zoneId);
+            clusterLeft = kind.cluster.size;
+          }
+          const a = rng.next() * Math.PI * 2;
+          const d = Math.sqrt(rng.next()) * kind.cluster.radius;
+          p = { x: clusterCenter.x + Math.cos(a) * d, z: clusterCenter.z + Math.sin(a) * d };
+          clusterLeft--;
+        } else {
+          p = samplePoint(rng, zoneId);
+        }
         if (!placeable(kind, p.x, p.z)) continue;
         // Meadow samples that landed inside a named zone are rejected so the
         // per-zone densities stay meaningful.

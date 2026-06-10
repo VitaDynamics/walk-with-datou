@@ -16,20 +16,48 @@ function sprite(w: number, h: number): { c: HTMLCanvasElement; g: CanvasRenderin
   return { c, g: ctx2d(c) };
 }
 
+/** The walker's look — same gentle figure, hair tells them apart. */
+export type AvatarStyle = 'boy' | 'girl';
+
 /** Head — round, charcoal hair, calm profile-ish face. Pivot = bottom center. */
-export function drawHumanHead(seed: number): PropSprite {
+export function drawHumanHead(seed: number, style: AvatarStyle = 'boy'): PropSprite {
   const rng = new Rng(seed);
   const { c, g } = sprite(192, 208);
-  // Neck.
+  // Girl: long hair behind everything — a soft curtain falling past the
+  // shoulders, tucked into the collar (the plane bottom sits inside it).
+  if (style === 'girl') {
+    g.beginPath();
+    g.moveTo(48, 196);
+    g.quadraticCurveTo(26, 170, 28, 112);
+    g.quadraticCurveTo(22, 28, 96, 22);
+    g.quadraticCurveTo(170, 28, 164, 112);
+    g.quadraticCurveTo(166, 170, 144, 196);
+    g.quadraticCurveTo(120, 206, 96, 204);
+    g.quadraticCurveTo(72, 206, 48, 196);
+    g.closePath();
+    g.fillStyle = ROBOT.dark;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 5;
+    g.lineJoin = 'round';
+    g.stroke();
+  }
+  // Neck — runs all the way to the plane bottom (the pivot sits inside the
+  // sweater collar, so head and body always read as one connected figure).
   g.fillStyle = '#e8cdb2';
-  g.fillRect(82, 158, 28, 40);
+  g.fillRect(81, 158, 30, 50);
   g.strokeStyle = INK.line;
   g.lineWidth = 4;
-  g.strokeRect(82, 158, 28, 40);
+  g.beginPath();
+  g.moveTo(81, 158);
+  g.lineTo(81, 208);
+  g.moveTo(111, 158);
+  g.lineTo(111, 208);
+  g.stroke();
   // Face.
   const face = blobPoints(rng, 96, 100, 62, 68, 12, 0.03);
   paintBlob(g, face, { fill: '#edd3b8', outline: INK.line, lineWidth: 5 });
-  // Hair — a soft charcoal cap with a swoop over the brow.
+  // Hair — a soft charcoal cap with a swoop over the brow (the girl's fringe).
   g.beginPath();
   g.moveTo(34, 96);
   g.quadraticCurveTo(28, 28, 96, 24);
@@ -44,18 +72,21 @@ export function drawHumanHead(seed: number): PropSprite {
   g.lineWidth = 5;
   g.lineJoin = 'round';
   g.stroke();
-  // Two quiet eye dots + a small ear.
+  // Two quiet eye dots.
   g.fillStyle = INK.line;
   for (const x of [82, 122]) {
     g.beginPath();
     g.arc(x, 102, 4.5, 0, Math.PI * 2);
     g.fill();
   }
-  g.strokeStyle = INK.soft;
-  g.lineWidth = 3;
-  g.beginPath();
-  g.arc(40, 110, 9, -0.8, 0.9);
-  g.stroke();
+  // A small ear for the boy; the girl's hair covers hers.
+  if (style === 'boy') {
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(40, 110, 9, -0.8, 0.9);
+    g.stroke();
+  }
   return { canvas: c, aspect: 192 / 208 };
 }
 

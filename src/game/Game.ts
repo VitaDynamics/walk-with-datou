@@ -11,9 +11,19 @@
 
 import * as THREE from 'three';
 import { canvasTexture, paintBackdrop, paintContactShadow } from '../art/textures';
-import { drawCairn, drawLamp, drawStick } from '../art/props';
+import {
+  drawCairn,
+  drawCampfire,
+  drawCrop,
+  drawFence,
+  drawLamp,
+  drawShelter,
+  drawSoil,
+  drawStick,
+} from '../art/props';
 import { DatouRig } from '../datou/DatouRig';
 import { HumanRig } from '../human/HumanRig';
+import { readSavedAvatar, type AvatarStyle } from '../human/avatar';
 import { Leash } from '../human/Leash';
 import { Player } from '../human/Player';
 import type { PhysicsAdapter } from '../physics/PhysicsAdapter';
@@ -29,6 +39,7 @@ import { Bond } from './Bond';
 import { CameraRig } from './CameraRig';
 import { Companion, type CompanionEvents, type WantKind } from './Companion';
 import { craft, recipe } from './Crafting';
+import { CROP_KINDS, Farm, MATURE, TEND_RANGE, type CropKind, type PlotState } from './Farm';
 import { Fetch } from './Fetch';
 import { Keys } from './Keys';
 import { Memories } from './Memories';
@@ -41,10 +52,28 @@ const COMFORT_MEMORY_SECONDS = 2.5;
 const GATHER_REACH = 1.9;
 const REACT_COOLDOWN = 6;
 
+type BuildableKind = 'cairn' | 'lantern' | 'fence' | 'campfire' | 'shelter';
+
 interface BuiltItem {
-  kind: 'cairn' | 'lantern';
+  kind: BuildableKind;
   x: number;
   z: number;
+}
+
+/** Plate heights/shadows for placed buildables. */
+const BUILD_LOOK: Record<BuildableKind, { height: number; shadowRadius: number }> = {
+  cairn: { height: 0.8, shadowRadius: 0.45 },
+  lantern: { height: 1.5, shadowRadius: 0.4 },
+  fence: { height: 0.95, shadowRadius: 0.55 },
+  campfire: { height: 1.0, shadowRadius: 0.7 },
+  shelter: { height: 1.5, shadowRadius: 1.0 },
+};
+
+interface PlotVisual {
+  soil: Cutout;
+  crop: Cutout | null;
+  cropKind: CropKind | null;
+  stage: number;
 }
 
 export class Game {
@@ -68,11 +97,13 @@ export class Game {
   private readonly keys = new Keys();
   private readonly raycaster = new THREE.Raycaster();
   private readonly stickCutout: Cutout;
+  private readonly farm = new Farm();
+  private readonly plotVisuals = new Map<number, PlotVisual>();
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
   private garlandWorn = false;
-  private placing: 'cairn' | 'lantern' | null = null;
+  private placing: BuildableKind | 'plot' | null = null;
   private pendingGather: string | null = null;
   private pendingReaction: { verb: string; x: number; z: number } | null = null;
   private reactCooldown = 0;
@@ -97,7 +128,7 @@ export class Game {
 
     const shadowTex = canvasTexture(paintContactShadow());
     this.datouRig = new DatouRig(shadowTex);
-    this.humanRig = new HumanRig(shadowTex);
+    this.humanRig = new HumanRig(shadowTex, readSavedAvatar());
     this.scene.add(this.datouRig.group, this.humanRig.group, this.leash.mesh);
 
     this.stickCutout = new Cutout(drawStick(5), { height: 0.28 });
@@ -110,6 +141,7 @@ export class Game {
     this.spots.restoreFound(this.loadJson<number[]>('wwd.spots.' + dailyKey(), []));
     for (const s of this.spots.spots) if (s.found) this.world.revealSpot(s);
     for (const b of this.loadJson<BuiltItem[]>('wwd.built', [])) this.placeBuilt(b, false);
+    this.syncFarm();
     this.garlandWorn = this.loadRaw('wwd.garland') === '1';
     this.datouRig.setGarland(this.garlandWorn);
     this.leashOn = this.loadRaw('wwd.leash') !== '0';
@@ -167,6 +199,11 @@ export class Game {
     requestAnimationFrame(this.tick);
   }
 
+  /** Live avatar swap from ⚙ settings. */
+  setAvatar(style: AvatarStyle): void {
+    this.humanRig.setAvatar(style);
+  }
+
   // --- pointer verbs ---
 
   private handleTap(clientX: number, clientY: number): void {
@@ -183,7 +220,11 @@ export class Game {
 
     // Placement mode: the next ground tap drops the crafted keepsake.
     if (this.placing) {
-      this.placeBuilt({ kind: this.placing, x: p.x, z: p.z }, true);
+      if (this.placing === 'plot') {
+        if (this.backpack.take('plot')) this.farm.addPlot(p.x, p.z);
+      } else {
+        this.placeBuilt({ kind: this.placing, x: p.x, z: p.z }, true);
+      }
       this.placing = null;
       return;
     }
@@ -191,6 +232,17 @@ export class Game {
     // Answering an active curious want by pointing at what Datou sees.
     if (this.companion.activeWant === 'curious') {
       this.events.guidedTo = p;
+      return;
+    }
+
+    // A garden plot under the tap → plant / harvest (walk over first).
+    const plot = this.farm.plotAt(p.x, p.z);
+    if (plot) {
+      if (Math.hypot(plot.x - this.player.x, plot.z - this.player.z) <= 2.2) {
+        this.tendPlot(plot);
+      } else {
+        this.player.walkTo(plot.x, plot.z);
+      }
       return;
     }
 
@@ -299,7 +351,11 @@ export class Game {
         break;
       }
       case 'cairn':
-      case 'lantern': {
+      case 'lantern':
+      case 'fence':
+      case 'campfire':
+      case 'shelter':
+      case 'plot': {
         this.placing = id;
         this.ui.toast(t('place.hint'));
         break;
@@ -309,15 +365,86 @@ export class Game {
 
   private placeBuilt(item: BuiltItem, fresh: boolean): void {
     if (fresh && !this.backpack.take(item.kind)) return;
-    const cut =
-      item.kind === 'cairn'
-        ? new Cutout(drawCairn(item.x * 31 + item.z * 7), { height: 0.8, shadowRadius: 0.45 })
-        : new Cutout(drawLamp(item.x * 17 + item.z * 3), { height: 1.5, shadowRadius: 0.4 });
+    const seed = Math.round(item.x * 31 + item.z * 7);
+    const drawBuild = {
+      cairn: drawCairn,
+      lantern: drawLamp,
+      fence: drawFence,
+      campfire: drawCampfire,
+      shelter: drawShelter,
+    }[item.kind];
+    const cut = new Cutout(drawBuild(seed), BUILD_LOOK[item.kind]);
     this.world.placeCutout(cut, item.x, item.z);
     if (fresh) {
       const built = this.loadJson<BuiltItem[]>('wwd.built', []);
       built.push(item);
       this.saveJson('wwd.built', built);
+    }
+  }
+
+  /** Tap on a garden plot: plant the first plantable resource, or harvest. */
+  private tendPlot(plot: PlotState): void {
+    if (plot.crop && plot.progress >= MATURE) {
+      const result = this.farm.harvest(plot);
+      if (result) {
+        this.backpack.add(result.crop, result.count);
+        this.bond.add('discovery', 2);
+        this.physics.applyPet();
+        this.datouRig.pulse();
+        this.memories.add({
+          ts: Date.now(),
+          kind: 'want',
+          key: 'harvest',
+          mood: this.physics.getDatouState().mood,
+        });
+        this.ui.toast(
+          t('farm.harvest', { thing: tDyn(`thing.${result.crop}`), n: String(result.count) }),
+        );
+      }
+      return;
+    }
+    if (plot.crop) {
+      this.ui.toast(t('farm.growing'));
+      return;
+    }
+    const crop = CROP_KINDS.find((kind) => this.backpack.count(kind) > 0);
+    if (!crop) {
+      this.ui.toast(t('farm.empty'));
+      return;
+    }
+    this.backpack.take(crop);
+    this.farm.plant(plot, crop);
+    this.ui.toast(t('farm.planted', { thing: tDyn(`thing.${crop}`) }));
+  }
+
+  /** Keep plot visuals in sync with farm state (soil decal + staged crop). */
+  private syncFarm(): void {
+    for (const plot of this.farm.list()) {
+      let vis = this.plotVisuals.get(plot.id);
+      if (!vis) {
+        const soil = new Cutout(drawSoil(plot.id * 13 + 5), { height: 1.7, decal: true });
+        this.world.placeCutout(soil, plot.x, plot.z);
+        vis = { soil, crop: null, cropKind: null, stage: -1 };
+        this.plotVisuals.set(plot.id, vis);
+      }
+      const stage = plot.crop ? this.farm.stage(plot) : -1;
+      if (vis.stage !== stage || vis.cropKind !== plot.crop) {
+        if (vis.crop) {
+          vis.crop.group.removeFromParent();
+          vis.crop.dispose();
+          vis.crop = null;
+        }
+        if (plot.crop) {
+          const h = 0.35 + stage * 0.12;
+          vis.crop = new Cutout(drawCrop(plot.crop, stage, plot.id * 7), {
+            height: h,
+            renderOrder: 2,
+          });
+          this.world.placeCutout(vis.crop, plot.x, plot.z);
+        }
+        vis.cropKind = plot.crop;
+        vis.stage = stage;
+      }
     }
   }
 
@@ -441,6 +568,13 @@ export class Game {
       }
     }
 
+    // The garden grows — faster when Datou is tending it nearby.
+    this.farm.update(
+      dt,
+      (x, z) => Math.hypot(state.position.x - x, state.position.z - z) <= TEND_RANGE,
+    );
+    this.syncFarm();
+
     // Walking past a hidden spot reveals it — co-walking discovers things.
     const nearSpot = this.spots.nearestUndiscovered(state.position.x, state.position.z, 0.9);
     if (nearSpot) this.handleDiscover(nearSpot);
@@ -458,7 +592,7 @@ export class Game {
     this.humanRig.update(dt, this.player.x, this.player.z, this.player.vx, this.player.vz, camYaw);
 
     this.leash.setVisible(this.leashOn && !this.fetch.active);
-    this.leash.update(this.humanRig.handPosition, this.datouRig.harnessPosition);
+    this.leash.update(dt, this.humanRig.handPosition, this.datouRig.harnessPosition);
 
     const stickPos = this.fetch.stickPosition();
     if (stickPos) {
