@@ -689,4 +689,345 @@ export const FORM_TEMPLATES: Partial<Record<FormId, SpriteOpList>> = {
       { op: 'line', x0: 24, y0: 184, x1: 296, y1: 184, width: 3, color: 'WATER.deep', jitter: 3 },
     ],
   },
+
+  // --- W7 density: bespoke art for the high-traffic core forms --------------
+
+  // bundle — a tied sheaf of stock, cord-wrapped.
+  bundle: {
+    canvas: [176, 128],
+    ops: [
+      { op: 'line', x0: 22, y0: 96, x1: 154, y1: 84, width: 7, color: 'fill' },
+      { op: 'line', x0: 22, y0: 84, x1: 154, y1: 72, width: 7, color: 'fill' },
+      { op: 'line', x0: 22, y0: 72, x1: 154, y1: 60, width: 7, color: 'shade' },
+      { op: 'line', x0: 58, y0: 52, x1: 64, y1: 104, width: 5, color: 'SAGE.shade' },
+      { op: 'line', x0: 114, y0: 50, x1: 120, y1: 102, width: 5, color: 'SAGE.shade' },
+    ],
+  },
+
+  // pile — a neat heap of stones.
+  pile: {
+    canvas: [160, 128],
+    ops: [
+      { op: 'blob', cx: 56, cy: 96, rx: 30, ry: 20, fill: 'fill', outline: 'INK.line', lineWidth: 4 },
+      { op: 'blob', cx: 104, cy: 98, rx: 32, ry: 19, fill: 'fill', outline: 'INK.line', lineWidth: 4 },
+      { op: 'blob', cx: 80, cy: 64, rx: 26, ry: 17, fill: 'shade', outline: 'INK.line', lineWidth: 4 },
+    ],
+  },
+
+  // cord — a coil of twisted strands.
+  cord: {
+    canvas: [160, 128],
+    ops: [
+      { op: 'blob', cx: 80, cy: 78, rx: 54, ry: 40, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'blob', cx: 80, cy: 78, rx: 26, ry: 18, fill: 'shade', outline: 'INK.soft', lineWidth: 3 },
+      { op: 'line', x0: 36, y0: 64, x1: 124, y1: 92, width: 3, color: 'shade' },
+    ],
+  },
+
+  // panel — a flat boarded sheet with seams.
+  panel: {
+    canvas: [224, 192],
+    ops: [
+      { op: 'rect', x: 36, y: 40, w: 152, h: 132, r: 8, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 86, y0: 46, x1: 86, y1: 166, width: 3, color: 'shade' },
+      { op: 'line', x0: 138, y0: 46, x1: 138, y1: 166, width: 3, color: 'shade' },
+    ],
+  },
+
+  // block — a quarried cube.
+  block: {
+    canvas: [192, 192],
+    ops: [
+      { op: 'rect', x: 40, y: 60, w: 112, h: 112, r: 6, fill: 'fill', outline: 'INK.line', lineWidth: 6 },
+      { op: 'path', points: [[40, 60], [72, 32], [184, 32], [152, 60]], close: true, fill: 'shade', outline: 'INK.line', lineWidth: 5 },
+      { op: 'path', points: [[152, 60], [184, 32], [184, 144], [152, 172]], close: true, fill: 'shade', outline: 'INK.line', lineWidth: 5 },
+    ],
+  },
+
+  // ring — a woven loop.
+  ring: {
+    canvas: [160, 160],
+    ops: [
+      { op: 'blob', cx: 80, cy: 88, rx: 56, ry: 56, fill: 'fill', outline: 'INK.line', lineWidth: 6 },
+      { op: 'blob', cx: 80, cy: 88, rx: 30, ry: 30, fill: 'PAPER.skyBottom', outline: 'INK.soft', lineWidth: 3 },
+    ],
+  },
+
+  // vessel — an open-mouthed pot.
+  vessel: {
+    canvas: [192, 224],
+    ops: [
+      { op: 'path', points: [[56, 96], [44, 180], [148, 180], [136, 96]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'blob', cx: 96, cy: 96, rx: 48, ry: 14, fill: 'shade', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 60, y0: 132, x1: 132, y1: 132, width: 2, color: 'shade' },
+    ],
+  },
+
+  // fence — two posts and two rails.
+  fence: {
+    canvas: [256, 176],
+    ops: [
+      { op: 'line', x0: 56, y0: 164, x1: 58, y1: 36, width: 12, color: 'shade' },
+      { op: 'line', x0: 200, y0: 164, x1: 202, y1: 36, width: 12, color: 'shade' },
+      { op: 'line', x0: 36, y0: 70, x1: 220, y1: 66, width: 11, color: 'fill' },
+      { op: 'line', x0: 36, y0: 116, x1: 220, y1: 112, width: 11, color: 'fill' },
+    ],
+  },
+
+  // gate — a low fence with a hinged center leaf.
+  gate: {
+    canvas: [256, 192],
+    ops: [
+      { op: 'line', x0: 44, y0: 180, x1: 46, y1: 44, width: 13, color: 'shade' },
+      { op: 'line', x0: 212, y0: 180, x1: 214, y1: 44, width: 13, color: 'shade' },
+      { op: 'rect', x: 80, y: 70, w: 96, h: 104, r: 6, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 86, y0: 160, x1: 170, y1: 84, width: 4, color: 'shade' },
+    ],
+  },
+
+  // table — a top on four legs.
+  table: {
+    canvas: [256, 224],
+    ops: [
+      { op: 'line', x0: 64, y0: 210, x1: 66, y1: 110, width: 11, color: 'shade' },
+      { op: 'line', x0: 192, y0: 210, x1: 190, y1: 110, width: 11, color: 'shade' },
+      { op: 'path', points: [[36, 96], [220, 92], [224, 120], [32, 124]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+    ],
+  },
+
+  // stool — a small round seat on three legs.
+  stool: {
+    canvas: [176, 192],
+    ops: [
+      { op: 'line', x0: 60, y0: 176, x1: 56, y1: 110, width: 9, color: 'shade' },
+      { op: 'line', x0: 116, y0: 176, x1: 120, y1: 110, width: 9, color: 'shade' },
+      { op: 'blob', cx: 88, cy: 102, rx: 52, ry: 18, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+    ],
+  },
+
+  // lamp — a stem with a paper shade and a baked warm halo.
+  lamp: {
+    canvas: [192, 288],
+    ops: [
+      { op: 'halo', cx: 96, cy: 110, r: 84 },
+      { op: 'line', x0: 96, y0: 272, x1: 96, y1: 140, width: 8, color: 'shade' },
+      { op: 'blob', cx: 96, cy: 272, rx: 44, ry: 12, fill: 'shade', outline: 'INK.line', lineWidth: 4 },
+      { op: 'path', points: [[60, 138], [132, 138], [116, 84], [76, 84]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'blob', cx: 96, cy: 104, rx: 6, ry: 6, fill: 'ROBOT.accent', outline: 'INK.soft', lineWidth: 2 },
+    ],
+  },
+
+  // planter — a low trough of earth with a sprig.
+  planter: {
+    canvas: [224, 176],
+    ops: [
+      { op: 'path', points: [[40, 96], [52, 160], [172, 160], [184, 96]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'blob', cx: 112, cy: 98, rx: 70, ry: 14, fill: 'shade', outline: 'INK.line', lineWidth: 4 },
+      { op: 'grass', x: 96, baseY: 96, height: 46, lean: -8, width: 5, color: 'SAGE.mid' },
+      { op: 'grass', x: 122, baseY: 96, height: 40, lean: 10, width: 5, color: 'SAGE.deep' },
+    ],
+  },
+
+  // trellis — a tall diagonal lattice.
+  trellis: {
+    canvas: [192, 288],
+    ops: [
+      { op: 'line', x0: 36, y0: 272, x1: 156, y1: 40, width: 4, color: 'fill' },
+      { op: 'line', x0: 96, y0: 272, x1: 156, y1: 156, width: 4, color: 'fill' },
+      { op: 'line', x0: 156, y0: 272, x1: 36, y1: 40, width: 4, color: 'fill' },
+      { op: 'line', x0: 96, y0: 272, x1: 36, y1: 156, width: 4, color: 'fill' },
+      { op: 'blob', cx: 96, cy: 120, rx: 12, ry: 10, fill: 'SAGE.light', outline: 'INK.soft', lineWidth: 2 },
+    ],
+  },
+
+  // chime — a crossbar with hanging tubes.
+  chime: {
+    canvas: [192, 288],
+    ops: [
+      { op: 'line', x0: 96, y0: 272, x1: 96, y1: 72, width: 8, color: 'shade' },
+      { op: 'line', x0: 60, y0: 76, x1: 140, y1: 76, width: 5, color: 'shade' },
+      { op: 'line', x0: 72, y0: 80, x1: 72, y1: 150, width: 3, color: 'INK.soft' },
+      { op: 'line', x0: 96, y0: 80, x1: 96, y1: 168, width: 3, color: 'INK.soft' },
+      { op: 'line', x0: 120, y0: 80, x1: 120, y1: 144, width: 3, color: 'INK.soft' },
+      { op: 'blob', cx: 96, cy: 178, rx: 9, ry: 12, fill: 'fill', outline: 'INK.line', lineWidth: 3 },
+      { op: 'blob', cx: 120, cy: 152, rx: 8, ry: 6, fill: 'ROBOT.accent', outline: 'INK.soft', lineWidth: 2 },
+    ],
+  },
+
+  // mat — a flat woven rectangle (ground decal read).
+  mat: {
+    canvas: [256, 160],
+    ops: [
+      { op: 'blob', cx: 128, cy: 96, rx: 104, ry: 52, fill: 'fill', outline: 'INK.line', lineWidth: 5, irregularity: 0.05 },
+      { op: 'blob', cx: 128, cy: 96, rx: 80, ry: 38, fill: 'shade', outline: 'INK.soft', lineWidth: 2, irregularity: 0.05 },
+    ],
+  },
+
+  // sign — a board on a post with carved ticks.
+  sign: {
+    canvas: [224, 288],
+    ops: [
+      { op: 'line', x0: 112, y0: 276, x1: 112, y1: 120, width: 11, color: 'shade' },
+      { op: 'rect', x: 44, y: 70, w: 136, h: 64, r: 8, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 64, y0: 96, x1: 160, y1: 94, width: 4, color: 'INK.soft' },
+      { op: 'line', x0: 64, y0: 114, x1: 132, y1: 112, width: 4, color: 'INK.soft' },
+    ],
+  },
+
+  // basket — a woven open carrier.
+  basket: {
+    canvas: [192, 192],
+    ops: [
+      { op: 'path', points: [[44, 92], [56, 170], [136, 170], [148, 92]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'blob', cx: 96, cy: 92, rx: 56, ry: 14, fill: 'shade', outline: 'INK.line', lineWidth: 4 },
+      { op: 'line', x0: 48, y0: 88, x1: 144, y1: 88, width: 4, color: 'shade' },
+      { op: 'line', x0: 56, y0: 60, x1: 136, y1: 60, width: 5, color: 'fill', jitter: 5 },
+    ],
+  },
+
+  // shelter — a gabled kennel in robot cream.
+  shelter: {
+    canvas: [288, 256],
+    ops: [
+      { op: 'rect', x: 56, y: 120, w: 176, h: 116, r: 12, fill: 'fill', outline: 'INK.line', lineWidth: 6 },
+      { op: 'path', points: [[36, 126], [144, 48], [252, 126]], close: true, fill: 'shade', outline: 'INK.line', lineWidth: 6 },
+      { op: 'path', points: [[112, 236], [112, 168], [144, 140], [176, 168], [176, 236]], close: true, fill: 'ROBOT.visor', outline: 'INK.line', lineWidth: 5 },
+      { op: 'blob', cx: 144, cy: 128, rx: 7, ry: 7, fill: 'ROBOT.accent', outline: 'INK.line', lineWidth: 2 },
+    ],
+  },
+
+  // archway — two posts and a gentle arch with blossoms.
+  archway: {
+    canvas: [288, 320],
+    ops: [
+      { op: 'line', x0: 64, y0: 304, x1: 64, y1: 120, width: 13, color: 'fill' },
+      { op: 'line', x0: 224, y0: 304, x1: 224, y1: 120, width: 13, color: 'fill' },
+      { op: 'path', points: [[52, 124], [144, 36], [236, 124]], outline: 'fill', lineWidth: 14 },
+      { op: 'blob', cx: 100, cy: 80, rx: 11, ry: 9, fill: 'CLAY.blossom', outline: 'INK.soft', lineWidth: 2 },
+      { op: 'blob', cx: 188, cy: 80, rx: 11, ry: 9, fill: 'CLAY.blossom', outline: 'INK.soft', lineWidth: 2 },
+    ],
+  },
+
+  // pergola — posts under a flat slatted roof.
+  pergola: {
+    canvas: [288, 256],
+    ops: [
+      { op: 'line', x0: 56, y0: 240, x1: 56, y1: 96, width: 12, color: 'fill' },
+      { op: 'line', x0: 232, y0: 240, x1: 232, y1: 96, width: 12, color: 'fill' },
+      { op: 'rect', x: 32, y: 70, w: 224, h: 18, r: 4, fill: 'shade', outline: 'INK.line', lineWidth: 4 },
+      { op: 'line', x0: 70, y0: 64, x1: 70, y1: 92, width: 5, color: 'fill' },
+      { op: 'line', x0: 120, y0: 64, x1: 120, y1: 92, width: 5, color: 'fill' },
+      { op: 'line', x0: 170, y0: 64, x1: 170, y1: 92, width: 5, color: 'fill' },
+      { op: 'line', x0: 220, y0: 64, x1: 220, y1: 92, width: 5, color: 'fill' },
+    ],
+  },
+
+  // well — a low stone ring with a little roof.
+  well: {
+    canvas: [224, 288],
+    ops: [
+      { op: 'path', points: [[56, 160], [64, 248], [160, 248], [168, 160]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 6 },
+      { op: 'blob', cx: 112, cy: 160, rx: 60, ry: 18, fill: 'ROBOT.visor', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 64, y0: 156, x1: 60, y1: 64, width: 7, color: 'shade' },
+      { op: 'line', x0: 160, y0: 156, x1: 164, y1: 64, width: 7, color: 'shade' },
+      { op: 'path', points: [[44, 70], [112, 28], [180, 70]], close: true, fill: 'shade', outline: 'INK.line', lineWidth: 5 },
+    ],
+  },
+
+  // shrine — a small stone niche with an upright marker.
+  shrine: {
+    canvas: [224, 288],
+    ops: [
+      { op: 'path', points: [[52, 130], [52, 256], [172, 256], [172, 130], [112, 88]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 6 },
+      { op: 'rect', x: 92, y: 150, w: 40, h: 96, r: 8, fill: 'ROBOT.visor', outline: 'INK.line', lineWidth: 4 },
+      { op: 'blob', cx: 112, cy: 176, rx: 8, ry: 8, fill: 'ROBOT.accent', outline: 'INK.soft', lineWidth: 2 },
+    ],
+  },
+
+  // cold-frame — a low glazed box over earth.
+  'cold-frame': {
+    canvas: [256, 192],
+    ops: [
+      { op: 'rect', x: 40, y: 120, w: 176, h: 56, r: 6, fill: 'shade', outline: 'INK.line', lineWidth: 5 },
+      { op: 'path', points: [[40, 120], [76, 76], [216, 76], [216, 120]], close: true, fill: 'WATER.edge', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 110, y0: 80, x1: 92, y1: 118, width: 3, color: 'INK.soft' },
+      { op: 'line', x0: 160, y0: 80, x1: 150, y1: 118, width: 3, color: 'INK.soft' },
+    ],
+  },
+
+  // campfire — stone ring, crossed logs, a quiet flame + warm halo.
+  campfire: {
+    canvas: [224, 192],
+    ops: [
+      { op: 'halo', cx: 112, cy: 120, r: 88 },
+      { op: 'line', x0: 56, y0: 168, x1: 168, y1: 144, width: 12, color: 'shade' },
+      { op: 'line', x0: 60, y0: 144, x1: 164, y1: 170, width: 12, color: 'fill' },
+      { op: 'path', points: [[112, 64], [138, 116], [112, 148], [86, 116]], close: true, fill: 'ROBOT.accent', outline: 'INK.line', lineWidth: 4 },
+      { op: 'blob', cx: 56, cy: 174, rx: 14, ry: 10, fill: 'CLAY.pale', outline: 'INK.line', lineWidth: 3 },
+      { op: 'blob', cx: 168, cy: 174, rx: 14, ry: 10, fill: 'CLAY.pale', outline: 'INK.line', lineWidth: 3 },
+    ],
+  },
+
+  // garland — a sweeping arc of blossoms (worn read).
+  garland: {
+    canvas: [224, 128],
+    ops: [
+      { op: 'line', x0: 24, y0: 48, x1: 200, y1: 48, width: 6, color: 'SAGE.shade', jitter: 10, segments: 8 },
+      { op: 'blob', cx: 56, cy: 78, rx: 12, ry: 10, fill: 'fill', outline: 'INK.soft', lineWidth: 2 },
+      { op: 'blob', cx: 96, cy: 92, rx: 12, ry: 10, fill: 'fill', outline: 'INK.soft', lineWidth: 2 },
+      { op: 'blob', cx: 136, cy: 92, rx: 12, ry: 10, fill: 'fill', outline: 'INK.soft', lineWidth: 2 },
+      { op: 'blob', cx: 176, cy: 78, rx: 12, ry: 10, fill: 'fill', outline: 'INK.soft', lineWidth: 2 },
+    ],
+  },
+
+  // stick — the fetch toy: a sturdy forked branch with a grip wrap.
+  stick: {
+    canvas: [192, 128],
+    ops: [
+      { op: 'line', x0: 24, y0: 84, x1: 168, y1: 56, width: 10, color: 'fill' },
+      { op: 'line', x0: 120, y0: 64, x1: 156, y1: 30, width: 7, color: 'fill' },
+      { op: 'line', x0: 44, y0: 74, x1: 52, y1: 92, width: 4, color: 'shade' },
+      { op: 'line', x0: 52, y0: 72, x1: 60, y1: 90, width: 4, color: 'shade' },
+    ],
+  },
+
+  // axe — a wedge head clamped on a handle (tool, rides in the gripper).
+  axe: {
+    canvas: [160, 224],
+    ops: [
+      { op: 'line', x0: 84, y0: 212, x1: 76, y1: 60, width: 11, color: 'shade' },
+      { op: 'path', points: [[60, 56], [120, 40], [128, 92], [70, 96]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+      { op: 'line', x0: 80, y0: 70, x1: 76, y1: 180, width: 3, color: 'INK.soft' },
+    ],
+  },
+
+  // pickaxe — a double-pointed head crossing a handle.
+  pickaxe: {
+    canvas: [192, 224],
+    ops: [
+      { op: 'line', x0: 96, y0: 212, x1: 96, y1: 70, width: 11, color: 'shade' },
+      { op: 'path', points: [[28, 92], [96, 60], [164, 92], [96, 80]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+    ],
+  },
+
+  // shears — two hinged blades.
+  shears: {
+    canvas: [160, 224],
+    ops: [
+      { op: 'line', x0: 72, y0: 212, x1: 64, y1: 120, width: 6, color: 'shade' },
+      { op: 'line', x0: 88, y0: 212, x1: 96, y1: 120, width: 6, color: 'shade' },
+      { op: 'path', points: [[64, 120], [40, 48], [60, 44], [80, 112]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 4 },
+      { op: 'path', points: [[96, 120], [120, 48], [100, 44], [80, 112]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 4 },
+      { op: 'blob', cx: 80, cy: 116, rx: 6, ry: 6, fill: 'ROBOT.accent', outline: 'INK.line', lineWidth: 2 },
+    ],
+  },
+
+  // scoop — a cupped head on a handle.
+  scoop: {
+    canvas: [160, 224],
+    ops: [
+      { op: 'line', x0: 80, y0: 212, x1: 80, y1: 96, width: 10, color: 'shade' },
+      { op: 'path', points: [[44, 92], [116, 92], [104, 48], [56, 48]], close: true, fill: 'fill', outline: 'INK.line', lineWidth: 5 },
+    ],
+  },
 };
