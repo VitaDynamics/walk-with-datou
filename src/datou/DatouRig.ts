@@ -13,7 +13,15 @@
  */
 
 import * as THREE from 'three';
-import { drawCalf, drawEyes, drawHead, drawThigh, drawTorso, type EyeState } from '../art/datouParts';
+import {
+  drawCalf,
+  drawEyes,
+  drawHead,
+  drawThigh,
+  drawTorso,
+  type EyeState,
+} from '../art/datouParts';
+import { drawGarland } from '../art/props';
 import { canvasTexture } from '../art/textures';
 import type { PropSprite } from '../art/props';
 import type { DatouState } from '../physics/PhysicsAdapter';
@@ -62,6 +70,8 @@ interface Leg {
   phase: number;
 }
 
+const UP = new THREE.Vector3(0, 1, 0);
+
 function partPlane(
   sprite: PropSprite,
   height: number,
@@ -107,6 +117,8 @@ export class DatouRig {
   private blinkIn = 3;
   private blinkLeft = 0;
   private petPulse = 0;
+  private garland: THREE.Mesh | null = null;
+  private readonly anchorWork = new THREE.Vector3();
 
   constructor(shadowTexture: THREE.Texture) {
     // Legs: far pair drawn behind (small -z, slight tint), near pair in front.
@@ -136,15 +148,16 @@ export class DatouRig {
     farFront.phase = Math.PI;
     this.legs.push(nearFront, nearRear, farFront, farRear);
 
-    this.body = partPlane(drawTorso(6), 0.26 * SCALE, 'center');
+    this.body = partPlane(drawTorso(6), 0.3 * SCALE, 'center');
     this.body.position.set(0, BODY_Y, 0);
     this.flip.add(this.body);
 
-    // Head on its neck — anchor bottom = the head_pitch joint.
-    const head = partPlane(drawHead(7), 0.3 * SCALE, 'bottom');
-    this.eyes = partPlane(drawEyes('neutral'), 0.115 * SCALE, 'center');
-    // Centered on the visor (front-upper face of the module).
-    this.eyes.position.set(0.024, 0.185 * SCALE, 0.012);
+    // Head on its neck — anchor bottom = the head_pitch joint. Oversized on
+    // purpose: 大头 is all dome, chibi like the sticker sheet.
+    const head = partPlane(drawHead(7), 0.42 * SCALE, 'bottom');
+    this.eyes = partPlane(drawEyes('neutral'), 0.17 * SCALE, 'center');
+    // Centered on the big charcoal face plate (front of the dome).
+    this.eyes.position.set(0.045 * SCALE, 0.23 * SCALE, 0.012);
     this.eyeMat = this.eyes.material as THREE.MeshBasicMaterial;
     for (const s of ['neutral', 'happy', 'curious', 'sleepy', 'blink'] as const) {
       this.eyeTextures.set(s, canvasTexture(drawEyes(s).canvas));
@@ -167,16 +180,45 @@ export class DatouRig {
 
     // Invisible-but-raycastable tap target.
     this.hitMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.4, 1.1),
+      new THREE.PlaneGeometry(1.4, 1.3),
       new THREE.MeshBasicMaterial({ transparent: true, colorWrite: false, depthWrite: false }),
     );
-    this.hitMesh.position.y = 0.5;
+    this.hitMesh.position.y = 0.55;
     this.group.add(this.hitMesh);
   }
 
   /** Quick warm feedback for a pet/comfort touch (a soft lean, not a bounce). */
   pulse(): void {
     this.petPulse = 1;
+  }
+
+  /** Wear / remove the flower garland (crafted keepsake). */
+  setGarland(on: boolean): void {
+    if (on && !this.garland) {
+      this.garland = partPlane(drawGarland(9), 0.12, 'center');
+      this.garland.position.set(HEAD_BASE_X - 0.02, HEAD_BASE_Y - 0.04, 0.07);
+      this.flip.add(this.garland);
+    } else if (!on && this.garland) {
+      this.flip.remove(this.garland);
+      this.garland = null;
+    }
+  }
+
+  /** World position of the harness (leash attach point, top of the shoulders). */
+  get harnessPosition(): THREE.Vector3 {
+    return this.localToWorld(0.1, BODY_Y + 0.1);
+  }
+
+  /** World position just under the head — where a carried stick sits. */
+  get mouthPosition(): THREE.Vector3 {
+    return this.localToWorld(HEAD_BASE_X + 0.2, HEAD_BASE_Y - 0.02);
+  }
+
+  private localToWorld(x: number, y: number): THREE.Vector3 {
+    this.anchorWork.set(x * this.facing, y, 0);
+    this.anchorWork.applyAxisAngle(UP, this.flip.rotation.y);
+    this.anchorWork.add(this.group.position);
+    return this.anchorWork;
   }
 
   update(dt: number, state: DatouState, expression: Expression, camYaw: number): void {

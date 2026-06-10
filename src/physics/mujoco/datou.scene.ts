@@ -34,8 +34,8 @@ export interface DatouSceneOptions {
 
 export const DEFAULT_SCENE_OPTIONS: DatouSceneOptions = {
   timestep: 0.005,
-  // Covers the glade diorama (GLADE_RADIUS 8 in world/Diorama.ts) with margin.
-  parkHalfExtent: 10,
+  // Covers the 500×500 park (WORLD_WALK_RADIUS 245 in world/zones.ts).
+  parkHalfExtent: 245,
   bodyRadius: 0.22,
   bodyHalfLength: 0.25,
   colliders: [],
@@ -62,10 +62,11 @@ export function buildDatouSceneXml(opts: DatouSceneOptions = DEFAULT_SCENE_OPTIO
   const restHeight = opts.bodyRadius; // capsule resting on the ground (Z-up)
   return `<mujoco model="datou-puck">
   <option timestep="${opts.timestep}" gravity="0 0 -9.81" integrator="implicitfast"/>
-  <!-- The glade emits one static cylinder geom per major obstacle (tree,
-       rocks, bush, stump, lamp — see world/layout.ts via createPhysics).
-       A handful of static geoms: 16M is ample. -->
-  <size memory="16M"/>
+  <!-- One static cylinder geom per major obstacle (landmarks + a capped
+       nearest-to-home subset of scattered trees/rocks — see worldColliders
+       in world/layout.ts via createPhysics). All static, so only
+       Datou-vs-nearby pairs cost anything; 64M covers the model arrays. -->
+  <size memory="64M"/>
 
   <default>
     <geom condim="1" friction="1 0.005 0.0001"/>

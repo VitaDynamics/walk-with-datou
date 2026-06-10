@@ -264,6 +264,293 @@ export function drawPad(seed: number): PropSprite {
   return { canvas: c, aspect: 320 / 256 };
 }
 
+/** Conifer for the woods — stacked sage triangles, hand-cut. */
+export function drawPine(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 640);
+  // Trunk.
+  wobblyLine(g, rng, 192, 612, 190, 420, 16, CLAY.deep, 2, 4);
+  // Three foliage tiers, widest at the bottom.
+  const tiers: Array<[number, number, number, string]> = [
+    [470, 150, 95, SAGE.deep],
+    [350, 125, 85, SAGE.mid],
+    [235, 95, 80, SAGE.light],
+  ];
+  for (const [y, rx, ry, tone] of tiers) {
+    const cx = 192 + (rng.next() * 2 - 1) * 8;
+    g.beginPath();
+    g.moveTo(cx - rx, y + ry * 0.4);
+    g.quadraticCurveTo(cx - rx * 0.3, y - ry * 0.5, cx, y - ry);
+    g.quadraticCurveTo(cx + rx * 0.3, y - ry * 0.5, cx + rx, y + ry * 0.4);
+    g.quadraticCurveTo(cx, y + ry * 0.62, cx - rx, y + ry * 0.4);
+    g.closePath();
+    g.fillStyle = tone;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 5;
+    g.lineJoin = 'round';
+    g.stroke();
+  }
+  return { canvas: c, aspect: 384 / 640 };
+}
+
+/** Lakeside reed clump — tall blades with seed heads. */
+export function drawReed(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 320);
+  const baseY = 306;
+  for (let i = 0; i < 5; i++) {
+    const x = 56 + rng.next() * 80;
+    const lean = (rng.next() * 2 - 1) * 30;
+    const h = 190 + rng.next() * 90;
+    grassStroke(g, rng, x, baseY, h, lean, 5, i % 2 ? SAGE.deep : SAGE.mid);
+    if (rng.next() < 0.6) {
+      // Cattail head near the tip.
+      const tipX = x + lean * 0.9;
+      const tipY = baseY - h * 0.92;
+      g.fillStyle = CLAY.deep;
+      g.beginPath();
+      g.ellipse(tipX, tipY, 7, 20, lean * 0.004, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK.soft;
+      g.lineWidth = 2.5;
+      g.stroke();
+    }
+  }
+  return { canvas: c, aspect: 192 / 320 };
+}
+
+/** Standalone woods mushroom (bigger cousin of the discovery icon). */
+export function drawMushroom(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(160, 160);
+  const baseY = 148;
+  g.fillStyle = CLAY.pale;
+  g.beginPath();
+  g.moveTo(64, baseY);
+  g.lineTo(68, 88);
+  g.lineTo(94, 88);
+  g.lineTo(98, baseY);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.stroke();
+  blob(g, rng, 80, 76, 52, 30, { fill: CLAY.blossom, outline: INK.line, lineWidth: 4.5 }, 9, 0.08);
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = CLAY.pale;
+    g.beginPath();
+    g.arc(48 + i * 22 + rng.next() * 8, 66 + rng.next() * 14, 5, 0, Math.PI * 2);
+    g.fill();
+  }
+  return { canvas: c, aspect: 1 };
+}
+
+/** Trail bench — weathered clay planks, side-on. */
+export function drawBench(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 224);
+  g.lineJoin = 'round';
+  // Legs.
+  for (const x of [70, 300]) {
+    wobblyLine(g, rng, x, 210, x + 4, 120, 12, CLAY.deep, 1.5, 3);
+  }
+  // Seat planks.
+  for (const [y, h] of [
+    [118, 26],
+    [88, 20],
+  ] as const) {
+    g.beginPath();
+    g.moveTo(34, y);
+    g.lineTo(350, y - 4);
+    g.lineTo(350, y - 4 + h);
+    g.lineTo(34, y + h);
+    g.closePath();
+    g.fillStyle = CLAY.light;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4.5;
+    g.stroke();
+  }
+  // Grain ticks.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const x = 70 + rng.next() * 240;
+    g.beginPath();
+    g.moveTo(x, 124);
+    g.lineTo(x + 18, 123);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 384 / 224 };
+}
+
+/** Hand-painted signpost — a clay post with a sage arrow board. */
+export function drawSignpost(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(224, 352);
+  wobblyLine(g, rng, 112, 340, 110, 70, 13, CLAY.deep, 1.5, 4);
+  // Arrow board.
+  const dir = rng.next() < 0.5 ? 1 : -1;
+  g.save();
+  g.translate(112, 110);
+  g.scale(dir, 1);
+  g.beginPath();
+  g.moveTo(-72, -26);
+  g.lineTo(48, -26);
+  g.lineTo(76, 0);
+  g.lineTo(48, 26);
+  g.lineTo(-72, 26);
+  g.closePath();
+  g.fillStyle = SAGE.light;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Carved text ticks.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 3.5;
+  for (const [x, w] of [
+    [-56, 36],
+    [-10, 28],
+  ] as const) {
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x + w, 0);
+    g.stroke();
+  }
+  g.restore();
+  return { canvas: c, aspect: 224 / 352 };
+}
+
+// --- Pickable resources (gatherable to the backpack) -------------------------
+
+/** A dry twig on the ground. */
+export function drawTwig(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 96);
+  const y = 64 + rng.next() * 10;
+  wobblyLine(g, rng, 18, y + 14, 110, y - 10, 6, CLAY.deep, 2.5, 5);
+  wobblyLine(g, rng, 62, y + 2, 92, y - 26, 4, CLAY.deep, 2, 3);
+  return { canvas: c, aspect: 128 / 96 };
+}
+
+/** A smooth pebble. */
+export function drawPebble(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(96, 80);
+  blob(g, rng, 48, 48, 30, 20, { fill: CLAY.pale, outline: INK.line, lineWidth: 3.5 }, 8, 0.1);
+  g.save();
+  g.globalAlpha = 0.5;
+  blob(g, rng, 42, 42, 12, 7, { fill: '#ffffff' }, 7, 0.15);
+  g.restore();
+  return { canvas: c, aspect: 96 / 80 };
+}
+
+/** A low berry sprig. */
+export function drawBerry(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 128);
+  const baseY = 118;
+  grassStroke(g, rng, 64, baseY, 64, -10, 4, SAGE.shade);
+  grassStroke(g, rng, 68, baseY, 56, 16, 4, SAGE.shade);
+  for (let i = 0; i < 4; i++) {
+    const x = 44 + rng.next() * 44;
+    const y = 48 + rng.next() * 28;
+    g.fillStyle = CLAY.blossom;
+    g.beginPath();
+    g.arc(x, y, 8 + rng.next() * 3, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.stroke();
+  }
+  return { canvas: c, aspect: 1 };
+}
+
+/** A fallen pinecone. */
+export function drawPinecone(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(96, 96);
+  blob(g, rng, 48, 56, 22, 30, { fill: CLAY.mid, outline: INK.line, lineWidth: 3.5 }, 9, 0.1);
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 2.5;
+  for (let row = 0; row < 3; row++) {
+    const y = 40 + row * 14;
+    g.beginPath();
+    g.moveTo(32, y);
+    g.quadraticCurveTo(48, y + 8, 64, y);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 1 };
+}
+
+// --- Crafted things ----------------------------------------------------------
+
+/** The fetch stick — sturdier than a twig, clearly a toy. */
+export function drawStick(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(160, 96);
+  wobblyLine(g, rng, 16, 62, 144, 40, 9, CLAY.deep, 2, 5);
+  wobblyLine(g, rng, 100, 48, 128, 22, 6, CLAY.deep, 1.5, 3);
+  // A wrap of cord at the grip.
+  g.strokeStyle = CLAY.light;
+  g.lineWidth = 4;
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.moveTo(34 + i * 7, 52);
+    g.lineTo(36 + i * 7, 68);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 160 / 96 };
+}
+
+/** A little stacked-stone cairn — a keepsake marking a walk. */
+export function drawCairn(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(160, 192);
+  const stones: Array<[number, number, number]> = [
+    [96, 46, 30],
+    [76, 30, 96],
+    [54, 22, 140],
+  ];
+  let y = 168;
+  for (const [rx, ry, _] of stones) {
+    void _;
+    y -= ry * 1.35;
+    blob(g, rng, 80 + (rng.next() * 2 - 1) * 6, y + ry * 0.4, rx, ry, {
+      fill: CLAY.pale,
+      outline: INK.line,
+      lineWidth: 4,
+    });
+  }
+  return { canvas: c, aspect: 160 / 192 };
+}
+
+/** A flower garland plate (worn around Datou's neck). */
+export function drawGarland(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 96);
+  g.strokeStyle = SAGE.shade;
+  g.lineWidth = 6;
+  g.beginPath();
+  g.moveTo(16, 36);
+  g.quadraticCurveTo(96, 84, 176, 36);
+  g.stroke();
+  for (let i = 0; i < 6; i++) {
+    const t = (i + 0.5) / 6;
+    const x = 16 + t * 160;
+    const y = 36 + Math.sin(t * Math.PI) * 42;
+    blob(g, rng, x, y, 11, 9, { fill: CLAY.blossom, outline: INK.soft, lineWidth: 2.5 }, 7, 0.12);
+    g.fillStyle = ROBOT.accent;
+    g.beginPath();
+    g.arc(x, y, 3.5, 0, Math.PI * 2);
+    g.fill();
+  }
+  return { canvas: c, aspect: 2 };
+}
+
 // --- Discovery reveal icons -------------------------------------------------
 
 export type DiscoveryArt = 'sprout' | 'shiny' | 'feather' | 'mushroom' | 'ladybug';

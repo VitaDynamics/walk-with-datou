@@ -69,8 +69,8 @@ export class Companion {
   private static readonly WINDUP = 1.4;
   private static readonly ACTIVE_WINDOW = 7;
   private static readonly COOLDOWN = 2.5;
-  /** Datou within this distance of the pad counts as "keeping company". */
-  private static readonly NEAR_DIST = 2.4;
+  /** Datou within this distance of the player counts as "keeping company". */
+  private static readonly NEAR_DIST = 2.8;
   /** A guide tap within this distance of a hidden spot counts as pointing at it. */
   private static readonly GUIDE_SPOT_DIST = 1.2;
   /** Datou within this distance of a spot reveals it. */
@@ -150,22 +150,21 @@ export class Companion {
   /**
    * Advance one frame.
    * @param datou  Datou's state from the physics backend.
-   * @param pad    The resting pad ("your spot") position.
+   * @param player The human's position.
    * @param events What the player did this frame.
    */
-  update(datou: DatouState, pad: Vec2, events: CompanionEvents, dt: number): void {
+  update(datou: DatouState, player: Vec2, events: CompanionEvents, dt: number): void {
     if (this.petCooldown > 0) this.petCooldown -= dt;
 
-    // Keeping company: Datou near the pad trickles bond passively.
-    if (this.distTo(datou.position, pad) <= Companion.NEAR_DIST) this.bond.proximity(dt);
+    // Keeping company: walking together trickles bond passively.
+    if (this.distTo(datou.position, player) <= Companion.NEAR_DIST) this.bond.proximity(dt);
 
     // A comforting hold is always meaningful (and calms a want too).
     if (events.comforted) this.bond.add('play', 2);
 
-    if (events.guidedTo) {
-      this.investigate(events.guidedTo.x, events.guidedTo.z);
-      return;
-    }
+    // Ground taps move the HUMAN now; they only reach Datou as an answer to
+    // an active curious want (judgeResponse) — explicit prop taps use
+    // investigate() directly.
 
     switch (this.phase) {
       case 'rest':

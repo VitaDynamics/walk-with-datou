@@ -32,7 +32,7 @@ export interface Spot {
 
 const ART_KINDS: readonly DiscoveryArt[] = ['sprout', 'shiny', 'feather', 'mushroom', 'ladybug'];
 
-export const SPOTS_PER_DAY = 5;
+export const SPOTS_PER_DAY = 6;
 
 /** Seed for "today" — yyyymmdd as an int, so hiding places rotate daily. */
 export function dailySeed(date: Date = new Date()): number {

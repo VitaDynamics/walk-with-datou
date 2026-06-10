@@ -11,11 +11,13 @@ const inputs = (over: Partial<Parameters<Controller['compute']>[0]> = {}) => ({
 });
 
 describe('Controller', () => {
-  it('follow: steers toward the player at configured speed', () => {
+  it('follow: trots toward a far player, walks when close', () => {
     const c = new Controller(new Rng(1));
-    const m = c.compute(inputs({ player: { x: 10, z: 0 } }), 0.016);
-    expect(m.vx).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speed, 6);
-    expect(m.vz).toBeCloseTo(0, 6);
+    const far = c.compute(inputs({ player: { x: 10, z: 0 } }), 0.016);
+    expect(far.vx).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speedFar, 6);
+    expect(far.vz).toBeCloseTo(0, 6);
+    const near = c.compute(inputs({ player: { x: 3, z: 0 } }), 0.016);
+    expect(near.vx).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speed, 6);
   });
 
   it('follow: stops within followMinDist', () => {
@@ -29,7 +31,7 @@ describe('Controller', () => {
     const c = new Controller(new Rng(1));
     const m = c.compute(inputs({ mode: 'explore', target: { x: 0, z: 5 } }), 0.016);
     expect(m.vx).toBeCloseTo(0, 6);
-    expect(m.vz).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speed, 6);
+    expect(m.vz).toBeCloseTo(DEFAULT_CONTROLLER_CONFIG.speed, 6); // 5 m < farDist? no: 5 < 6 → walk
   });
 
   it('idle wander is deterministic given the same seed', () => {

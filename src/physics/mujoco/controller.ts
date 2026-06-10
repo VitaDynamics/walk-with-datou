@@ -12,21 +12,28 @@ import type { Rng } from './rng';
  * whole motion stream reproducible for diary replay (§4.7).
  */
 export interface ControllerConfig {
-  speed: number; // m/s
+  speed: number; // m/s near a target
+  speedFar: number; // trot when the waypoint is far
+  farDist: number; // beyond this, trot
   followMinDist: number; // stop this far from the player in follow mode
   arriveDist: number; // stop this close to an explicit target
   wanderIntervalMin: number; // seconds
   wanderIntervalMax: number;
-  parkHalfExtent: number; // wander stays within +/- this (scaled)
+  /** Idle potter range around the player. */
+  wanderNear: number;
+  wanderFar: number;
 }
 
 export const DEFAULT_CONTROLLER_CONFIG: ControllerConfig = {
-  speed: 1.7,
-  followMinDist: 1.1,
+  speed: 1.8,
+  speedFar: 4.9,
+  farDist: 6,
+  followMinDist: 1.3,
   arriveDist: 0.25,
   wanderIntervalMin: 3,
   wanderIntervalMax: 7,
-  parkHalfExtent: 6,
+  wanderNear: 3,
+  wanderFar: 11,
 };
 
 export interface ControllerInputs {
@@ -80,10 +87,12 @@ export class Controller {
         this.wanderTimer -= dt;
         if (this.wanderTimer <= 0) {
           this.wanderTimer = this.rng.range(this.cfg.wanderIntervalMin, this.cfg.wanderIntervalMax);
-          const r = this.cfg.parkHalfExtent * 0.7;
+          // Potter around the player, not the whole park.
+          const a = this.rng.range(0, Math.PI * 2);
+          const d = this.rng.range(this.cfg.wanderNear, this.cfg.wanderFar);
           this.wanderTarget = {
-            x: this.rng.range(-r, r),
-            z: this.rng.range(-r, r),
+            x: inp.player.x + Math.cos(a) * d,
+            z: inp.player.z + Math.sin(a) * d,
           };
         }
         return this.wanderTarget;
@@ -104,9 +113,10 @@ export class Controller {
     if (dist <= stopDist) {
       return { vx: 0, vz: 0 };
     }
+    const speed = dist > this.cfg.farDist ? this.cfg.speedFar : this.cfg.speed;
     return {
-      vx: (dx / dist) * this.cfg.speed,
-      vz: (dz / dist) * this.cfg.speed,
+      vx: (dx / dist) * speed,
+      vz: (dz / dist) * speed,
     };
   }
 }

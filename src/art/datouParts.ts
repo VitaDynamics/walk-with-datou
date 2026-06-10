@@ -1,13 +1,15 @@
 /**
- * Datou's body plates — assembled like the real VITA quadruped
- * (sim_tools/.../robots/vita01evt): a long light-shell torso standing on four
- * TWO-segment legs (thigh + calf, Z-folded), with a sensor-head module on a
- * short neck at the TOP-FRONT of the body (the real robot's head_yaw /
- * head_pitch joints become the rig's emotion channel). Mostly cream/white like
- * the real machine, charcoal visor + calves, one amber logo accent. No tail —
- * the VITA has none; feeling lives in the head, eyes, and leg posture.
+ * Datou's body plates — the official Vbot character (the VITA sticker sheet)
+ * rendered in the diorama's cutout style: chibi proportions with an oversized
+ * round dome head (大头!), a big soft charcoal face plate carrying large
+ * expressive eyes, a compact rounded shell body, chubby two-segment legs and
+ * ball feet. Same skeleton as the real robot (thigh + calf Z-fold, head on a
+ * short neck, no tail) so the rig's joints still match the MJCF, but the
+ * silhouette is the cute mascot, not the engineering sample.
  *
- * Hand-drawn cutout style throughout: ink outlines, wobbly blobs, flat fills.
+ * Palette stays the baseline ROBOT tokens — cream shell, warm charcoal face,
+ * one amber accent (flank logo + antenna tip). Ink outlines, wobbly blobs,
+ * flat fills throughout.
  */
 
 import { Rng } from '../physics/mujoco/rng';
@@ -40,62 +42,65 @@ function roundedRectPath(
 }
 
 /**
- * Torso — the VITA base_link silhouette: long (≈2.6:1) rounded shell, cream
- * like the real robot, with a darker belly tray, hip modules at both ends,
- * panel seams, and the amber logo dot. Facing right.
+ * Torso — the chibi Vbot shell: a compact (≈2:1) chubby rounded body, cream
+ * like the stickers, with a darker belly tray, hip modules at both ends,
+ * a soft panel seam, and the amber logo dot. Facing right.
  */
 export function drawTorso(seed: number): PropSprite {
   const rng = new Rng(seed);
-  const { c, g } = sprite(480, 200);
+  const { c, g } = sprite(440, 220);
   // Hip modules peeking from behind the shell at both ends (dark, like the
   // real hip actuators at x ±0.18).
-  for (const x of [86, 394]) {
-    roundedRectPath(g, x - 30, 96, 60, 64, 22);
+  for (const x of [87, 353]) {
+    roundedRectPath(g, x - 32, 120, 64, 68, 26);
     g.fillStyle = ROBOT.dark;
     g.fill();
     g.strokeStyle = INK.line;
     g.lineWidth = 5;
     g.stroke();
   }
-  // Shell — long rounded body.
-  const pts = blobPoints(rng, 240, 96, 210, 62, 14, 0.025);
+  // Shell — short, plump rounded body.
+  const pts = blobPoints(rng, 220, 102, 188, 76, 14, 0.02);
   paintBlob(g, pts, { fill: ROBOT.shell, outline: INK.line, lineWidth: 6 });
+  // Soft crown highlight along the back.
+  g.save();
+  g.globalAlpha = 0.35;
+  blob(g, rng, 200, 52, 110, 18, { fill: '#ffffff' }, 10, 0.1);
+  g.restore();
   // Charcoal belly tray (the sensor/battery underside of the real base).
   g.save();
   g.beginPath();
-  g.rect(60, 112, 360, 60);
+  g.rect(48, 126, 344, 64);
   g.clip();
-  const belly = blobPoints(rng, 240, 108, 196, 50, 14, 0.03);
+  const belly = blobPoints(rng, 220, 122, 176, 56, 14, 0.03);
   paintBlob(g, belly, { fill: ROBOT.dark });
   g.restore();
   g.strokeStyle = ROBOT.darkShade;
   g.lineWidth = 3;
   g.beginPath();
-  g.moveTo(70, 116);
-  g.quadraticCurveTo(240, 132, 410, 116);
+  g.moveTo(58, 130);
+  g.quadraticCurveTo(220, 148, 382, 130);
   g.stroke();
-  // Panel seams on the shell top.
+  // One quiet panel seam on the shell top.
   g.strokeStyle = ROBOT.shellShade;
   g.lineWidth = 3;
-  for (const x of [150, 330]) {
-    g.beginPath();
-    g.moveTo(x, 48);
-    g.quadraticCurveTo(x + 6, 78, x, 108);
-    g.stroke();
-  }
+  g.beginPath();
+  g.moveTo(150, 50);
+  g.quadraticCurveTo(157, 86, 150, 122);
+  g.stroke();
   // Quiet vent ticks near the rear.
   g.lineWidth = 2.5;
-  for (let i = 0; i < 4; i++) {
-    const x = 116 + i * 12;
+  for (let i = 0; i < 3; i++) {
+    const x = 104 + i * 13;
     g.beginPath();
-    g.moveTo(x, 66);
-    g.lineTo(x - 4, 88);
+    g.moveTo(x, 74);
+    g.lineTo(x - 4, 96);
     g.stroke();
   }
-  // The amber logo dot + small wordmark tick (VITA plate on the flank).
+  // The amber logo dot + small wordmark tick (Vbot plate on the flank).
   g.fillStyle = ROBOT.accent;
   g.beginPath();
-  g.arc(316, 84, 9, 0, Math.PI * 2);
+  g.arc(294, 90, 10, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 2.5;
@@ -103,143 +108,162 @@ export function drawTorso(seed: number): PropSprite {
   g.strokeStyle = ROBOT.shellShade;
   g.lineWidth = 3.5;
   g.beginPath();
-  g.moveTo(334, 84);
-  g.lineTo(366, 84);
+  g.moveTo(314, 90);
+  g.lineTo(346, 90);
   g.stroke();
-  return { canvas: c, aspect: 480 / 200 };
+  return { canvas: c, aspect: 440 / 220 };
 }
 
 /**
- * Head module on its neck — pivot is the BOTTOM CENTER (the head_pitch joint).
- * A short dark neck stem, then the cream sensor head with a charcoal visor on
- * the front face (eyes plate mounts there) and a small lidar bump on top.
+ * Head — the oversized Vbot dome, pivot at BOTTOM CENTER (the head_pitch
+ * joint). A short dark neck stem, then a big near-round cream dome with a
+ * large soft charcoal face plate wrapping the front (eyes plate mounts there)
+ * and a little antenna with an amber tip on top.
  */
 export function drawHead(seed: number): PropSprite {
   const rng = new Rng(seed);
-  const { c, g } = sprite(256, 240);
-  // Neck stem (head_yaw column).
-  roundedRectPath(g, 112, 168, 32, 64, 12);
+  const { c, g } = sprite(260, 260);
+  // Neck stem (head_yaw column) — mostly tucked under the dome.
+  roundedRectPath(g, 114, 192, 32, 60, 12);
   g.fillStyle = ROBOT.dark;
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 5;
   g.stroke();
-  // Head shell — rounded module, slightly longer than tall, nose to the right.
-  const pts = blobPoints(rng, 128, 102, 96, 68, 12, 0.025);
+  // Antenna stem first so the dome outline covers its base.
+  roundedRectPath(g, 125, 16, 10, 28, 5);
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.stroke();
+  // Dome — big, nearly round, barely wobbled so it stays plump and clean.
+  const pts = blobPoints(rng, 130, 126, 102, 96, 14, 0.018);
   paintBlob(g, pts, { fill: ROBOT.shell, outline: INK.line, lineWidth: 6 });
   // Crown highlight.
   g.save();
   g.globalAlpha = 0.4;
-  blob(g, rng, 116, 58, 60, 16, { fill: '#ffffff' }, 10, 0.12);
+  blob(g, rng, 108, 62, 58, 18, { fill: '#ffffff' }, 10, 0.12);
   g.restore();
-  // Lidar bump on top.
-  roundedRectPath(g, 96, 22, 48, 22, 10);
-  g.fillStyle = ROBOT.dark;
+  // Amber antenna tip — the one warm accent up top.
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.arc(130, 14, 8, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
-  g.lineWidth = 4;
+  g.lineWidth = 3;
   g.stroke();
-  // Charcoal visor — front (right) face of the module; eyes plate sits here.
-  roundedRectPath(g, 92, 70, 122, 70, 30);
+  // Charcoal face plate — a big soft squircle hugging the front (right) of
+  // the dome; the eyes plate sits centered on it.
+  roundedRectPath(g, 88, 50, 140, 138, 58);
   g.fillStyle = ROBOT.visor;
   g.fill();
   g.strokeStyle = INK.line;
-  g.lineWidth = 4.5;
+  g.lineWidth = 5;
   g.stroke();
-  // Visor sheen.
+  // Face-plate sheen.
   g.save();
-  g.globalAlpha = 0.1;
-  roundedRectPath(g, 102, 78, 64, 16, 8);
+  g.globalAlpha = 0.08;
+  roundedRectPath(g, 102, 62, 72, 22, 11);
   g.fillStyle = ROBOT.shell;
   g.fill();
   g.restore();
   // Side sensor dot (rear of head).
   g.fillStyle = ROBOT.shellShade;
   g.beginPath();
-  g.arc(52, 104, 7, 0, Math.PI * 2);
+  g.arc(46, 128, 7, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = ROBOT.darkShade;
   g.lineWidth = 2.5;
   g.stroke();
-  return { canvas: c, aspect: 256 / 240 };
+  return { canvas: c, aspect: 260 / 260 };
 }
 
 export type EyeState = 'neutral' | 'happy' | 'curious' | 'sleepy' | 'blink';
 
-/** Eye plate variants for the visor (warm-white on near-black). */
+/**
+ * Eye plate variants for the face plate (warm-white on near-black) — the
+ * sticker-sheet eye language: big rounded shapes, thick happy arcs, all the
+ * feeling carried by shape alone.
+ */
 export function drawEyes(state: EyeState): PropSprite {
-  const { c, g } = sprite(192, 80);
-  const eyeY = 40;
-  const lx = 58;
-  const rx = 134;
+  const { c, g } = sprite(200, 100);
+  const eyeY = 50;
+  const lx = 62;
+  const rx = 138;
   g.strokeStyle = '#f4efdf';
   g.fillStyle = '#f4efdf';
   g.lineCap = 'round';
   switch (state) {
     case 'neutral':
+      // Big soft capsules — calm and present.
       for (const x of [lx, rx]) {
         g.beginPath();
-        g.ellipse(x, eyeY, 13, 16, 0, 0, Math.PI * 2);
+        g.ellipse(x, eyeY, 15, 21, 0, 0, Math.PI * 2);
         g.fill();
       }
       break;
     case 'happy':
-      g.lineWidth = 9;
+      // Thick upturned arcs, the sticker smile-eyes.
+      g.lineWidth = 12;
       for (const x of [lx, rx]) {
         g.beginPath();
-        g.arc(x, eyeY + 6, 16, Math.PI * 1.15, Math.PI * 1.85);
+        g.arc(x, eyeY + 7, 19, Math.PI * 1.12, Math.PI * 1.88);
         g.stroke();
       }
       break;
     case 'curious':
-      // Both eyes rounder and a touch wider — alert, not googly.
-      for (const x of [lx, rx]) {
-        g.beginPath();
-        g.ellipse(x, eyeY - 2, 15, 18, 0, 0, Math.PI * 2);
-        g.fill();
-      }
+      // Wide round eyes, the front one a touch bigger — a head-tilt read.
+      g.beginPath();
+      g.ellipse(lx, eyeY - 1, 15, 19, 0, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.ellipse(rx, eyeY - 4, 18, 23, 0, 0, Math.PI * 2);
+      g.fill();
       break;
     case 'sleepy':
-      g.lineWidth = 8;
+      // Heavy drooping lids.
+      g.lineWidth = 10;
       for (const x of [lx, rx]) {
         g.beginPath();
-        g.moveTo(x - 14, eyeY + 2);
-        g.quadraticCurveTo(x, eyeY + 10, x + 14, eyeY + 2);
+        g.moveTo(x - 16, eyeY);
+        g.quadraticCurveTo(x, eyeY + 12, x + 16, eyeY);
         g.stroke();
       }
       break;
     case 'blink':
-      g.lineWidth = 7;
+      // A gentle contented bow, not a flat shutter line.
+      g.lineWidth = 8;
       for (const x of [lx, rx]) {
         g.beginPath();
-        g.moveTo(x - 13, eyeY);
-        g.lineTo(x + 13, eyeY);
+        g.moveTo(x - 15, eyeY + 3);
+        g.quadraticCurveTo(x, eyeY - 4, x + 15, eyeY + 3);
         g.stroke();
       }
       break;
   }
-  return { canvas: c, aspect: 192 / 80 };
+  return { canvas: c, aspect: 200 / 100 };
 }
 
-/** Thigh — cream upper segment (like the white FL_thigh). Pivot = top center. */
+/** Thigh — chubby cream upper segment (sticker-plump). Pivot = top center. */
 export function drawThigh(seed: number): PropSprite {
   const rng = new Rng(seed);
   void rng.next();
-  const { c, g } = sprite(96, 176);
+  const { c, g } = sprite(104, 176);
   // Hip joint cap behind.
   g.fillStyle = ROBOT.dark;
   g.beginPath();
-  g.arc(48, 26, 22, 0, Math.PI * 2);
+  g.arc(52, 26, 24, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 5;
   g.stroke();
-  // Thigh body, tapering toward the knee.
+  // Thigh body — plump, rounding gently toward the knee.
   g.beginPath();
-  g.moveTo(26, 22);
-  g.quadraticCurveTo(20, 90, 36, 152);
-  g.lineTo(62, 152);
-  g.quadraticCurveTo(76, 90, 70, 22);
+  g.moveTo(24, 22);
+  g.quadraticCurveTo(16, 92, 36, 154);
+  g.lineTo(68, 154);
+  g.quadraticCurveTo(88, 92, 80, 22);
   g.closePath();
   g.fillStyle = ROBOT.shell;
   g.fill();
@@ -251,10 +275,10 @@ export function drawThigh(seed: number): PropSprite {
   g.strokeStyle = ROBOT.shellShade;
   g.lineWidth = 3;
   g.beginPath();
-  g.moveTo(36, 58);
-  g.lineTo(60, 58);
+  g.moveTo(36, 60);
+  g.lineTo(68, 60);
   g.stroke();
-  return { canvas: c, aspect: 96 / 176 };
+  return { canvas: c, aspect: 104 / 176 };
 }
 
 /** Calf — charcoal lower segment with the ball foot. Pivot = top center. */
@@ -265,7 +289,7 @@ export function drawCalf(seed: number): PropSprite {
   // Knee joint cap.
   g.fillStyle = ROBOT.shell;
   g.beginPath();
-  g.arc(48, 22, 16, 0, Math.PI * 2);
+  g.arc(48, 22, 17, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 4.5;
@@ -273,8 +297,8 @@ export function drawCalf(seed: number): PropSprite {
   // Calf — slim, slightly curved like the real part.
   g.beginPath();
   g.moveTo(36, 18);
-  g.quadraticCurveTo(28, 90, 40, 156);
-  g.lineTo(58, 156);
+  g.quadraticCurveTo(28, 90, 40, 152);
+  g.lineTo(58, 152);
   g.quadraticCurveTo(60, 90, 60, 18);
   g.closePath();
   g.fillStyle = ROBOT.dark;
@@ -283,10 +307,10 @@ export function drawCalf(seed: number): PropSprite {
   g.lineWidth = 4.5;
   g.lineJoin = 'round';
   g.stroke();
-  // Ball foot (gray in the real model).
+  // Big round ball foot — the sticker bounce.
   g.fillStyle = ROBOT.darkShade;
   g.beginPath();
-  g.arc(48, 166, 17, 0, Math.PI * 2);
+  g.arc(48, 164, 19, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = INK.line;
   g.lineWidth = 4.5;
@@ -295,7 +319,7 @@ export function drawCalf(seed: number): PropSprite {
   g.globalAlpha = 0.35;
   g.fillStyle = ROBOT.shell;
   g.beginPath();
-  g.arc(43, 160, 5, 0, Math.PI * 2);
+  g.arc(42, 157, 5.5, 0, Math.PI * 2);
   g.fill();
   g.restore();
   return { canvas: c, aspect: 0.5 };

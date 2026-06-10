@@ -1,50 +1,81 @@
 /**
- * Game — the diorama orchestrator.
+ * Game — the walk orchestrator.
  *
- * Owns the renderer, the glade, the rig, the want loop, and the console, and
- * routes the three pointer gestures into companionship verbs:
- *   tap Datou → pet · hold Datou → soothe · tap glade → explore together.
- * The physics adapter contract is untouched: this layer only reads
+ * You are the human; Datou walks with you, on or off the leash. One loop
+ * routes everything: WASD / tap-to-walk movement, petting and soothing,
+ * gathering pickables into the backpack, crafting and placing keepsakes,
+ * throwing the fetch stick, Datou's want loop, daily discoveries, and the
+ * memory log. The physics adapter contract is untouched: this layer reads
  * getDatouState() and pulls the mode/target levers.
  */
 
 import * as THREE from 'three';
 import { canvasTexture, paintBackdrop, paintContactShadow } from '../art/textures';
+import { drawCairn, drawLamp, drawStick } from '../art/props';
 import { DatouRig } from '../datou/DatouRig';
+import { HumanRig } from '../human/HumanRig';
+import { Leash } from '../human/Leash';
+import { Player } from '../human/Player';
 import type { PhysicsAdapter } from '../physics/PhysicsAdapter';
-import { Console, type Stance } from '../ui/Console';
-import { Diorama, WALK_RADIUS } from '../world/Diorama';
+import { Console } from '../ui/Console';
+import { Cutout } from '../world/Cutout';
+import { SPOT_ANCHORS } from '../world/layout';
+import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
+import { World } from '../world/World';
+import { WORLD_WALK_RADIUS } from '../world/zones';
+import { Backpack, type CraftedId, type ResourceId } from './Backpack';
 import { Bond } from './Bond';
 import { CameraRig } from './CameraRig';
 import { Companion, type CompanionEvents, type WantKind } from './Companion';
+import { craft, recipe } from './Crafting';
+import { Fetch } from './Fetch';
+import { Keys } from './Keys';
 import { Memories } from './Memories';
 import { Pointer } from './Pointer';
+import { t, tDyn } from '../i18n';
 
 const MAX_DT = 1 / 30;
-/** Bond level at which the trust bar reads full (kept abstract for the player). */
 const TRUST_FULL = 120;
-const BOND_KEY = 'wwd.bond';
-const SPOTS_KEY_PREFIX = 'wwd.spots.';
-/** A hold this long counts as a real soothing session → memory. */
 const COMFORT_MEMORY_SECONDS = 2.5;
+const GATHER_REACH = 1.9;
+const REACT_COOLDOWN = 6;
+
+interface BuiltItem {
+  kind: 'cairn' | 'lantern';
+  x: number;
+  z: number;
+}
 
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly cameraRig: CameraRig;
-  private readonly diorama: Diorama;
-  private readonly rig: DatouRig;
+  private readonly world: World;
+  private readonly datouRig: DatouRig;
+  private readonly humanRig: HumanRig;
+  private readonly leash = new Leash();
+  private readonly player = new Player();
   private readonly physics: PhysicsAdapter;
   private readonly companion: Companion;
   private readonly bond: Bond;
   private readonly memories = new Memories();
+  private readonly backpack = new Backpack();
   private readonly spots: SpotField;
+  private readonly fetch: Fetch;
   private readonly ui: Console;
   private readonly pointer: Pointer;
+  private readonly keys = new Keys();
   private readonly raycaster = new THREE.Raycaster();
+  private readonly stickCutout: Cutout;
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
+  private leashOn = true;
+  private garlandWorn = false;
+  private placing: 'cairn' | 'lantern' | null = null;
+  private pendingGather: string | null = null;
+  private pendingReaction: { verb: string; x: number; z: number } | null = null;
+  private reactCooldown = 0;
   private comforting = false;
   private comfortPulseIn = 0;
   private lastTime = performance.now();
@@ -61,17 +92,27 @@ export class Game {
 
     this.cameraRig = new CameraRig(window.innerWidth / window.innerHeight);
 
-    this.diorama = new Diorama();
-    this.scene.add(this.diorama.group);
+    this.world = new World(dailySeed(), this.loadJson<string[]>(this.pickedKey(), []));
+    this.scene.add(this.world.group);
 
-    this.rig = new DatouRig(canvasTexture(paintContactShadow()));
-    this.scene.add(this.rig.group);
+    const shadowTex = canvasTexture(paintContactShadow());
+    this.datouRig = new DatouRig(shadowTex);
+    this.humanRig = new HumanRig(shadowTex);
+    this.scene.add(this.datouRig.group, this.humanRig.group, this.leash.mesh);
 
-    // --- Relationship state (persists across sessions) ---
-    this.bond = new Bond(this.loadBond());
-    this.spots = new SpotField(dailySeed(), this.diorama.spotAnchors, SPOTS_PER_DAY);
-    this.spots.restoreFound(this.loadFoundSpots());
-    for (const s of this.spots.spots) if (s.found) this.diorama.revealSpot(s);
+    this.stickCutout = new Cutout(drawStick(5), { height: 0.28 });
+    this.stickCutout.group.visible = false;
+    this.scene.add(this.stickCutout.group);
+
+    // --- Relationship + world state (persists) ---
+    this.bond = new Bond(Number(this.loadRaw('wwd.bond')) || 0);
+    this.spots = new SpotField(dailySeed(), SPOT_ANCHORS, SPOTS_PER_DAY);
+    this.spots.restoreFound(this.loadJson<number[]>('wwd.spots.' + dailyKey(), []));
+    for (const s of this.spots.spots) if (s.found) this.world.revealSpot(s);
+    for (const b of this.loadJson<BuiltItem[]>('wwd.built', [])) this.placeBuilt(b, false);
+    this.garlandWorn = this.loadRaw('wwd.garland') === '1';
+    this.datouRig.setGarland(this.garlandWorn);
+    this.leashOn = this.loadRaw('wwd.leash') !== '0';
 
     this.companion = new Companion(
       this.bond,
@@ -84,12 +125,21 @@ export class Game {
       Math.random,
       this.spots,
     );
+    this.fetch = new Fetch({
+      setMode: (m) => this.physics.setMode(m),
+      setTarget: (x, z) => this.physics.setTarget(x, z),
+      onComplete: () => this.handleFetchComplete(),
+    });
 
-    this.ui = new Console(this.memories, {
-      onStance: (stance) => this.setStance(stance),
+    this.ui = new Console(this.memories, this.backpack, {
+      onLeashToggle: () => this.toggleLeash(),
+      onUseItem: (id) => this.useItem(id),
+      onCraft: (id) => this.craftItem(id),
     });
     this.ui.setFoundToday(this.spots.foundCount, this.spots.spots.length);
     this.ui.setTrust(this.bond.level / TRUST_FULL);
+    this.ui.setLeash(this.leashOn);
+    this.ui.setGarlandWorn(this.garlandWorn);
 
     this.pointer = new Pointer(canvas, {
       onTap: (x, y) => this.handleTap(x, y),
@@ -99,13 +149,15 @@ export class Game {
       onZoom: (d) => this.cameraRig.addZoom(d),
     });
 
-    // The "you" the physics follows is the resting pad.
-    this.physics.setColliders?.(this.diorama.colliders);
-    this.physics.setPlayerPosition(this.diorama.padPosition.x, this.diorama.padPosition.z);
-    this.physics.setMode('idle');
+    this.player.setColliders(this.world.colliders);
+    this.physics.setColliders?.(this.world.colliders);
+    this.physics.setPlayerPosition(this.player.x, this.player.z);
+    this.applyStance();
 
     window.addEventListener('resize', this.onResize);
-    window.addEventListener('beforeunload', () => this.saveBond());
+    window.addEventListener('beforeunload', () =>
+      this.saveRaw('wwd.bond', String(this.bond.level)),
+    );
   }
 
   start(): void {
@@ -123,15 +175,48 @@ export class Game {
     if (hit === 'datou') {
       this.events.petted = true;
       this.physics.applyPet();
-      this.rig.pulse();
+      this.datouRig.pulse();
       return;
     }
-    if (hit) {
-      // Clamp the guide point inside the walkable glade.
-      const len = Math.hypot(hit.x, hit.z);
-      const s = len > WALK_RADIUS ? WALK_RADIUS / len : 1;
-      this.events.guidedTo = { x: hit.x * s, z: hit.z * s };
+    if (!hit) return;
+    const p = this.clampToWorld(hit.x, hit.z);
+
+    // Placement mode: the next ground tap drops the crafted keepsake.
+    if (this.placing) {
+      this.placeBuilt({ kind: this.placing, x: p.x, z: p.z }, true);
+      this.placing = null;
+      return;
     }
+
+    // Answering an active curious want by pointing at what Datou sees.
+    if (this.companion.activeWant === 'curious') {
+      this.events.guidedTo = p;
+      return;
+    }
+
+    // A pickable under the tap → gather (walk over first if needed).
+    const pickable = this.world.nearestInstance(p.x, p.z, 1.0, true);
+    if (pickable) {
+      if (Math.hypot(pickable.x - this.player.x, pickable.z - this.player.z) <= GATHER_REACH) {
+        this.gather(pickable.id, pickable.kind, pickable.x, pickable.z);
+      } else {
+        this.player.walkTo(pickable.x, pickable.z);
+        this.pendingGather = pickable.id;
+      }
+      return;
+    }
+
+    // An interactable prop → Datou trots over and reacts.
+    const prop = this.world.nearestInstance(p.x, p.z, 1.2, false);
+    if (prop && kindDef(prop.kind).verb !== 'none' && !kindDef(prop.kind).pickable) {
+      this.companion.investigate(prop.x, prop.z);
+      this.pendingReaction = { verb: kindDef(prop.kind).verb, x: prop.x, z: prop.z };
+      return;
+    }
+
+    // Otherwise: walk there together.
+    this.player.walkTo(p.x, p.z);
+    this.pendingGather = null;
   }
 
   private handleHoldStart(clientX: number, clientY: number): void {
@@ -156,32 +241,121 @@ export class Game {
     }
   }
 
-  /** Raycast a screen point: Datou's tap plate, else the glade floor. */
   private pick(clientX: number, clientY: number): 'datou' | { x: number; z: number } | null {
     const ndc = new THREE.Vector2(
       (clientX / window.innerWidth) * 2 - 1,
       -(clientY / window.innerHeight) * 2 + 1,
     );
     this.raycaster.setFromCamera(ndc, this.cameraRig.camera);
-    if (this.raycaster.intersectObject(this.rig.hitMesh, false).length > 0) return 'datou';
-    const ground = this.raycaster.intersectObject(this.diorama.groundMesh, false)[0];
+    if (this.raycaster.intersectObject(this.datouRig.hitMesh, false).length > 0) return 'datou';
+    const ground = this.raycaster.intersectObject(this.world.groundMesh, false)[0];
     if (ground) return { x: ground.point.x, z: ground.point.z };
     return null;
   }
 
+  private clampToWorld(x: number, z: number): { x: number; z: number } {
+    const r = Math.hypot(x, z);
+    const s = r > WORLD_WALK_RADIUS ? WORLD_WALK_RADIUS / r : 1;
+    return { x: x * s, z: z * s };
+  }
+
+  // --- backpack / craft / build / fetch ---
+
+  private gather(id: string, kind: ScatterKind, x: number, z: number): void {
+    if (!this.world.removeInstance(id)) return;
+    this.backpack.add(kind as ResourceId);
+    this.bond.add('discovery', 1);
+    const picked = this.loadJson<string[]>(this.pickedKey(), []);
+    picked.push(id);
+    this.saveJson(this.pickedKey(), picked);
+    this.ui.toast(t('gather.toast', { thing: tDyn(`thing.${kind}`) }));
+    void x;
+    void z;
+  }
+
+  private craftItem(id: CraftedId): void {
+    if (craft(recipe(id), this.backpack)) {
+      this.ui.toast(tDyn(`thing.${id}`));
+    }
+  }
+
+  private useItem(id: CraftedId): void {
+    switch (id) {
+      case 'stick': {
+        if (this.fetch.active) return;
+        // Throw ahead of the player (their last heading, else camera-forward).
+        const speed = Math.hypot(this.player.vx, this.player.vz);
+        const yaw = this.cameraRig.azimuth;
+        const dirX = speed > 0.2 ? this.player.vx : -Math.sin(yaw);
+        const dirZ = speed > 0.2 ? this.player.vz : -Math.cos(yaw);
+        this.fetch.throw(this.player.x, this.player.z, dirX, dirZ, WORLD_WALK_RADIUS);
+        break;
+      }
+      case 'garland': {
+        this.garlandWorn = !this.garlandWorn;
+        this.datouRig.setGarland(this.garlandWorn);
+        this.ui.setGarlandWorn(this.garlandWorn);
+        this.saveRaw('wwd.garland', this.garlandWorn ? '1' : '0');
+        break;
+      }
+      case 'cairn':
+      case 'lantern': {
+        this.placing = id;
+        this.ui.toast(t('place.hint'));
+        break;
+      }
+    }
+  }
+
+  private placeBuilt(item: BuiltItem, fresh: boolean): void {
+    if (fresh && !this.backpack.take(item.kind)) return;
+    const cut =
+      item.kind === 'cairn'
+        ? new Cutout(drawCairn(item.x * 31 + item.z * 7), { height: 0.8, shadowRadius: 0.45 })
+        : new Cutout(drawLamp(item.x * 17 + item.z * 3), { height: 1.5, shadowRadius: 0.4 });
+    this.world.placeCutout(cut, item.x, item.z);
+    if (fresh) {
+      const built = this.loadJson<BuiltItem[]>('wwd.built', []);
+      built.push(item);
+      this.saveJson('wwd.built', built);
+    }
+  }
+
+  private handleFetchComplete(): void {
+    this.bond.add('play');
+    this.physics.applyPet();
+    this.datouRig.pulse();
+    this.memories.add({
+      ts: Date.now(),
+      kind: 'want',
+      key: 'fetch',
+      mood: this.physics.getDatouState().mood,
+    });
+    this.ui.toast(t('fetch.return'));
+    this.applyStance();
+  }
+
   // --- companionship events ---
 
-  private setStance(stance: Stance): void {
+  private toggleLeash(): void {
     this.ui.notifyInteracted();
-    this.companion.homeMode = stance;
-    this.physics.setMode(stance);
+    this.leashOn = !this.leashOn;
+    this.ui.setLeash(this.leashOn);
+    this.saveRaw('wwd.leash', this.leashOn ? '1' : '0');
+    this.applyStance();
+  }
+
+  private applyStance(): void {
+    const mode = this.leashOn ? 'follow' : 'idle';
+    this.companion.homeMode = mode;
+    if (!this.fetch.active) this.physics.setMode(mode);
   }
 
   private handleDiscover(spot: Spot): void {
-    this.spots.markFound(spot.id);
-    this.diorama.revealSpot(spot);
-    this.physics.applyPet(); // a find makes Datou visibly happy
-    this.rig.pulse();
+    if (!this.spots.markFound(spot.id) && spot.found !== true) return;
+    this.world.revealSpot(spot);
+    this.physics.applyPet();
+    this.datouRig.pulse();
     const entry = {
       ts: Date.now(),
       kind: 'discovery' as const,
@@ -191,12 +365,12 @@ export class Game {
     this.memories.add(entry);
     this.ui.toast(this.ui.memoryText(entry));
     this.ui.setFoundToday(this.spots.foundCount, this.spots.spots.length);
-    this.saveFoundSpots();
+    this.saveJson('wwd.spots.' + dailyKey(), this.spots.foundIds());
   }
 
   private handleWantSatisfied(kind: WantKind): void {
     this.physics.applyPet();
-    this.rig.pulse();
+    this.datouRig.pulse();
     this.memories.add({
       ts: Date.now(),
       kind: 'want',
@@ -213,43 +387,104 @@ export class Game {
     const dt = Math.min((now - this.lastTime) / 1000, MAX_DT);
     this.lastTime = now;
 
-    // While soothing, keep the warmth flowing (mood + a soft lean now and then).
+    // Human movement (keyboard wins over tap-target).
+    this.player.update(dt, this.keys.axis(), this.cameraRig.azimuth);
+    this.physics.setPlayerPosition(this.player.x, this.player.z);
+
+    // Soothing hold keeps the warmth flowing.
     if (this.comforting) {
       this.comfortPulseIn -= dt;
       if (this.comfortPulseIn <= 0) {
         this.comfortPulseIn = 0.9;
         this.physics.applyPet();
-        this.rig.pulse();
+        this.datouRig.pulse();
       }
     }
 
     this.physics.step(dt);
     const state = this.physics.getDatouState();
 
-    this.companion.update(state, this.diorama.padPosition, this.events, dt);
+    this.fetch.update(dt, state, this.player);
+    if (!this.fetch.active) {
+      this.companion.update(state, this.player, this.events, dt);
+    }
     this.events.petted = false;
     this.events.comforted = false;
     this.events.guidedTo = null;
 
-    // Bond milestones become memories + a quiet toast.
+    // Deferred gather: arrived next to the tapped pickable?
+    if (this.pendingGather) {
+      const item = this.world.nearestInstance(this.player.x, this.player.z, GATHER_REACH, true);
+      if (item && item.id === this.pendingGather) {
+        this.gather(item.id, item.kind, item.x, item.z);
+        this.pendingGather = null;
+      } else if (!this.player.hasTarget) {
+        this.pendingGather = null;
+      }
+    }
+
+    // Datou reached a tapped prop → a small in-character reaction.
+    if (this.reactCooldown > 0) this.reactCooldown -= dt;
+    if (this.pendingReaction) {
+      const d = Math.hypot(
+        state.position.x - this.pendingReaction.x,
+        state.position.z - this.pendingReaction.z,
+      );
+      if (d <= 1.1) {
+        if (this.reactCooldown <= 0) {
+          this.reactCooldown = REACT_COOLDOWN;
+          this.ui.toast(tDyn(`react.${this.pendingReaction.verb}`));
+          this.bond.add('discovery', 2);
+          this.datouRig.pulse();
+        }
+        this.pendingReaction = null;
+      }
+    }
+
+    // Walking past a hidden spot reveals it — co-walking discovers things.
+    const nearSpot = this.spots.nearestUndiscovered(state.position.x, state.position.z, 0.9);
+    if (nearSpot) this.handleDiscover(nearSpot);
+
     for (const unlock of this.bond.takeUnlocks()) {
       const entry = { ts: Date.now(), kind: 'milestone' as const, key: unlock, mood: state.mood };
       this.memories.add(entry);
       this.ui.toast(this.ui.memoryText(entry));
     }
 
-    // Render layers.
-    const datouPos = new THREE.Vector3(state.position.x, 0, state.position.z);
-    this.cameraRig.update(dt, datouPos);
-    this.diorama.update(dt, this.cameraRig.azimuth);
-    this.rig.update(dt, state, this.companion.expression, this.cameraRig.azimuth);
+    // --- render layers ---
+    const camYaw = this.cameraRig.azimuth;
+    this.world.update(dt, camYaw);
+    this.datouRig.update(dt, state, this.companion.expression, camYaw);
+    this.humanRig.update(dt, this.player.x, this.player.z, this.player.vx, this.player.vz, camYaw);
 
-    // Console sync.
+    this.leash.setVisible(this.leashOn && !this.fetch.active);
+    this.leash.update(this.humanRig.handPosition, this.datouRig.harnessPosition);
+
+    const stickPos = this.fetch.stickPosition();
+    if (stickPos) {
+      this.stickCutout.group.visible = true;
+      this.stickCutout.setPosition(stickPos.x, stickPos.z, stickPos.y);
+      this.stickCutout.faceCamera(camYaw);
+    } else if (this.fetch.carried) {
+      const m = this.datouRig.mouthPosition;
+      this.stickCutout.group.visible = true;
+      this.stickCutout.group.position.set(m.x, m.y - 0.14, m.z);
+      this.stickCutout.faceCamera(camYaw);
+    } else {
+      this.stickCutout.group.visible = false;
+    }
+
+    const focus = new THREE.Vector3(this.player.x, 0, this.player.z);
+    this.cameraRig.update(dt, focus);
+
+    // --- console sync ---
     this.ui.setMood(state.mood);
     this.ui.setTrust(this.bond.level / TRUST_FULL);
     const want = this.companion.activeWant;
-    if (want) {
-      const head = datouPos.clone().setY(1.15).project(this.cameraRig.camera);
+    if (want && !this.fetch.active) {
+      const head = new THREE.Vector3(state.position.x, 1.0, state.position.z).project(
+        this.cameraRig.camera,
+      );
       this.ui.showWant(
         want,
         ((head.x + 1) / 2) * window.innerWidth,
@@ -262,7 +497,7 @@ export class Game {
     this.saveIn -= dt;
     if (this.saveIn <= 0) {
       this.saveIn = 3;
-      this.saveBond();
+      this.saveRaw('wwd.bond', String(this.bond.level));
     }
 
     this.renderer.render(this.scene, this.cameraRig.camera);
@@ -274,45 +509,49 @@ export class Game {
     this.cameraRig.resize(window.innerWidth / window.innerHeight);
   };
 
-  // --- persistence ---
+  // --- persistence helpers ---
 
-  private loadBond(): number {
+  private pickedKey(): string {
+    return 'wwd.picked.' + dailyKey();
+  }
+
+  private loadRaw(key: string): string | null {
     try {
-      return Number(localStorage.getItem(BOND_KEY)) || 0;
+      return localStorage.getItem(key);
     } catch {
-      return 0;
+      return null;
     }
   }
 
-  private saveBond(): void {
+  private saveRaw(key: string, value: string): void {
     try {
-      localStorage.setItem(BOND_KEY, String(this.bond.level));
+      localStorage.setItem(key, value);
     } catch {
-      // Private mode — the relationship lives for the session only.
+      // Session-only in private mode.
     }
   }
 
-  private loadFoundSpots(): number[] {
+  private loadJson<T>(key: string, fallback: T): T {
     try {
-      const raw = localStorage.getItem(SPOTS_KEY_PREFIX + dailyKey());
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number') : [];
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : fallback;
     } catch {
-      return [];
+      return fallback;
     }
   }
 
-  private saveFoundSpots(): void {
+  private saveJson(key: string, value: unknown): void {
     try {
-      localStorage.setItem(SPOTS_KEY_PREFIX + dailyKey(), JSON.stringify(this.spots.foundIds()));
+      localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // Non-fatal.
+      // Session-only in private mode.
     }
   }
 
   dispose(): void {
     this.running = false;
     this.pointer.dispose();
+    this.keys.dispose();
     window.removeEventListener('resize', this.onResize);
     this.physics.dispose();
     this.renderer.dispose();

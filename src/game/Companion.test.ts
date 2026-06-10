@@ -117,14 +117,14 @@ describe('Companion want loop (diorama)', () => {
     expect(bond.level).toBeGreaterThanOrEqual(2);
   });
 
-  it('discovers a spot via direct guiding even without an active want', () => {
+  it('discovers a spot via direct investigation even without an active want', () => {
     const bond = new Bond();
     const { rec, actions } = makeActions();
     const spots = new SpotField(20260610, SPOT_ANCHORS);
     const c = new Companion(bond, actions, () => 0.99, spots); // long rest — no want yet
     const spot = spots.spots[0];
 
-    run(c, datouAt(0, 0), 0.2, { ...NO_EVENTS, guidedTo: { x: spot.x + 0.3, z: spot.z } });
+    c.investigate(spot.x + 0.3, spot.z);
     run(c, datouAt(spot.x, spot.z), 0.3);
     expect(rec.discovered.map((s) => s.id)).toEqual([spot.id]);
   });

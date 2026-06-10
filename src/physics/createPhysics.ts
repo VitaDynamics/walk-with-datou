@@ -67,13 +67,13 @@ export async function createPhysics(search = window.location.search): Promise<Cr
   if (requested === 'mujoco') {
     try {
       // Lazy import so the placeholder path never pulls the WASM into the bundle.
-      const [{ MujocoAdapter }, { gladeColliders }] = await Promise.all([
+      const [{ MujocoAdapter }, { worldColliders }] = await Promise.all([
         import('./MujocoAdapter'),
         import('../world/layout'),
       ]);
-      // Bake the glade's major obstacles (tree, rocks, bush, stump, lamp) into
-      // the model so Datou collides with them in simulation.
-      const adapter = new MujocoAdapter({ scene: { colliders: gladeColliders() } });
+      // Bake the world's major obstacles into the model, capped so the geom
+      // count stays reasonable (nearest-to-home subset wins).
+      const adapter = new MujocoAdapter({ scene: { colliders: worldColliders(280) } });
       await adapter.init();
       return { adapter, backend: 'mujoco' };
     } catch (err) {

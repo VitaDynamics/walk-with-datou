@@ -86,10 +86,7 @@ export class MujocoAdapter implements PhysicsAdapter {
     this.sceneOpts = { ...DEFAULT_SCENE_OPTIONS, ...config.scene };
     this.recorder = config.record ? new InputRecorder() : null;
     this.rng = new Rng(this.seed);
-    this.controller = new Controller(this.rng, {
-      ...DEFAULT_CONTROLLER_CONFIG,
-      parkHalfExtent: this.sceneOpts.parkHalfExtent,
-    });
+    this.controller = new Controller(this.rng, DEFAULT_CONTROLLER_CONFIG);
   }
 
   async init(): Promise<void> {

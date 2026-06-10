@@ -1,23 +1,51 @@
 /**
- * Console — the companion interface around the diorama.
+ * Console — the companion interface around the world.
  *
- * Not a game HUD: a thin, quiet product layer. A status capsule (name, mood,
- * trust) up top; three soft actions at the bottom (sit with me · let it
- * choose · memories); a small thought chip that floats near Datou when it
- * wants something; and memory cards in a side sheet. Plain DOM over the
- * canvas, styled with the baseline tokens in index.html.
+ * Status capsule (name, mood, trust) top-left; three soft actions at the
+ * bottom (leash · backpack · memories); a thought chip near Datou; the
+ * backpack sheet (gathered things + a small recipe book) on the left and
+ * memory cards on the right. Plain DOM over the canvas, baseline tokens.
  */
 
 import { applyStaticI18n, onLangChange, t, tDyn } from '../i18n';
 import type { DatouMood } from '../physics/PhysicsAdapter';
 import type { Memories, MemoryEntry } from '../game/Memories';
 import type { WantKind } from '../game/Companion';
-
-export type Stance = 'follow' | 'idle';
+import type { Backpack, CraftedId, ItemId } from '../game/Backpack';
+import { RECIPES, canCraft } from '../game/Crafting';
+import {
+  drawBerry,
+  drawCairn,
+  drawFlower,
+  drawGarland,
+  drawLamp,
+  drawMushroom,
+  drawPebble,
+  drawPinecone,
+  drawStick,
+  drawTwig,
+} from '../art/props';
 
 export interface ConsoleCallbacks {
-  onStance(stance: Stance): void;
+  onLeashToggle(): void;
+  onUseItem(id: CraftedId): void;
+  onCraft(id: CraftedId): void;
 }
+
+const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }> = {
+  twig: drawTwig,
+  pebble: drawPebble,
+  berry: drawBerry,
+  flower: drawFlower,
+  mushroom: drawMushroom,
+  pinecone: drawPinecone,
+  stick: drawStick,
+  cairn: drawCairn,
+  garland: drawGarland,
+  lantern: drawLamp,
+};
+
+const CRAFTED: readonly CraftedId[] = ['stick', 'cairn', 'garland', 'lantern'];
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -32,51 +60,64 @@ export class Console {
   private readonly hint = el<HTMLDivElement>('hint-line');
   private readonly wantChip = el<HTMLDivElement>('want-chip');
   private readonly toastEl = el<HTMLDivElement>('toast');
-  private readonly panel = el<HTMLDivElement>('memories-panel');
+  private readonly memoriesPanel = el<HTMLDivElement>('memories-panel');
   private readonly memoriesList = el<HTMLDivElement>('memories-list');
-  private readonly btnSit = el<HTMLButtonElement>('btn-sit');
-  private readonly btnRoam = el<HTMLButtonElement>('btn-roam');
-  private readonly btnMemories = el<HTMLButtonElement>('btn-memories');
+  private readonly packPanel = el<HTMLDivElement>('pack-panel');
+  private readonly packItems = el<HTMLDivElement>('pack-items');
+  private readonly packRecipes = el<HTMLDivElement>('pack-recipes');
+  private readonly btnLeash = el<HTMLButtonElement>('btn-leash');
 
   private readonly memories: Memories;
+  private readonly backpack: Backpack;
+  private readonly callbacks: ConsoleCallbacks;
+  private readonly icons = new Map<ItemId, string>();
   private mood: DatouMood = 'calm';
+  private garlandWorn = false;
   private toastTimer: number | null = null;
   private hintDismissed = false;
 
-  constructor(memories: Memories, callbacks: ConsoleCallbacks) {
+  constructor(memories: Memories, backpack: Backpack, callbacks: ConsoleCallbacks) {
     this.memories = memories;
+    this.backpack = backpack;
+    this.callbacks = callbacks;
 
-    this.btnSit.addEventListener('click', () => {
-      this.setStance('follow');
-      callbacks.onStance('follow');
+    this.btnLeash.addEventListener('click', () => callbacks.onLeashToggle());
+    el<HTMLButtonElement>('btn-pack').addEventListener('click', () => {
+      this.packPanel.hidden = !this.packPanel.hidden;
+      if (!this.packPanel.hidden) this.renderPack();
     });
-    this.btnRoam.addEventListener('click', () => {
-      this.setStance('idle');
-      callbacks.onStance('idle');
-    });
-    this.btnMemories.addEventListener('click', () => {
-      this.panel.hidden = !this.panel.hidden;
-      if (!this.panel.hidden) this.renderMemories();
+    el<HTMLButtonElement>('btn-memories').addEventListener('click', () => {
+      this.memoriesPanel.hidden = !this.memoriesPanel.hidden;
+      if (!this.memoriesPanel.hidden) this.renderMemories();
     });
     el<HTMLButtonElement>('memories-close').addEventListener('click', () => {
-      this.panel.hidden = true;
+      this.memoriesPanel.hidden = true;
+    });
+    el<HTMLButtonElement>('pack-close').addEventListener('click', () => {
+      this.packPanel.hidden = true;
     });
 
     memories.onChange(() => {
-      if (!this.panel.hidden) this.renderMemories();
+      if (!this.memoriesPanel.hidden) this.renderMemories();
+    });
+    backpack.onChange(() => {
+      if (!this.packPanel.hidden) this.renderPack();
     });
     onLangChange(() => {
       applyStaticI18n();
       this.setMood(this.mood);
-      if (!this.panel.hidden) this.renderMemories();
+      if (!this.memoriesPanel.hidden) this.renderMemories();
+      if (!this.packPanel.hidden) this.renderPack();
     });
-
-    this.setStance('idle');
   }
 
-  setStance(stance: Stance): void {
-    this.btnSit.classList.toggle('active', stance === 'follow');
-    this.btnRoam.classList.toggle('active', stance === 'idle');
+  setLeash(on: boolean): void {
+    this.btnLeash.classList.toggle('active', on);
+  }
+
+  setGarlandWorn(on: boolean): void {
+    this.garlandWorn = on;
+    if (!this.packPanel.hidden) this.renderPack();
   }
 
   setMood(mood: DatouMood): void {
@@ -84,19 +125,14 @@ export class Console {
     this.moodWord.textContent = t(`mood.${mood}`);
   }
 
-  /** Trust as 0..1 — rendered as a thin quiet bar, never a number. */
   setTrust(fraction: number): void {
     this.trustFill.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
   }
 
   setFoundToday(n: number, total: number): void {
-    this.foundToday.textContent = t('console.foundToday', {
-      n: String(n),
-      total: String(total),
-    });
+    this.foundToday.textContent = t('console.foundToday', { n: String(n), total: String(total) });
   }
 
-  /** Float the thought chip near Datou (screen px), or hide it. */
   showWant(kind: WantKind | null, screenX = 0, screenY = 0): void {
     if (!kind) {
       this.wantChip.hidden = true;
@@ -107,7 +143,6 @@ export class Console {
     this.wantChip.style.transform = `translate(${Math.round(screenX)}px, ${Math.round(screenY)}px) translate(-50%, -100%)`;
   }
 
-  /** One quiet line of feedback; fades on its own. */
   toast(text: string): void {
     this.toastEl.textContent = text;
     this.toastEl.hidden = false;
@@ -121,7 +156,6 @@ export class Console {
     }, 3200);
   }
 
-  /** First meaningful interaction: let the onboarding hint go. */
   notifyInteracted(): void {
     if (this.hintDismissed) return;
     this.hintDismissed = true;
@@ -140,9 +174,82 @@ export class Console {
         place: tDyn(`place.${place}`),
       });
     }
-    if (entry.kind === 'want') return tDyn(`memory.want.${entry.key}`);
+    if (entry.kind === 'want') {
+      if (entry.key === 'fetch') return t('memory.fetch');
+      return tDyn(`memory.want.${entry.key}`);
+    }
     if (entry.kind === 'comfort') return t('memory.comfort');
     return tDyn(`milestone.${entry.key}`);
+  }
+
+  private icon(id: ItemId): string {
+    let url = this.icons.get(id);
+    if (!url) {
+      url = ICON_DRAW[id](7).canvas.toDataURL();
+      this.icons.set(id, url);
+    }
+    return url;
+  }
+
+  private renderPack(): void {
+    const held = this.backpack.held();
+    this.packItems.replaceChildren();
+    if (held.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'pack-empty';
+      empty.textContent = t('pack.empty');
+      this.packItems.append(empty);
+    }
+    for (const id of held) {
+      const btn = document.createElement('button');
+      btn.className = 'pack-item';
+      btn.type = 'button';
+      btn.title = tDyn(`thing.${id}`);
+      const img = document.createElement('img');
+      img.src = this.icon(id);
+      img.alt = btn.title;
+      const count = document.createElement('span');
+      count.className = 'pack-count';
+      count.textContent = `×${this.backpack.count(id)}`;
+      btn.append(img, count);
+      const recipe = RECIPES.find((r) => r.id === id);
+      if (recipe) {
+        const use = document.createElement('span');
+        use.className = 'pack-use';
+        use.textContent =
+          recipe.use === 'wear'
+            ? t(this.garlandWorn ? 'use.unwear' : 'use.wear')
+            : t(`use.${recipe.use}`);
+        btn.append(use);
+        btn.addEventListener('click', () => this.callbacks.onUseItem(recipe.id));
+      }
+      this.packItems.append(btn);
+    }
+
+    this.packRecipes.replaceChildren();
+    for (const id of CRAFTED) {
+      const recipe = RECIPES.find((r) => r.id === id)!;
+      const btn = document.createElement('button');
+      btn.className = 'pack-recipe';
+      btn.type = 'button';
+      btn.disabled = !canCraft(recipe, this.backpack);
+      const img = document.createElement('img');
+      img.src = this.icon(id);
+      img.alt = '';
+      const text = document.createElement('span');
+      const name = document.createElement('div');
+      name.className = 'recipe-name';
+      name.textContent = tDyn(`thing.${id}`);
+      const needs = document.createElement('div');
+      needs.className = 'recipe-needs';
+      needs.textContent = Object.entries(recipe.needs)
+        .map(([res, n]) => `${tDyn(`thing.${res}`)} ×${n}`)
+        .join(' · ');
+      text.append(name, needs);
+      btn.append(img, text);
+      btn.addEventListener('click', () => this.callbacks.onCraft(id));
+      this.packRecipes.append(btn);
+    }
   }
 
   private renderMemories(): void {
@@ -164,8 +271,7 @@ export class Console {
       const time = document.createElement('div');
       time.className = 'memory-time';
       const d = new Date(entry.ts);
-      const today = new Date();
-      const sameDay = d.toDateString() === today.toDateString();
+      const sameDay = d.toDateString() === new Date().toDateString();
       time.textContent = sameDay
         ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
         : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });

@@ -18,19 +18,24 @@ import type {
  *    drifts to 'curious' while moving, and to 'tired' if stationary too long.
  */
 export class PlaceholderPhysics implements PhysicsAdapter {
-  // A robot-dog trot, scaled for the ~13 m glade diorama — companionable,
-  // never frantic (it eases to a stop within FOLLOW_MIN_DIST).
-  private static readonly SPEED = 1.7; // m/s
-  private static readonly FOLLOW_MIN_DIST = 1.1;
+  // Companionable walking pace near a target, with a real trot when it has
+  // ground to cover (the human walks 3.1 / runs 5.4 m/s — Datou keeps up).
+  private static readonly SPEED_NEAR = 1.8; // m/s
+  private static readonly SPEED_FAR = 4.9;
+  private static readonly FAR_DIST = 6; // beyond this, trot
+  private static readonly FOLLOW_MIN_DIST = 1.3;
   private static readonly ARRIVE_DIST = 0.25;
   private static readonly HAPPY_DURATION = 5; // seconds
   private static readonly WANDER_INTERVAL_MIN = 3;
   private static readonly WANDER_INTERVAL_MAX = 7;
-  // Clamp bound, kept just inside the glade's walkable radius (WALK_RADIUS
-  // 6.2 in world/Diorama.ts) so Datou never stands on the painted edge. The
-  // physics layer stays independent of the game layer, so this mirrors that
-  // value rather than importing it.
-  private static readonly HALF_EXTENT = 6.0;
+  // Off-leash potter range around the player — idle wander stays companionable
+  // instead of roaming the whole 500 m park.
+  private static readonly WANDER_NEAR = 3;
+  private static readonly WANDER_FAR = 11;
+  // Clamp bound, kept just inside the world's walkable radius
+  // (WORLD_WALK_RADIUS 245 in world/zones.ts). The physics layer stays
+  // independent of the game layer, so this mirrors that value.
+  private static readonly HALF_EXTENT = 245;
 
   private state: DatouState = {
     position: { x: 1.4, y: 0, z: 0.8 },
@@ -126,10 +131,14 @@ export class PlaceholderPhysics implements PhysicsAdapter {
             PlaceholderPhysics.WANDER_INTERVAL_MIN +
             Math.random() *
               (PlaceholderPhysics.WANDER_INTERVAL_MAX - PlaceholderPhysics.WANDER_INTERVAL_MIN);
-          const r = PlaceholderPhysics.HALF_EXTENT;
+          // Potter around the player, not the whole park.
+          const a = Math.random() * Math.PI * 2;
+          const d =
+            PlaceholderPhysics.WANDER_NEAR +
+            Math.random() * (PlaceholderPhysics.WANDER_FAR - PlaceholderPhysics.WANDER_NEAR);
           this.wanderTarget = {
-            x: (Math.random() - 0.5) * 2 * r * 0.6,
-            z: (Math.random() - 0.5) * 2 * r * 0.6,
+            x: this.playerPos.x + Math.cos(a) * d,
+            z: this.playerPos.z + Math.sin(a) * d,
           };
         }
         return this.wanderTarget;
@@ -147,8 +156,12 @@ export class PlaceholderPhysics implements PhysicsAdapter {
       this.mode === 'follow' ? PlaceholderPhysics.FOLLOW_MIN_DIST : PlaceholderPhysics.ARRIVE_DIST;
 
     if (dist > stopDist) {
-      const vx = (dx / dist) * PlaceholderPhysics.SPEED;
-      const vz = (dz / dist) * PlaceholderPhysics.SPEED;
+      const speed =
+        dist > PlaceholderPhysics.FAR_DIST
+          ? PlaceholderPhysics.SPEED_FAR
+          : PlaceholderPhysics.SPEED_NEAR;
+      const vx = (dx / dist) * speed;
+      const vz = (dz / dist) * speed;
       this.state.position.x += vx * dt;
       this.state.position.z += vz * dt;
       this.state.velocity.x = vx;

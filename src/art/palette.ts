@@ -33,6 +33,13 @@ export const GROUND = {
   edge: '#b9bd92',
 } as const;
 
+export const WATER = {
+  deep: '#9cb4ab',
+  mid: '#abc1b7',
+  edge: '#c4d2c4',
+  sand: '#e2d8bd',
+} as const;
+
 export const SAGE = {
   light: '#b5c2a2',
   mid: '#94a781',

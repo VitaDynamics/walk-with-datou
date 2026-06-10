@@ -255,6 +255,142 @@
         color: #fff;
       }
 
+      /* --- Backpack sheet (left side) --- */
+      #pack-panel[hidden] {
+        display: none;
+      }
+      #pack-panel {
+        position: absolute;
+        top: 150px;
+        left: 20px;
+        bottom: 96px;
+        width: min(300px, 80vw);
+        z-index: 7;
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+        animation: sheet-in var(--normal) ease-out;
+      }
+      #pack-panel .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      #pack-panel .pack-make-head {
+        padding-top: 8px;
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      #pack-close {
+        border: none;
+        background: transparent;
+        font-size: 18px;
+        line-height: 1;
+        color: var(--text-tertiary);
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+      #pack-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 4px 14px 12px;
+        overflow-y: auto;
+      }
+      #pack-recipes {
+        padding: 4px 14px 14px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .pack-item {
+        position: relative;
+        width: 58px;
+        height: 58px;
+        border-radius: var(--radius-s);
+        background: var(--surface-strong);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        transition: transform var(--fast) ease;
+      }
+      .pack-item:hover {
+        transform: translateY(-1px);
+      }
+      .pack-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .pack-item .pack-count {
+        position: absolute;
+        right: 4px;
+        bottom: 3px;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        background: var(--accent-soft);
+        border-radius: 999px;
+        padding: 1px 6px;
+      }
+      .pack-item .pack-use {
+        position: absolute;
+        left: 4px;
+        top: 3px;
+        font-size: 9px;
+        color: var(--text-tertiary);
+      }
+      .pack-empty {
+        padding: 14px 6px;
+        font-size: 12px;
+        color: var(--text-tertiary);
+        line-height: 1.5;
+      }
+      .pack-recipe {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: none;
+        background: var(--surface-strong);
+        border-radius: var(--radius-s);
+        padding: 8px 10px;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        transition: background var(--fast) ease;
+      }
+      .pack-recipe:hover:not(:disabled) {
+        background: var(--accent-soft);
+      }
+      .pack-recipe:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .pack-recipe img {
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+      }
+      .pack-recipe .recipe-name {
+        font-size: 12.5px;
+        color: var(--text-primary);
+      }
+      .pack-recipe .recipe-needs {
+        font-size: 10.5px;
+        color: var(--text-tertiary);
+      }
+
       /* --- Memories sheet (right side) --- */
       #memories-panel[hidden] {
         display: none;
@@ -483,9 +619,20 @@
 
     <!-- Action bar -->
     <div id="action-bar">
-      <button id="btn-sit" type="button" data-i18n="console.sit">Sit with me</button>
-      <button id="btn-roam" type="button" data-i18n="console.roam">Let it choose</button>
+      <button id="btn-leash" type="button" data-i18n="console.leash">Leash</button>
+      <button id="btn-pack" type="button" data-i18n="console.pack">Backpack</button>
       <button id="btn-memories" type="button" data-i18n="console.memories">Memories</button>
+    </div>
+
+    <!-- Backpack sheet -->
+    <div id="pack-panel" role="dialog" aria-label="Backpack" hidden>
+      <div class="panel-head">
+        <span data-i18n="pack.title">Backpack</span>
+        <button id="pack-close" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="pack-items"></div>
+      <div class="panel-head pack-make-head"><span data-i18n="pack.make">Make</span></div>
+      <div id="pack-recipes"></div>
     </div>
 
     <!-- Memories sheet -->
