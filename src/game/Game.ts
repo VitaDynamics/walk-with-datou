@@ -40,7 +40,7 @@ import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
 import { WORLD_WALK_RADIUS } from '../world/zones';
-import { Backpack, type CraftedId, type ResourceId } from './Backpack';
+import { Backpack, type CraftedId, type ItemId, type ResourceId } from './Backpack';
 import { Bond } from './Bond';
 import { CameraRig } from './CameraRig';
 import { Companion, type CompanionEvents, type WantKind } from './Companion';
@@ -597,11 +597,17 @@ export class Game {
 
   /** Materials the player has for the bench. Backpack resources double as materials. */
   private materialCount(mat: MaterialId): number {
-    if (mat in MATERIALS && this.isPackResource(mat)) return this.backpack.count(mat as ResourceId);
+    if (mat in MATERIALS && this.isPackResource(mat)) return this.backpack.count(mat as ItemId);
     return 0;
   }
 
+  /** Lives in the pack and feeds the bench (gatherables + coffer finds, §9). */
   private isPackResource(mat: string): boolean {
+    return this.isGatherable(mat) || mat === 'feather' || mat === 'reed' || mat === 'old-bolt';
+  }
+
+  /** Exists as a ground pickable Datou can forage. */
+  private isGatherable(mat: string): boolean {
     return (
       mat === 'twig' ||
       mat === 'pebble' ||
@@ -707,7 +713,7 @@ export class Game {
   /** A foraged (ground-pickable) material in a group, if any. */
   private pickableMaterialForGroup(group: MaterialGroup): MaterialId | null {
     for (const mat of MATERIAL_IDS) {
-      if (groupOf(mat) === group && this.isPackResource(mat)) return mat;
+      if (groupOf(mat) === group && this.isGatherable(mat)) return mat;
     }
     return null;
   }
@@ -742,7 +748,7 @@ export class Game {
 
   /** Send Datou after a SPECIFIC material (forage a pickable, else work its node). */
   private gatherMaterial(mat: MaterialId): void {
-    if (this.isPackResource(mat)) {
+    if (this.isGatherable(mat)) {
       this.startForage(mat);
       return;
     }
@@ -783,7 +789,7 @@ export class Game {
     const seen = new Set<MaterialId>();
     // Ground pickables that actually exist in the world right now.
     for (const mat of MATERIAL_IDS) {
-      if (!this.isPackResource(mat)) continue;
+      if (!this.isGatherable(mat)) continue;
       if (this.world.nearestPickableOfKind(mat, this.player.x, this.player.z, 240)) {
         out.push({ id: mat, via: 'forage' });
         seen.add(mat);
@@ -1194,7 +1200,7 @@ export class Game {
 
   /** Pin a material → Datou forages for it (leash comes off). */
   private startForage(mat: MaterialId): void {
-    if (!this.isPackResource(mat)) {
+    if (!this.isGatherable(mat)) {
       this.ui.toast(t('forage.cantFind'));
       return;
     }

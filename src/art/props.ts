@@ -1190,6 +1190,48 @@ export function drawDiscovery(kind: DiscoveryArt, seed: number): PropSprite {
   return { canvas: c, aspect: 1 };
 }
 
+/** An old robot bolt — the salvaged-metal find coffers grant (landmark §9).
+ *  Hex head + short threaded shank, robot-dark, a quiet manufactured note. */
+export function drawBolt(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 128);
+  g.save();
+  g.translate(64, 64);
+  g.rotate(-0.5 + rng.next() * 0.2);
+  // Shank with three thread ticks.
+  g.fillStyle = ROBOT.dark;
+  g.fillRect(-7, -6, 14, 52);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.strokeRect(-7, -6, 14, 52);
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 2.5;
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.moveTo(-7, 8 + i * 12);
+    g.lineTo(7, 12 + i * 12);
+    g.stroke();
+  }
+  // Hex head.
+  g.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 6 + (i / 6) * Math.PI * 2;
+    const x = Math.cos(a) * 20;
+    const y = -22 + Math.sin(a) * 20;
+    if (i === 0) g.moveTo(x, y);
+    else g.lineTo(x, y);
+  }
+  g.closePath();
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.lineJoin = 'round';
+  g.stroke();
+  g.restore();
+  return { canvas: c, aspect: 1 };
+}
+
 /**
  * The starter treasure coffer — a small hand-made chest near home that holds
  * the first blueprint hint + the stock to try it (the onboarding bridge to the

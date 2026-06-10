@@ -5,6 +5,9 @@
  */
 
 export type ResourceId = 'twig' | 'pebble' | 'berry' | 'flower' | 'mushroom' | 'pinecone';
+/** Coffer-granted finds — not gatherable from the ground, but they sit in the
+ *  pack and feed the Workshop bench like any material (landmark plan §9). */
+export type FoundId = 'feather' | 'reed' | 'old-bolt';
 export type CraftedId =
   // tier 1 — components & keepsakes
   | 'bundle'
@@ -23,7 +26,7 @@ export type CraftedId =
   // tier 3 — structures
   | 'shelter'
   | 'archway';
-export type ItemId = ResourceId | CraftedId;
+export type ItemId = ResourceId | FoundId | CraftedId;
 
 export const RESOURCE_IDS: readonly ResourceId[] = [
   'twig',
