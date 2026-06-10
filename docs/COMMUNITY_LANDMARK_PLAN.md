@@ -421,6 +421,20 @@ prove one complete area before generalizing anything.
 **Exit:** clearings hold, state persists, and we know our true horizon
 distance.
 
+> **Phase 0 findings (2026-06-10, measured):** `src/world/landmarks.ts`
+> (LandmarkField + CLEARINGS) landed with tests. The sightline check
+> (`?at=x,z,yaw` teleport + temporary 9 m mast at the Commons, headless
+> SwiftShader shots at 130/90/60/40/25 m) showed the follow camera **never
+> frames the horizon**: at pitch 0.62 rad with a 34° FOV the top of frame is
+> ~18° below horizontal, so the visible world is a ~20 m ground disc (~45 m
+> fully zoomed out) and tall plates beyond it are cropped by the frame top —
+> the 9 m mast is invisible even at 25 m. Rain/fog days wash out the far half
+> of even that disc (fog far-plane 28–50 m). **Calibration consequence: the
+> Datou sense is the primary lure channel, ground-level breadcrumbs carry the
+> approach ring, and tall silhouettes only establish identity inside ~20 m
+> (plus the minimap paint).** The horizon-ring layer of §5 is effectively
+> delivered by Datou + map, not by pixels.
+
 ### Phase 1 — Repair Commons, complete vertical slice
 
 - Final Commons sprites, composition, approach curve and breadcrumbs.

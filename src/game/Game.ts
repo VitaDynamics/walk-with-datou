@@ -345,6 +345,19 @@ export class Game {
       if (e.code === 'KeyM' && !e.repeat) toggleOverview();
     });
 
+    // Dev/QA teleport: ?at=x,z[,camYaw] starts the walk anywhere, facing
+    // anywhere — used by the headless sightline checks; inert in normal play.
+    const at = new URLSearchParams(location.search).get('at');
+    if (at) {
+      const [ax, az, yaw] = at.split(',').map(Number);
+      if (Number.isFinite(ax) && Number.isFinite(az)) {
+        const p = this.clampToWorld(ax, az);
+        this.player.x = p.x;
+        this.player.z = p.z;
+        if (Number.isFinite(yaw)) this.cameraRig.setYaw(yaw);
+      }
+    }
+
     this.player.setColliders(this.world.colliders);
     this.physics.setColliders?.(this.world.colliders);
     this.physics.setPlayerPosition(this.player.x, this.player.z);

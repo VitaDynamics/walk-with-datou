@@ -40,6 +40,12 @@ export class CameraRig {
     return this.yaw;
   }
 
+  /** Snap the orbit to a yaw (the ?at= dev teleport — no easing wanted). */
+  setYaw(yaw: number): void {
+    this.yaw = yaw;
+    this.targetYaw = yaw;
+  }
+
   get overview(): boolean {
     return this.overviewOn;
   }
