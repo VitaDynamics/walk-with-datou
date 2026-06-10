@@ -21,3 +21,11 @@ public/models/**/*.gltf
 public/models/**/*.bin
 public/models/**/*.png
 public/models/**/*.jpg
+
+# Decimated Vita robot meshes — reproduced by `npm run prep:robot` from the
+# read-only sim-app robot bundle (39 MB raw → ~3 MB decimated). Not committed
+# (binary STL blobs). The committed manifest.json + vita01evt.xml + keyframes.xml
+# + walk.json describe the robot + its motion so the game knows its rig even
+# before the meshes are prepped. See scripts/prep-robot.mjs.
+public/robots/**/meshes/*.STL
+public/robots/**/meshes/*.stl
