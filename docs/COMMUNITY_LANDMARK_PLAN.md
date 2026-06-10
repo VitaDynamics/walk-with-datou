@@ -12,8 +12,9 @@ player can remember, describe, and become curious about.
 The first release should create this loop:
 
 > Notice a distinctive place → wonder what happened there → travel with Datou
-> → do one local activity together → leave a visible change → discover a clue
-> to another place.
+> → do one local activity together → find a community supply coffer → build
+> something from its blueprint → leave a visible change → discover a clue to
+> another place.
 
 Success is not “the map contains more objects.” Success is that a player can
 say:
@@ -97,6 +98,7 @@ different identity.
 | **Local verb**    | One activity that requires both player intent and Datou’s action                              |
 | **Story trace**   | Environmental evidence of who made the place and what they were trying to do                  |
 | **Secret**        | One optional observation, item, or side path found by looking beyond the obvious interaction  |
+| **Coffer reward** | One discoverable community coffer containing a themed blueprint and one starter material set  |
 | **State change**  | A visible improvement that persists after completion                                          |
 | **Outbound clue** | A diegetic hint that creates curiosity about a different area                                 |
 | **Revisit hook**  | A daily, weather, tool, Workshop, or relationship variation that changes the area later       |
@@ -151,6 +153,17 @@ fabric, old robot panels, and amber safety lights.
 - Following blue ribbon scraps leads toward the lake without exposing an exact
   map marker.
 
+**Coffer reward: Chime supply box**
+
+- A patched coffer is tucked beneath the bulletin-board steps, visible from the
+  back rather than from the main entrance.
+- Datou notices the old volunteer scent and pulls loose the stuck amber latch.
+- It contains the complete **chime blueprint**, `4 flower + 1 feather`, exactly
+  enough materials for the first build, and a maker note suggesting that chimes
+  were used to mark friendly rest stops.
+- The coffer remains visibly open after collection, preserving the memory of
+  where the reward came from.
+
 **Revisit**
 
 - Notices rotate daily.
@@ -196,6 +209,17 @@ robot-compatible pump to water floating planters.
 
 - A dry side channel leads behind the rest platform to a community time capsule
   or unique Workshop finish reference.
+
+**Coffer reward: Planter tool chest**
+
+- A blue-lidded coffer is lodged in the dry side channel, making the optional
+  route carry a concrete reward.
+- Datou braces the warped lid while the player releases its two catches.
+- It contains the complete **planter blueprint**, `7 twig + 1 reed`, exactly
+  enough materials for the first build, and a water-damaged sketch showing an
+  empty ornament socket in the restored garden.
+- After crafting the planter, the player may place it anywhere or install it in
+  the garden socket for a stronger local transformation.
 
 **Revisit**
 
@@ -245,6 +269,19 @@ park relay using salvaged robot parts.
 - A hollow beneath the Great Tree contains a volunteer badge, old Datou-shaped
   sketch, or rare pattern inspiration.
 
+**Coffer reward: Relay field case**
+
+- A narrow metal coffer sits inside the hollow beneath the Great Tree and only
+  reads as manufactured after the player follows the triangular marks around
+  the camp.
+- Datou detects a dormant signal in the latch and holds the case steady while
+  the player opens it.
+- It contains the complete **wayfinder blueprint**, `3 old-bolt + 2 pebble`,
+  exactly enough materials for the first build, and a relay-network fragment
+  bearing the distant machine-site symbol.
+- Making the wayfinder gives the player a placeable keepsake; it does not add an
+  objective arrow or reveal undiscovered coordinates.
+
 **Revisit**
 
 - Signal strength and received snippets vary by weather and time.
@@ -271,8 +308,74 @@ Rules:
   areas remain only as vague stains or player-visible silhouettes.
 - A clue remains in the environment after discovery so the player can reconstruct
   how the places connect.
+- Each area contains one coffer, but its silhouette and placement follow the
+  local visual language. Coffers are rewards for reading the place, not repeated
+  generic chests dropped beside the main activity.
 
-## 7. System and Content Changes
+## 7. Community Coffer Reward Loop
+
+The park’s “treasure coffers” are old volunteer supply containers. This keeps
+the reward language consistent with a community-made park and avoids importing
+a fantasy treasure-chest tone.
+
+### Reward contract
+
+Opening a coffer performs one atomic, one-time grant:
+
+1. Reveal one **complete exact-pattern blueprint** in the Workshop Notebook.
+2. Add one exact starter set of named materials to the backpack.
+3. Record both grants against the stable coffer ID, then mark the coffer open.
+4. Add a shared memory naming the area and blueprint.
+5. Leave the coffer open in the world and mark it on the local map detail.
+
+The full blueprint is a deliberate exception to the Workshop’s usual
+partial-hint discovery. Exploration has a clear, dependable reward, while
+Datou’s inspirations and experimentation remain the main sources for the rest
+of the pattern library. The coffer does **not** grant the finished item: the
+player must arrange the supplied materials on the bench and complete the making
+moment.
+
+| Area                  | Blueprint   | Starter materials          | Intended first use                           |
+| --------------------- | ----------- | -------------------------- | -------------------------------------------- |
+| Trail Repair Commons  | `chime`     | `flower ×4`, `feather ×1`  | Place at home or donate to the Commons       |
+| Reedwater Pump Garden | `planter`   | `twig ×7`, `reed ×1`       | Place freely or install in the garden socket |
+| Old Pine Relay Camp   | `wayfinder` | `old-bolt ×3`, `pebble ×2` | Placeable keepsake; no navigation automation |
+
+### Placement and discovery rules
+
+- A coffer is visible from at least one optional observation angle after the
+  player enters the activity ring, but never sits directly in front of the
+  landmark.
+- Datou gives a coffer-specific tell within 4–6 m. The player still chooses to
+  investigate and open it.
+- Opening uses a short cooperative beat appropriate to the container: pull a
+  latch, brace a warped lid, or wake a dormant lock.
+- No coffer requires a tool, consumable key, bond threshold, or completion of a
+  different landmark.
+- Completing the local activity may improve visibility or access, but players
+  who carefully explore may find the coffer first.
+- Coffers never refill. Renewable materials remain the job of gathering,
+  foraging, and resource nodes.
+
+### Duplicate and failure handling
+
+- Blueprint and material grants carry the stable coffer ID as their source.
+  `WorkshopState.awardBlueprint(sourceId, pattern)` and
+  `Backpack.grantBundle(sourceId, materials)` each persist the source receipt
+  with their own state and become idempotent.
+- Mark the landmark coffer `opened` only after both grants report success. If a
+  reload interrupts the sequence, reopening retries both operations; the
+  completed side ignores the duplicate source while the missing side completes.
+- If the blueprint is already known, keep it known and grant the material set
+  normally; never replace it with random currency.
+- If the backpack UI is closed or the Workshop has not been opened before, the
+  reward still persists and appears when those interfaces are next opened.
+- If storage fails, keep the grant session-local and do not repeatedly reopen
+  the coffer during that session.
+- Materials are added directly to inventory capacity; the current game has no
+  punitive overflow or dropped-reward behavior.
+
+## 8. System and Content Changes
 
 ### Authored area data
 
@@ -285,6 +388,10 @@ interface LandmarkArea {
   approachRadius: number;
   activityRadius: number;
   state: 'unseen' | 'noticed' | 'arrived' | 'completed';
+  coffer: {
+    blueprintPattern: string;
+    materials: Partial<Record<MaterialId, number>>;
+  };
   clueTo?: LandmarkArea['id'];
 }
 ```
@@ -314,6 +421,26 @@ overlapping it.
 - Replace generic reaction toasts at hero props with physical response,
   animation, short sound hooks, and visible world-state change.
 
+### Coffer and blueprint state
+
+- Add a reusable coffer interaction state:
+  `closed → noticed → opening → opened`.
+- Persist opened coffer IDs with the landmark-area save instead of daily
+  dressing.
+- Extend `WorkshopState` with explicitly awarded full blueprints, stored as
+  canonical exact-pattern keys and displayed separately from partial
+  inspirations. Awarding a blueprint makes the exact arrangement visible but
+  does not mark the item as made.
+- Add one coffer reward service that coordinates the source-tagged, idempotent
+  Workshop and backpack grants, then records the opened landmark state and
+  emits the memory event.
+- Expand backpack material support beyond the current six ground resources so
+  `feather`, `reed`, and `old-bolt` can be held, displayed, saved, and placed on
+  the Workshop bench. Use the existing `MaterialId` registry as the source of
+  truth rather than maintaining a second partial material list.
+- Add purpose-built closed/open community-coffer sprites with area accent
+  variants; do not use three unrelated reward containers.
+
 ### Map and discovery
 
 - Keep the minimap available, but mask unvisited authored details.
@@ -333,12 +460,12 @@ overlapping it.
   clues sooner; a Calm Datou observes longer; every personality can complete
   every activity.
 
-## 8. Implementation Sequence
+## 9. Implementation Sequence
 
 ### Phase 1 — Area framework and blockout
 
 - Add landmark area definitions, progression state, save keys, scatter exclusion
-  masks, and debug visualization.
+  masks, coffer reward definitions, and debug visualization.
 - Recompose the existing east, lake, and woods locations using temporary
   silhouettes.
 - Tune sightlines at normal camera distance before producing final sprites.
@@ -350,16 +477,19 @@ from a blurred screenshot.
 ### Phase 2 — Repair Commons vertical slice
 
 - Build final Commons props, approach breadcrumbs, activity, completion state,
-  memory event, and clue to the lake.
+  Chime supply box, blueprint/material grant, memory event, and clue to the
+  lake.
 - Add its map reveal behavior and persistence.
 
 **Exit criterion:** A first-time tester finds the Commons without a HUD marker,
 can explain what the place was used for, completes the activity with Datou, and
-notices the lake clue.
+finds the coffer, makes the chime from its supplied materials, and notices the
+lake clue.
 
 ### Phase 3 — Complete the three-area chain
 
-- Build Pump Garden and Relay Camp using the proven area/activity contracts.
+- Build Pump Garden and Relay Camp using the proven area/activity/coffer
+  contracts.
 - Add early-discovery handling and persistent state changes.
 - Connect the Relay Camp response to the future machine-site mystery.
 
@@ -377,7 +507,7 @@ relationship of the three areas.
 **Exit criterion:** Returning players can identify one visible change in each
 completed area and have one new reason to interact without resetting progress.
 
-## 9. Test Plan
+## 10. Test Plan
 
 ### Automated
 
@@ -387,6 +517,14 @@ completed area and have one new reason to interact without resetting progress.
 - An area found out of sequence remains completable and does not break clues.
 - Map clicks cannot target masked authored interiors.
 - All three areas emit correctly localized memory and interaction keys.
+- Each coffer grants its blueprint and exact material bundle once, including
+  after save/load and rapid repeated interaction.
+- A coffer whose blueprint is already known still grants materials once and
+  does not corrupt Workshop discovery state.
+- Awarded blueprints show the complete exact arrangement but remain unmade
+  until crafted at the bench.
+- `feather`, `reed`, and `old-bolt` survive backpack save/load and are accepted
+  by the Workshop.
 
 ### Visual and playtest
 
@@ -395,6 +533,8 @@ completed area and have one new reason to interact without resetting progress.
   points, and whether the next clue was understood.
 - Ask testers to name each place and draw the route after 15 minutes. Recognition
   matters more than exact map accuracy.
+- Verify players understand that the coffer supplies a build opportunity, not a
+  finished object, and can produce the intended item without external help.
 - Observe rather than explain. Add guidance only where repeated testers fail to
   perceive an intended lure.
 - Test at normal follow camera, maximum normal zoom, and overview mode.
@@ -406,7 +546,7 @@ completed area and have one new reason to interact without resetting progress.
 - Target no meaningful frame-time regression on the current mid-range laptop
   baseline.
 
-## 10. Metrics
+## 11. Metrics
 
 Primary:
 
@@ -420,16 +560,19 @@ Supporting:
 - Landmark activity completion rate.
 - Return visits and Workshop contributions per area.
 - Number of memories created at authored areas versus generic scatter props.
+- Coffer discovery rate, blueprint craft rate, and percentage of crafted
+  rewards installed back into their source area.
 
 Do not optimize for collected-item count. The intended outcome is a chain of
 remembered places and shared moments.
 
-## 11. Scope Boundaries
+## 12. Scope Boundaries
 
 Included in the first slice:
 
 - Three authored areas and their connecting clue chain.
-- New landmark props, activities, persistence, map reveal, and Datou tells.
+- New landmark props, activities, community coffers, blueprint/material rewards,
+  persistence, map reveal, and Datou tells.
 - Small layout and scatter changes needed to frame those areas.
 
 Deferred:
@@ -440,7 +583,7 @@ Deferred:
 - Redesigning every biome before the three-area loop is playtested.
 - Building the far machine site beyond the Relay Camp’s distant response.
 
-## 12. References
+## 13. References
 
 - Gómez-Maureira et al., “Level Design Patterns That Invoke
   Curiosity-Driven Exploration,” CHI PLAY 2021:

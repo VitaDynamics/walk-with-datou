@@ -1189,3 +1189,110 @@ export function drawDiscovery(kind: DiscoveryArt, seed: number): PropSprite {
   g.stroke();
   return { canvas: c, aspect: 1 };
 }
+
+/**
+ * The starter treasure coffer — a small hand-made chest near home that holds
+ * the first blueprint hint + the stock to try it (the onboarding bridge to the
+ * no-blueprint Workshop loop). Two calm states: closed, and opened (lid tipped
+ * back, a soft warm hint of contents). Cream/clay body, ink outline, one amber
+ * latch dot — the lamp/lantern accent language, no glow or sparkle.
+ */
+export function drawCoffer(seed: number, open = false): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(256, 224);
+  const baseY = 196;
+  // Body — a rounded clay box on stubby feet.
+  g.beginPath();
+  g.moveTo(48, 120);
+  g.lineTo(54, baseY);
+  g.lineTo(202, baseY);
+  g.lineTo(208, 120);
+  g.closePath();
+  g.fillStyle = CLAY.light;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Iron band + grain.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(60, 152);
+  g.lineTo(196, 152);
+  g.stroke();
+  for (let i = 0; i < 3; i++) {
+    wobblyLine(g, rng, 80 + i * 48, 124, 82 + i * 48, baseY - 6, 2, CLAY.mid, 1.5, 4);
+  }
+  // Feet.
+  for (const x of [62, 194]) {
+    g.fillStyle = CLAY.deep;
+    g.fillRect(x - 8, baseY - 2, 16, 10);
+  }
+  if (!open) {
+    // Closed domed lid.
+    g.beginPath();
+    g.moveTo(46, 122);
+    g.quadraticCurveTo(128, 70, 210, 122);
+    g.lineTo(206, 132);
+    g.quadraticCurveTo(128, 86, 50, 132);
+    g.closePath();
+    g.fillStyle = CLAY.mid;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 5;
+    g.stroke();
+    // Amber latch.
+    g.fillStyle = ROBOT.accent;
+    g.beginPath();
+    g.arc(128, 128, 8, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 3;
+    g.stroke();
+  } else {
+    // Opened: lid tipped back, a soft warm interior + a tiny hint of contents.
+    const halo = g.createRadialGradient(128, 118, 6, 128, 118, 70);
+    halo.addColorStop(0, LAMP_WARM);
+    halo.addColorStop(1, 'rgba(233, 196, 124, 0)');
+    g.fillStyle = halo;
+    g.fillRect(48, 70, 160, 80);
+    // Open mouth (dark interior).
+    g.beginPath();
+    g.ellipse(128, 118, 78, 18, 0, 0, Math.PI * 2);
+    g.fillStyle = CLAY.deep;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.stroke();
+    // Tipped-back lid.
+    g.beginPath();
+    g.moveTo(54, 110);
+    g.quadraticCurveTo(120, 44, 196, 64);
+    g.quadraticCurveTo(150, 78, 92, 116);
+    g.closePath();
+    g.fillStyle = CLAY.mid;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 5;
+    g.lineJoin = 'round';
+    g.stroke();
+    // A little rolled "blueprint" sketch peeking out.
+    g.save();
+    g.translate(132, 104);
+    g.rotate(-0.2);
+    g.fillStyle = '#fbf7ec';
+    g.fillRect(-22, -10, 44, 20);
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.strokeRect(-22, -10, 44, 20);
+    g.beginPath();
+    g.moveTo(-14, -2);
+    g.lineTo(14, -2);
+    g.moveTo(-14, 4);
+    g.lineTo(8, 4);
+    g.stroke();
+    g.restore();
+  }
+  return { canvas: c, aspect: 256 / 224 };
+}

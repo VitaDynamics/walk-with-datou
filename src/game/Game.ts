@@ -17,6 +17,7 @@ import {
   drawBirdbath,
   drawCairn,
   drawCampfire,
+  drawCoffer,
   drawCrop,
   drawFence,
   drawLamp,
@@ -54,6 +55,7 @@ import { Workshop } from '../ui/Workshop';
 import { WorkshopState } from './workshop/WorkshopState';
 import type { Outcome } from './workshop/bench';
 import { parseItemId, itemName } from './workshop/items';
+import { canonical, arrangement } from './workshop/pattern';
 import { itemSprite, itemHeight } from './workshop/sprites';
 import type { MaterialId } from './workshop/materials';
 import { MATERIALS } from './workshop/materials';
@@ -72,6 +74,8 @@ const TRUST_FULL = 120;
 const COMFORT_MEMORY_SECONDS = 2.5;
 const GATHER_REACH = 1.9;
 const REACT_COOLDOWN = 6;
+/** The starter coffer sits just off the home pad, in easy first-walk reach. */
+const COFFER_POS = { x: -1.8, z: 4.0 } as const;
 
 type BuildableKind =
   | 'cairn'
@@ -151,6 +155,11 @@ export class Game {
   private readonly tools = new Tools();
   private readonly harvest: Harvest;
   private readonly nodeVisuals = new Map<string, { cut: Cutout; state: string }>();
+  // Starter treasure coffer — teaches the blueprint concept (a banked hint +
+  // the stock to try it), opened once near home.
+  private cofferCutout: Cutout | null = null;
+  private cofferOpen = false;
+  private pendingCoffer = false;
   // Inspiration cadence (§5.2): a slow tick, a cooldown, and a pity timer so at
   // least one fires every ~2 sessions and never more than one per 10 min.
   private inspoTickIn = 90;
@@ -284,6 +293,7 @@ export class Game {
     for (const b of this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []))
       this.placeWorkshopItem(b.id, b.x, b.z, false);
     this.placeNodes();
+    this.placeCoffer();
 
     this.pointer = new Pointer(canvas, {
       onTap: (x, y) => this.handleTap(x, y),
@@ -401,6 +411,17 @@ export class Game {
       } else {
         this.player.walkTo(pickable.x, pickable.z);
         this.pendingGather = pickable.id;
+      }
+      return;
+    }
+
+    // The starter coffer → walk over and open it (once).
+    if (!this.cofferOpen && Math.hypot(p.x - COFFER_POS.x, p.z - COFFER_POS.z) <= 1.6) {
+      if (Math.hypot(COFFER_POS.x - this.player.x, COFFER_POS.z - this.player.z) <= GATHER_REACH) {
+        this.openCoffer();
+      } else {
+        this.player.walkTo(COFFER_POS.x, COFFER_POS.z);
+        this.pendingCoffer = true;
       }
       return;
     }
@@ -680,6 +701,62 @@ export class Game {
       this.world.placeCutout(cut, p.x, p.z);
       this.nodeVisuals.set(p.id, { cut, state });
     }
+  }
+
+  // --- Starter treasure coffer (blueprint onboarding) ---
+
+  private placeCoffer(): void {
+    this.cofferOpen = this.loadRaw('wwd.coffer') === '1';
+    this.cofferCutout = new Cutout(drawCoffer(7, this.cofferOpen), {
+      height: 0.7,
+      shadowRadius: 0.5,
+    });
+    this.world.placeCutout(this.cofferCutout, COFFER_POS.x, COFFER_POS.z);
+  }
+
+  /**
+   * Open the coffer once: bank a basic blueprint hint (the fetch stick — the
+   * simplest exact, and it feeds the play loop the player already knows) with
+   * ONE of its two cells revealed, and drop the twigs to fulfil it. This is the
+   * concrete teach of the no-blueprint loop: an idea + the stock to try it.
+   */
+  private openCoffer(): void {
+    if (this.cofferOpen) return;
+    this.cofferOpen = true;
+    this.saveRaw('wwd.coffer', '1');
+
+    // The fetch-stick pattern: two twigs side by side.
+    const stickArr = arrangement(
+      [null, null, null, 'wood', 'wood', null, null, null, null],
+      [0, 0, 0, 1, 1, 0, 0, 0, 0],
+    );
+    const key = canonical(stickArr);
+    this.workshopState.bankHint({
+      pattern: key,
+      revealedCells: [3], // show one of the two cells — "you're close, fill it"
+      context: 'a little chest near home',
+      day: dailyKey(),
+    });
+    // The stock to actually make it.
+    this.backpack.add('twig', 2);
+
+    // Re-plate to the opened state + a calm warm beat.
+    if (this.cofferCutout) {
+      this.cofferCutout.group.removeFromParent();
+      this.cofferCutout.dispose();
+      this.cofferCutout = new Cutout(drawCoffer(7, true), { height: 0.7, shadowRadius: 0.5 });
+      this.world.placeCutout(this.cofferCutout, COFFER_POS.x, COFFER_POS.z);
+    }
+    this.bond.add('discovery', 2);
+    this.datouRig.pulse();
+    this.datouRig.reach();
+    this.memories.add({
+      ts: Date.now(),
+      kind: 'want',
+      key: 'coffer',
+      mood: this.physics.getDatouState().mood,
+    });
+    this.ui.toast(t('coffer.opened'));
   }
 
   /** Re-draw a node's plate if its harvest state changed (depletion/regrow). */
@@ -972,6 +1049,16 @@ export class Game {
         this.pendingGather = null;
       } else if (!this.player.hasTarget) {
         this.pendingGather = null;
+      }
+    }
+
+    // Deferred coffer-open: walked to the chest?
+    if (this.pendingCoffer) {
+      if (Math.hypot(COFFER_POS.x - this.player.x, COFFER_POS.z - this.player.z) <= GATHER_REACH) {
+        this.openCoffer();
+        this.pendingCoffer = false;
+      } else if (!this.player.hasTarget) {
+        this.pendingCoffer = false;
       }
     }
 
