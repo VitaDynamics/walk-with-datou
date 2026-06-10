@@ -39,6 +39,8 @@ export interface RecipeCardCallbacks {
   hasGroup(group: MaterialGroup, n: number): boolean;
   /** Build one of `form` now (consume materials, record, place/equip). */
   build(form: FormId): void;
+  /** Ask Datou to go gather the missing materials for `form` (forage or work a node). */
+  fetchFor(form: FormId): void;
 }
 
 function div(cls: string): HTMLDivElement {
@@ -108,5 +110,18 @@ export function recipeCard(form: FormId, cb: RecipeCardCallbacks): HTMLDivElemen
     if (!btn.disabled) cb.build(form);
   });
   card.append(btn);
+
+  // When short, offer to send Datou to gather the rest (forage / work a node).
+  if (!canBuild) {
+    const fetch = document.createElement('button');
+    fetch.type = 'button';
+    fetch.className = 'ws-recipe-fetch';
+    fetch.textContent = t('workshop.askDatou');
+    fetch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cb.fetchFor(form);
+    });
+    card.append(fetch);
+  }
   return card;
 }

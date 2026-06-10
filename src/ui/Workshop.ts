@@ -36,6 +36,8 @@ export interface WorkshopCallbacks {
   hasGroup(group: import('../game/workshop/materials').MaterialGroup, n: number): boolean;
   /** Build one of `form` directly from the Tree recipe (consume + record). */
   onBuildForm(form: import('../game/workshop/forms').FormId): void;
+  /** Ask Datou to gather what a `form` still needs (forage or work a node). */
+  onFetchFor(form: import('../game/workshop/forms').FormId): void;
 }
 
 type Tab = 'bench' | 'tree' | 'notebook';
@@ -177,6 +179,10 @@ export class Workshop {
           build: (form) => {
             this.cb.onBuildForm(form);
             this.render(); // refresh counts/state after a build
+          },
+          fetchFor: (form) => {
+            this.cb.onFetchFor(form);
+            this.hide(); // step back and let Datou work
           },
         }),
       );
@@ -594,6 +600,8 @@ const WORKSHOP_CSS = `
 .ws-recipe-build{border:none;background:var(--accent);color:#fff;font-family:inherit;font-size:13px;font-weight:500;padding:8px 0;border-radius:999px;cursor:pointer;transition:background var(--fast);}
 .ws-recipe-build:hover:not(:disabled){background:#6c7c6a;}
 .ws-recipe-build:disabled{background:var(--surface-muted,#ece7df);color:var(--text-tertiary);cursor:default;}
+.ws-recipe-fetch{border:none;background:transparent;color:var(--accent);font-family:inherit;font-size:12px;font-weight:500;padding:4px 0 0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.ws-recipe-fetch:hover{color:#6c7c6a;}
 
 @media (max-width:680px){
   .ws-grid{grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,76px);}

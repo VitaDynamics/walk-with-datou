@@ -290,6 +290,7 @@ export class Game {
       onPinForage: (mat) => this.startForage(mat),
       hasGroup: (group, n) => this.heldInGroup(group) >= n,
       onBuildForm: (form) => this.buildFormFromTree(form),
+      onFetchFor: (form) => this.gatherForForm(form),
     });
     document
       .getElementById('btn-workshop')
@@ -635,6 +636,80 @@ export class Game {
     const size = sizesFor(form).length === 1 ? sizesFor(form)[0] : mass <= 3 ? sizesFor(form)[0] : mass <= 6 ? sizesFor(form)[Math.min(1, sizesFor(form).length - 1)] : sizesFor(form)[sizesFor(form).length - 1];
     const id = itemId({ form, material: domMat, size, finish: finishesFor(form)[0] });
     this.handleMake({ kind: 'exact', form, id, patternKey: canonical(pat) });
+  }
+
+  /**
+   * Goal-level command: "Datou, get what I need for this." Reads the blueprint's
+   * groups, finds the first one we're short on, and sends Datou to gather it —
+   * foraging a ground pickable of that group, OR working a node that yields it
+   * (if the matching tool is equipped). A readable nudge when neither is
+   * possible (no tool, nothing nearby).
+   */
+  private gatherForForm(form: FormId): void {
+    const pat = patternForForm(form);
+    if (!pat) return;
+    const need = patternRecipe(pat);
+    for (const [group, n] of Object.entries(need) as [MaterialGroup, number][]) {
+      if (this.heldInGroup(group) >= n) continue;
+      this.gatherGroup(group);
+      return;
+    }
+  }
+
+  /** Send Datou to gather one material of `group` (forage pickable, else work a node). */
+  private gatherGroup(group: MaterialGroup): void {
+    // Prefer a ground pickable of this group that exists somewhere nearby.
+    const pickable = this.pickableMaterialForGroup(group);
+    if (pickable && this.world.nearestPickableOfKind(pickable, this.player.x, this.player.z, 90)) {
+      this.startForage(pickable);
+      return;
+    }
+    // Else look for a node that yields this group and that we can work.
+    const work = this.workableNodeForGroup(group);
+    if (work) {
+      this.tapNode(work);
+      return;
+    }
+    // Nothing reachable — explain why (likely a tool gap for bulk materials).
+    const node = this.anyNodeForGroup(group);
+    if (node) this.ui.toast(t('node.needTool'));
+    else this.ui.toast(t('forage.cantFind'));
+  }
+
+  /** A foraged (ground-pickable) material in a group, if any. */
+  private pickableMaterialForGroup(group: MaterialGroup): MaterialId | null {
+    for (const mat of MATERIAL_IDS) {
+      if (groupOf(mat) === group && this.isPackResource(mat)) return mat;
+    }
+    return null;
+  }
+
+  /** Nearest node yielding `group` that the equipped tool can work. */
+  private workableNodeForGroup(group: MaterialGroup): NodePlacement | null {
+    const eq = this.tools.equippedTool();
+    let best: NodePlacement | null = null;
+    let bestD = Infinity;
+    for (const p of NODE_PLACEMENTS) {
+      const def = NODE_DEFS[p.type];
+      if (!def.yields.some((y) => groupOf(y.material) === group)) continue;
+      if (!eq || eq.kind !== def.tool || eq.tier < def.minTier) continue;
+      if (this.nodeState.charges(p.id) <= 0) continue;
+      const d = Math.hypot(p.x - this.player.x, p.z - this.player.z);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  /** Any node (tool or not) that yields `group` — for the "need a tool" nudge. */
+  private anyNodeForGroup(group: MaterialGroup): NodePlacement | null {
+    return (
+      NODE_PLACEMENTS.find((p) =>
+        NODE_DEFS[p.type].yields.some((y) => groupOf(y.material) === group),
+      ) ?? null
+    );
   }
 
   /**
