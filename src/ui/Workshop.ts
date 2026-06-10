@@ -104,6 +104,7 @@ export class Workshop {
   hide(): void {
     if (!this.open) return;
     this.finishMaterialDrag();
+    dismissPopovers();
     this.open = false;
     this.root.hidden = true;
     // Refund anything left on the bench — nothing is ever lost on close.
@@ -167,6 +168,7 @@ export class Workshop {
 
   private render(): void {
     applyStaticI18n(this.root);
+    dismissPopovers(); // the Tree popover lives in <body>; clear any stragglers
     for (const tb of ['bench', 'tree', 'notebook'] as const) {
       this.tabBtns[tb].classList.toggle('active', this.tab === tb);
     }
@@ -470,6 +472,11 @@ function div(cls: string): HTMLDivElement {
   return d;
 }
 
+/** Remove any Tree recipe popovers (they live in <body>, outside #workshop). */
+function dismissPopovers(): void {
+  for (const p of document.querySelectorAll('.ws-pop')) p.remove();
+}
+
 const matIconCache = new Map<MaterialId, string>();
 function matIcon(mat: MaterialId): string {
   let url = matIconCache.get(mat);
@@ -507,7 +514,11 @@ const WORKSHOP_CSS = `
 .ws-tab.active{color:var(--text-primary);background:var(--accent-soft);}
 .ws-close{border:none;background:transparent;font-size:22px;line-height:1;color:var(--text-tertiary);cursor:pointer;padding:2px 8px;}
 .ws-close:hover{color:var(--text-primary);}
-.ws-body{flex:1;overflow-y:auto;padding:24px 26px 28px;}
+.ws-body{flex:1;overflow-y:auto;padding:24px 26px 28px;scrollbar-width:thin;scrollbar-color:rgba(124,140,122,0.35) transparent;}
+.ws-body::-webkit-scrollbar{width:8px;}
+.ws-body::-webkit-scrollbar-track{background:transparent;}
+.ws-body::-webkit-scrollbar-thumb{background:rgba(124,140,122,0.3);border-radius:999px;border:2px solid transparent;background-clip:padding-box;}
+.ws-body::-webkit-scrollbar-thumb:hover{background:rgba(124,140,122,0.5);background-clip:padding-box;}
 
 /* Bench tab */
 .ws-bench{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start;justify-content:center;}
@@ -584,8 +595,8 @@ const WORKSHOP_CSS = `
 /* Tree node tap + recipe popover */
 .ws-node.tappable{cursor:pointer;position:relative;}
 .ws-node.tappable:hover .ws-node-plate{box-shadow:0 0 0 2px var(--accent-soft);}
-.ws-pop{position:absolute;left:50%;top:72px;transform:translateX(-50%);z-index:3;animation:ws-pop-in 160ms ease-out;}
-@keyframes ws-pop-in{from{opacity:0;transform:translateX(-50%) translateY(-4px);}to{opacity:1;transform:translateX(-50%);}}
+.ws-pop{position:fixed;z-index:14;animation:ws-pop-in 160ms ease-out;}
+@keyframes ws-pop-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
 .ws-recipe{width:188px;background:var(--surface-strong);border-radius:var(--radius-m);box-shadow:var(--shadow-soft);padding:14px;display:flex;flex-direction:column;gap:10px;}
 .ws-recipe-head{display:flex;align-items:center;gap:10px;}
 .ws-recipe-plate{width:44px;height:44px;background:var(--bg);border-radius:var(--radius-s);display:flex;align-items:center;justify-content:center;flex:none;}

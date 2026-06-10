@@ -76,6 +76,10 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
   const taughtTiers = taughtFamilyTiers(madeByForm);
   const pendingSprites: Array<{ img: HTMLImageElement; id: ItemId }> = [];
   let openPop: HTMLDivElement | null = null;
+  const closePop = (): void => {
+    openPop?.remove();
+    openPop = null;
+  };
 
   for (const family of FAMILY_ORDER) {
     const forms = FORMS_BY_FAMILY.get(family) ?? [];
@@ -119,20 +123,21 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
         name.textContent = tDyn(`form.${form}`);
       }
       node.append(plate, name);
-      // Click a node → toggle a recipe popover (what it needs + Build).
+      // Click a node → toggle a recipe popover. The popover is fixed-positioned
+      // in the viewport (not nested in the scroll container) and clamped on-
+      // screen, so edge/bottom nodes never spill out or get clipped.
       if (recipeCb) {
         node.classList.add('tappable');
         node.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (openPop) {
-            const wasMine = openPop.parentElement === node;
-            openPop.remove();
-            openPop = null;
-            if (wasMine) return;
-          }
+          const wasMine = openPop?.dataset.form === form;
+          closePop();
+          if (wasMine) return;
           const pop = div('ws-pop');
+          pop.dataset.form = form;
           pop.append(recipeCard(form, recipeCb));
-          node.append(pop);
+          document.body.append(pop);
+          positionPop(pop, node);
           openPop = pop;
         });
       }
@@ -147,15 +152,37 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
     }
     wrap.append(branch);
   }
-  // Tap anywhere else in the tree closes an open recipe popover.
-  wrap.addEventListener('click', () => {
-    if (openPop) {
-      openPop.remove();
-      openPop = null;
-    }
-  });
+  // Tap elsewhere, scroll, or resize closes an open recipe popover.
+  wrap.addEventListener('click', closePop);
+  wrap.addEventListener('scroll', closePop, true);
   hydrateSprites(wrap, pendingSprites);
   return wrap;
+}
+
+/**
+ * Place a fixed-position popover beside the node, clamped to the viewport.
+ * Prefers below-and-aligned; flips above if it would clip the bottom; nudges
+ * horizontally so it never spills off either edge. 12 px margin.
+ */
+function positionPop(pop: HTMLDivElement, node: HTMLElement): void {
+  const M = 12;
+  const r = node.getBoundingClientRect();
+  const pw = pop.offsetWidth || 200;
+  const ph = pop.offsetHeight || 180;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Centered under the node by default.
+  let left = r.left + r.width / 2 - pw / 2;
+  let top = r.bottom + 8;
+  // Flip above if it would run off the bottom.
+  if (top + ph + M > vh) top = r.top - ph - 8;
+  // Clamp into the viewport on both axes.
+  left = Math.max(M, Math.min(left, vw - pw - M));
+  top = Math.max(M, Math.min(top, vh - ph - M));
+
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
 }
 
 function groupMadeItems(ids: ItemId[]): Map<FormId, ItemId[]> {
