@@ -14,6 +14,8 @@
 
 import * as THREE from 'three';
 import {
+  drawArmForearm,
+  drawArmUpper,
   drawCalf,
   drawEyes,
   drawHead,
@@ -81,6 +83,18 @@ interface Leg {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
+/** Dorsal work arm (2-segment manipulator folded along the spine). */
+const ARM_UPPER_LEN = 0.21;
+const ARM_FOREARM_LEN = 0.23;
+const ARM_BASE_X = -0.08; // shoulder mount on the back of the shell
+type ArmMode = 'folded' | 'reach' | 'carry';
+/** [upper, forearm] rotations per mode (facing right; + folds backward). */
+const ARM_POSES: Record<ArmMode, [number, number]> = {
+  folded: [-1.78, 2.62],
+  reach: [0.55, -0.5],
+  carry: [-0.5, -1.05],
+};
+
 function partPlane(
   sprite: PropSprite,
   height: number,
@@ -128,6 +142,12 @@ export class DatouRig {
   private petPulse = 0;
   private garland: THREE.Mesh | null = null;
   private readonly anchorWork = new THREE.Vector3();
+  private readonly armUpper = new THREE.Group();
+  private readonly armForearm = new THREE.Group();
+  private readonly gripperTip = new THREE.Object3D();
+  private armMode: ArmMode = 'folded';
+  private reachLeft = 0;
+  private readonly gripperWork = new THREE.Vector3();
 
   constructor(shadowTexture: THREE.Texture) {
     // Legs: far pair drawn behind (small -z, slight tint), near pair in front.
@@ -175,6 +195,20 @@ export class DatouRig {
     this.headGroup.position.set(HEAD_BASE_X, HEAD_BASE_Y, 0.06);
     this.flip.add(this.headGroup);
 
+    // Dorsal work arm: shoulder on the back of the shell, folded at rest.
+    const upperPlane = partPlane(drawArmUpper(8), ARM_UPPER_LEN + 0.06, 'top');
+    const forearmPlane = partPlane(drawArmForearm(9), ARM_FOREARM_LEN + 0.07, 'top');
+    this.armUpper.add(upperPlane);
+    this.armForearm.add(forearmPlane);
+    this.armForearm.position.y = -ARM_UPPER_LEN;
+    this.gripperTip.position.y = -ARM_FOREARM_LEN;
+    this.armForearm.add(this.gripperTip);
+    this.armUpper.add(this.armForearm);
+    this.armUpper.position.set(ARM_BASE_X, BODY_Y + 0.1, -0.02);
+    this.armUpper.rotation.z = ARM_POSES.folded[0];
+    this.armForearm.rotation.z = ARM_POSES.folded[1];
+    this.flip.add(this.armUpper);
+
     this.group.add(this.flip);
 
     // Contact shadow (flat, not billboarded).
@@ -218,9 +252,20 @@ export class DatouRig {
     return this.localToWorld(0.1, BODY_Y + 0.1);
   }
 
-  /** World position just under the head — where a carried stick sits. */
-  get mouthPosition(): THREE.Vector3 {
-    return this.localToWorld(HEAD_BASE_X + 0.2, HEAD_BASE_Y - 0.02);
+  /** World position of the dorsal arm's gripper tip (carried items ride here). */
+  get gripperPosition(): THREE.Vector3 {
+    this.gripperTip.getWorldPosition(this.gripperWork);
+    return this.gripperWork;
+  }
+
+  /** Hold something in the gripper (carry pose) or stow the arm. */
+  setCarrying(on: boolean): void {
+    this.armMode = on ? 'carry' : 'folded';
+  }
+
+  /** One calm reach-down beat (picking / inspecting with the arm). */
+  reach(seconds = 1.2): void {
+    if (this.armMode !== 'carry') this.reachLeft = seconds;
   }
 
   private localToWorld(x: number, y: number): THREE.Vector3 {
@@ -323,6 +368,15 @@ export class DatouRig {
       HEAD_BASE_Y + (this.pose.bodyY - BODY_Y) + this.pose.headLift + bob * 0.7 + breath + happyBob;
     this.headGroup.position.x = HEAD_BASE_X - this.pose.bodyRot * 0.1;
     this.headGroup.rotation.z = this.pose.headRot + (moving ? Math.sin(this.gaitPhase) * 0.02 : 0);
+
+    // --- Dorsal arm: folded at rest, reaching or carrying when asked ---
+    if (this.reachLeft > 0) this.reachLeft -= dt;
+    const armMode: ArmMode =
+      this.armMode === 'carry' ? 'carry' : this.reachLeft > 0 ? 'reach' : 'folded';
+    const [upTarget, foreTarget] = ARM_POSES[armMode];
+    const ka = 1 - Math.exp(-dt * 6);
+    this.armUpper.rotation.z += (upTarget - this.armUpper.rotation.z) * ka;
+    this.armForearm.rotation.z += (foreTarget - this.armForearm.rotation.z) * ka;
 
     // --- Eyes: mood plate + blink ---
     let eye: EyeState =

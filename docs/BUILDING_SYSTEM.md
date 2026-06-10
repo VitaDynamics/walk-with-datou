@@ -221,11 +221,20 @@ Opens from the bench in-world, or the pack button long-press. Esc closes.
 
 ---
 
-## 7. Datou the forager
+## 7. Datou the forager — and the dorsal arm
+
+**Hardware update (approved):** Datou carries a small **mechanical arm on his
+back** — a 2-segment manipulator with a two-finger gripper, folded flat along
+the spine when idle (the silhouette stays clean). The arm is what actually
+DOES the physical work: it picks small finds off the ground into the back
+bucket, holds the fetch stick, steadies crops, and **wields the tools** of §8
+(axe/pickaxe clamp into the gripper). Animation language stays calm: unfold →
+reach → grip → stow, one beat each, never flailing.
 
 - **Back bucket:** a small pannier rig plate on Datou's torso (visible; fills
   visibly: 0/3/6 sketch states). Capacity 6 (upgradeable via a crafted bucket
-  form).
+  form). The dorsal arm drops each pick into it over the shoulder — the
+  signature work gesture.
 - **Command:** in the Workshop or pack, pin a material ("need twigs") → leash
   off, Datou enters **forage mode**: seeks the nearest matching pickables
   within ~60 m (`World.nearestInstance` already supports this), trots
@@ -276,14 +285,16 @@ Datou sniffing a Great Tree, §5.1). **Tiers gate nodes, Terraria-style:**
 - **t2 flint** (flint + beam): + Clay Seams, Flint Lodes; ~1.5× yield.
 - **t3 machined** (old-bolt + plank + cord): + Bolt Caches; ~2× yield, faster.
 
-Tools mount on Datou's back-bucket rig (visible plate). **Soft durability:**
+Tools clamp into the **dorsal arm's gripper** (§7) — the equipped tool is
+visible riding on Datou's back, and the work swings are the arm's, not body
+slams. **Soft durability:**
 after ~30 swings a tool dulls (−50 % yield, drawn with a chipped edge); one
 pebble at the bench re-sharpens it instantly. Tools never break.
 
 ### 8.3 The work loop
 
-Equip a tool → tap a node → Datou trots over, braces, and works in **calm
-beats** (3–6 swings, paper _tok_, a small plate shake on the node — never
+Equip a tool → tap a node → Datou trots over, braces, and the **arm** works
+in **calm beats** (3–6 swings, paper _tok_, a small plate shake on the node — never
 frantic): each beat drops a yield burst into his bucket; when the bucket
 fills he trots the haul back to you, dumps it with the happy pulse, and
 returns — until the node's daily charges are spent or you call him off.

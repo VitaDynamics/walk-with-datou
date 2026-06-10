@@ -536,6 +536,7 @@ export class Game {
     this.world.revealSpot(spot);
     this.physics.applyPet();
     this.datouRig.pulse();
+    this.datouRig.reach();
     const entry = {
       ts: Date.now(),
       kind: 'discovery' as const,
@@ -616,6 +617,7 @@ export class Game {
           this.ui.toast(tDyn(`react.${this.pendingReaction.verb}`));
           this.bond.add('discovery', 2);
           this.datouRig.pulse();
+          this.datouRig.reach();
         }
         this.pendingReaction = null;
       }
@@ -656,11 +658,14 @@ export class Game {
       this.stickCutout.setPosition(stickPos.x, stickPos.z, stickPos.y);
       this.stickCutout.faceCamera(camYaw);
     } else if (this.fetch.carried) {
-      const m = this.datouRig.mouthPosition;
+      // The dorsal arm holds the stick in its gripper.
+      this.datouRig.setCarrying(true);
+      const g = this.datouRig.gripperPosition;
       this.stickCutout.group.visible = true;
-      this.stickCutout.group.position.set(m.x, m.y - 0.14, m.z);
+      this.stickCutout.group.position.set(g.x, Math.max(0.1, g.y - 0.1), g.z);
       this.stickCutout.faceCamera(camYaw);
     } else {
+      this.datouRig.setCarrying(false);
       this.stickCutout.group.visible = false;
     }
 

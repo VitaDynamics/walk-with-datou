@@ -332,3 +332,96 @@ export function drawCalf(seed: number): PropSprite {
   g.restore();
   return { canvas: c, aspect: 0.5 };
 }
+
+/**
+ * Dorsal arm, upper segment — the work manipulator folded on Datou's back.
+ * Charcoal like the calves, cream shoulder cap. Pivot = top center (shoulder).
+ */
+export function drawArmUpper(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  void rng.next();
+  const { c, g } = sprite(80, 160);
+  // Shoulder joint cap.
+  g.fillStyle = ROBOT.shell;
+  g.beginPath();
+  g.arc(40, 22, 18, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.stroke();
+  // Upper segment — slim box, slight taper.
+  g.beginPath();
+  g.moveTo(28, 20);
+  g.lineTo(24, 138);
+  g.lineTo(54, 138);
+  g.lineTo(52, 20);
+  g.closePath();
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Seam tick.
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(28, 78);
+  g.lineTo(52, 78);
+  g.stroke();
+  return { canvas: c, aspect: 0.5 };
+}
+
+/**
+ * Dorsal arm, forearm + two-finger gripper. Pivot = top center (elbow).
+ * The gripper tip sits at the bottom of the plate.
+ */
+export function drawArmForearm(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  void rng.next();
+  const { c, g } = sprite(96, 176);
+  // Elbow cap.
+  g.fillStyle = ROBOT.shell;
+  g.beginPath();
+  g.arc(48, 20, 15, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.stroke();
+  // Forearm.
+  g.beginPath();
+  g.moveTo(38, 18);
+  g.lineTo(34, 112);
+  g.lineTo(62, 112);
+  g.lineTo(58, 18);
+  g.closePath();
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Wrist accent.
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.arc(48, 116, 6, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 2.5;
+  g.stroke();
+  // Two-finger gripper.
+  for (const dir of [-1, 1] as const) {
+    g.beginPath();
+    g.moveTo(48 + dir * 6, 122);
+    g.quadraticCurveTo(48 + dir * 22, 136, 48 + dir * 12, 162);
+    g.quadraticCurveTo(48 + dir * 8, 168, 48 + dir * 4, 160);
+    g.quadraticCurveTo(48 + dir * 12, 138, 48 + dir * 2, 126);
+    g.closePath();
+    g.fillStyle = ROBOT.darkShade;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 3.5;
+    g.stroke();
+  }
+  return { canvas: c, aspect: 96 / 176 };
+}
