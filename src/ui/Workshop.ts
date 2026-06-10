@@ -32,6 +32,10 @@ export interface WorkshopCallbacks {
   takeOne(mat: MaterialId): boolean;
   /** Pin a material for Datou to forage (right-click / long-press a chip). */
   onPinForage(mat: MaterialId): void;
+  /** Does the player hold `n` units of any material in `group`? (Tree recipe.) */
+  hasGroup(group: import('../game/workshop/materials').MaterialGroup, n: number): boolean;
+  /** Build one of `form` directly from the Tree recipe (consume + record). */
+  onBuildForm(form: import('../game/workshop/forms').FormId): void;
 }
 
 type Tab = 'bench' | 'tree' | 'notebook';
@@ -166,7 +170,16 @@ export class Workshop {
     }
     this.bodyEl.replaceChildren();
     if (this.tab === 'bench') this.renderBench();
-    else if (this.tab === 'tree') this.bodyEl.append(renderTree(this.state));
+    else if (this.tab === 'tree')
+      this.bodyEl.append(
+        renderTree(this.state, {
+          hasGroup: (group, n) => this.cb.hasGroup(group, n),
+          build: (form) => {
+            this.cb.onBuildForm(form);
+            this.render(); // refresh counts/state after a build
+          },
+        }),
+      );
     else this.bodyEl.append(renderNotebook(this.state));
   }
 
@@ -557,7 +570,30 @@ const WORKSHOP_CSS = `
 .ws-hint-grid{display:grid;grid-template-columns:repeat(3,22px);grid-template-rows:repeat(3,22px);gap:3px;}
 .ws-hint-cell{width:22px;height:22px;border-radius:5px;background:rgba(0,0,0,0.05);}
 .ws-hint-cell.on{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent);}
-.ws-hint-ctx{font-size:11.5px;color:var(--text-secondary);margin-top:8px;}
+.ws-hint-ctx{font-size:11.5px;color:var(--text-tertiary);margin-top:8px;}
+.ws-hint-card{display:flex;flex-direction:column;gap:7px;max-width:240px;}
+.ws-hint-title{font-size:13px;font-weight:600;color:var(--text-primary);}
+.ws-hint-recipe{font-size:11.5px;color:var(--text-secondary);}
+
+/* Tree node tap + recipe popover */
+.ws-node.tappable{cursor:pointer;position:relative;}
+.ws-node.tappable:hover .ws-node-plate{box-shadow:0 0 0 2px var(--accent-soft);}
+.ws-pop{position:absolute;left:50%;top:72px;transform:translateX(-50%);z-index:3;animation:ws-pop-in 160ms ease-out;}
+@keyframes ws-pop-in{from{opacity:0;transform:translateX(-50%) translateY(-4px);}to{opacity:1;transform:translateX(-50%);}}
+.ws-recipe{width:188px;background:var(--surface-strong);border-radius:var(--radius-m);box-shadow:var(--shadow-soft);padding:14px;display:flex;flex-direction:column;gap:10px;}
+.ws-recipe-head{display:flex;align-items:center;gap:10px;}
+.ws-recipe-plate{width:44px;height:44px;background:var(--bg);border-radius:var(--radius-s);display:flex;align-items:center;justify-content:center;flex:none;}
+.ws-recipe-plate img{width:80%;height:80%;object-fit:contain;}
+.ws-recipe-name{font-size:13.5px;font-weight:600;color:var(--text-primary);}
+.ws-recipe-needs{display:flex;flex-direction:column;gap:5px;}
+.ws-recipe-need{display:flex;align-items:center;gap:8px;}
+.ws-recipe-swatch{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.12);flex:none;}
+.ws-recipe-need-label{font-size:12px;color:var(--text-secondary);}
+.ws-recipe-need-label.short{color:var(--danger);}
+.ws-recipe-unknown{font-size:11.5px;color:var(--text-tertiary);}
+.ws-recipe-build{border:none;background:var(--accent);color:#fff;font-family:inherit;font-size:13px;font-weight:500;padding:8px 0;border-radius:999px;cursor:pointer;transition:background var(--fast);}
+.ws-recipe-build:hover:not(:disabled){background:#6c7c6a;}
+.ws-recipe-build:disabled{background:var(--surface-muted,#ece7df);color:var(--text-tertiary);cursor:default;}
 
 @media (max-width:680px){
   .ws-grid{grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,76px);}

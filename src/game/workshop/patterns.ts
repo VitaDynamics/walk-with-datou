@@ -199,3 +199,33 @@ export function matchExact(key: string): FormId | null {
 export function patternKeys(): string[] {
   return [...TABLE.keys()];
 }
+
+/** The authored pattern for a canonical key (first one that matches it). */
+const BY_KEY: ReadonlyMap<string, ExactPattern> = (() => {
+  const m = new Map<string, ExactPattern>();
+  for (const p of EXACT_PATTERNS) {
+    const k = canonical(p);
+    if (!m.has(k)) m.set(k, p);
+  }
+  return m;
+})();
+
+export function patternByKey(key: string): ExactPattern | null {
+  return BY_KEY.get(key) ?? null;
+}
+
+/** A readable recipe: how many filled cells of each material group a pattern wants. */
+export function patternRecipe(p: ExactPattern): Partial<Record<'wood' | 'stone' | 'plant' | 'found', number>> {
+  const need: Record<string, number> = {};
+  for (let i = 0; i < 9; i++) {
+    const g = p.cells[i];
+    if (!g) continue;
+    need[g] = (need[g] ?? 0) + Math.max(1, p.stacks[i]);
+  }
+  return need;
+}
+
+/** First authored pattern that yields a given form (for Tree-tab recipes). */
+export function patternForForm(form: FormId): ExactPattern | null {
+  return EXACT_PATTERNS.find((p) => p.result === form) ?? null;
+}

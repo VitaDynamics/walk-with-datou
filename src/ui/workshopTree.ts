@@ -24,6 +24,7 @@ import {
 import { cachedItemSpriteUrl, itemSpriteUrl } from '../game/workshop/sprites';
 import { EXACT_PATTERNS } from '../game/workshop/patterns';
 import { canonical } from '../game/workshop/pattern';
+import { recipeCard, type RecipeCardCallbacks } from './workshopRecipe';
 
 const FAMILY_ORDER: FormFamily[] = ['component', 'furnishing', 'structure', 'datou', 'keepsake', 'tool'];
 const FORMS_BY_FAMILY = new Map(
@@ -68,12 +69,13 @@ function div(cls: string): HTMLDivElement {
   return d;
 }
 
-export function renderTree(state: WorkshopState): HTMLDivElement {
+export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks): HTMLDivElement {
   const wrap = div('ws-tree');
   const madeByForm = groupMadeItems(state.madeIds());
   const hinted = hintedForms(state);
   const taughtTiers = taughtFamilyTiers(madeByForm);
   const pendingSprites: Array<{ img: HTMLImageElement; id: ItemId }> = [];
+  let openPop: HTMLDivElement | null = null;
 
   for (const family of FAMILY_ORDER) {
     const forms = FORMS_BY_FAMILY.get(family) ?? [];
@@ -117,6 +119,23 @@ export function renderTree(state: WorkshopState): HTMLDivElement {
         name.textContent = tDyn(`form.${form}`);
       }
       node.append(plate, name);
+      // Click a node → toggle a recipe popover (what it needs + Build).
+      if (recipeCb) {
+        node.classList.add('tappable');
+        node.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (openPop) {
+            const wasMine = openPop.parentElement === node;
+            openPop.remove();
+            openPop = null;
+            if (wasMine) return;
+          }
+          const pop = div('ws-pop');
+          pop.append(recipeCard(form, recipeCb));
+          node.append(pop);
+          openPop = pop;
+        });
+      }
       items.append(node);
     }
     if (items.childElementCount === 0) {
@@ -128,6 +147,13 @@ export function renderTree(state: WorkshopState): HTMLDivElement {
     }
     wrap.append(branch);
   }
+  // Tap anywhere else in the tree closes an open recipe popover.
+  wrap.addEventListener('click', () => {
+    if (openPop) {
+      openPop.remove();
+      openPop = null;
+    }
+  });
   hydrateSprites(wrap, pendingSprites);
   return wrap;
 }

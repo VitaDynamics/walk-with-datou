@@ -54,11 +54,13 @@ import { t, tDyn } from '../i18n';
 import { Workshop } from '../ui/Workshop';
 import { WorkshopState } from './workshop/WorkshopState';
 import type { Outcome } from './workshop/bench';
-import { parseItemId, itemName } from './workshop/items';
-import { canonical, arrangement } from './workshop/pattern';
+import { parseItemId, itemName, itemId, sizesFor, finishesFor } from './workshop/items';
+import { canonical } from './workshop/pattern';
+import { patternForForm, patternRecipe } from './workshop/patterns';
+import type { FormId } from './workshop/forms';
 import { itemSprite, itemHeight } from './workshop/sprites';
-import type { MaterialId } from './workshop/materials';
-import { MATERIALS } from './workshop/materials';
+import type { MaterialId, MaterialGroup } from './workshop/materials';
+import { MATERIALS, MATERIAL_IDS, groupOf } from './workshop/materials';
 import { rollInspiration, type InspoContext, type Mood } from './workshop/inspiration';
 import { weatherFor, seasonFor, tintFor } from './workshop/weather';
 import { zoneAt } from '../world/zones';
@@ -286,6 +288,8 @@ export class Game {
       },
       onMake: (outcome) => this.handleMake(outcome),
       onPinForage: (mat) => this.startForage(mat),
+      hasGroup: (group, n) => this.heldInGroup(group) >= n,
+      onBuildForm: (form) => this.buildFormFromTree(form),
     });
     document
       .getElementById('btn-workshop')
@@ -579,6 +583,60 @@ export class Game {
     );
   }
 
+  /** Total held units across all pack materials of a given group. */
+  private heldInGroup(group: MaterialGroup): number {
+    let n = 0;
+    for (const mat of MATERIAL_IDS) {
+      if (groupOf(mat) === group) n += this.materialCount(mat);
+    }
+    return n;
+  }
+
+  /** Pick the first held material in a group (cheapest available stock). */
+  private firstHeldInGroup(group: MaterialGroup): MaterialId | null {
+    for (const mat of MATERIAL_IDS) {
+      if (groupOf(mat) === group && this.materialCount(mat) > 0) return mat;
+    }
+    return null;
+  }
+
+  /**
+   * Build a form directly from the Tree recipe: consume the needed materials
+   * (by group), then route through the same make path (record + memory +
+   * place/equip). Assumes hasGroup already gated the Build button.
+   */
+  private buildFormFromTree(form: FormId): void {
+    const pat = patternForForm(form);
+    if (!pat) return;
+    const need = patternRecipe(pat);
+    // Resolve each group to a concrete held material and check stock.
+    const plan: { mat: MaterialId; n: number }[] = [];
+    for (const [group, n] of Object.entries(need) as [MaterialGroup, number][]) {
+      const mat = this.firstHeldInGroup(group);
+      if (!mat || this.materialCount(mat) < n) {
+        this.ui.toast(t('workshop.needMore'));
+        return;
+      }
+      plan.push({ mat, n });
+    }
+    // The dominant material decides the item's material (heaviest group).
+    let domMat = plan[0].mat;
+    let domN = plan[0].n;
+    for (const p of plan) {
+      if (p.n > domN) {
+        domN = p.n;
+        domMat = p.mat;
+      }
+    }
+    // Consume.
+    for (const p of plan) this.backpack.take(p.mat as ResourceId, p.n);
+    // Size from total mass, plain finish (a clean Tree build).
+    const mass = plan.reduce((s, p) => s + p.n, 0);
+    const size = sizesFor(form).length === 1 ? sizesFor(form)[0] : mass <= 3 ? sizesFor(form)[0] : mass <= 6 ? sizesFor(form)[Math.min(1, sizesFor(form).length - 1)] : sizesFor(form)[sizesFor(form).length - 1];
+    const id = itemId({ form, material: domMat, size, finish: finishesFor(form)[0] });
+    this.handleMake({ kind: 'exact', form, id, patternKey: canonical(pat) });
+  }
+
   /**
    * The bench confirmed a make. Materials were already pulled from the pack as
    * they were placed on cells, so here we just record knowledge, stamp the
@@ -725,20 +783,25 @@ export class Game {
     this.cofferOpen = true;
     this.saveRaw('wwd.coffer', '1');
 
-    // The fetch-stick pattern: two twigs side by side.
-    const stickArr = arrangement(
-      [null, null, null, 'wood', 'wood', null, null, null, null],
-      [0, 0, 0, 1, 1, 0, 0, 0, 0],
-    );
-    const key = canonical(stickArr);
-    this.workshopState.bankHint({
-      pattern: key,
-      revealedCells: [3], // show one of the two cells — "you're close, fill it"
-      context: 'a little chest near home',
-      day: dailyKey(),
-    });
-    // The stock to actually make it.
-    this.backpack.add('twig', 2);
+    // Bank the three bootstrap blueprints — the fetch stick (feeds the play
+    // loop) and the two t1 tools (the §8.2 node bootstrap), each fully revealed
+    // so the chest READS as a how-to, not a riddle.
+    for (const form of ['stick', 'axe', 'pickaxe'] as const) {
+      const pat = patternForForm(form);
+      if (!pat) continue;
+      const cells: number[] = [];
+      for (let i = 0; i < 9; i++) if (pat.cells[i]) cells.push(i);
+      this.workshopState.bankHint({
+        pattern: canonical(pat),
+        revealedCells: cells, // a starter blueprint shows the whole shape
+        context: t('coffer.context'),
+        day: dailyKey(),
+      });
+    }
+    // The stock to actually make all three: twigs for the stick + tool handles,
+    // pebbles for the tool heads (t1 wooden/stone tools, §8.2).
+    this.backpack.add('twig', 6);
+    this.backpack.add('pebble', 4);
 
     // Re-plate to the opened state + a calm warm beat.
     if (this.cofferCutout) {

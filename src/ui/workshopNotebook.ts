@@ -1,13 +1,17 @@
 /**
  * Workshop Notebook tab (BUILDING_SYSTEM §6 tab 3, W5).
  *
- * Banked inspirations (the sketch hints with where/when/with-whom they
- * happened — they double as memories), plus the curio collection. Paper cards,
- * pencil hint-grids; no slot chrome.
+ * Banked inspirations rendered as LEGIBLE mini-blueprints: the thing it makes
+ * (name + a pencil silhouette of its plate) and the 3×3 with the revealed
+ * cells showing WHICH material group goes there (a small swatch), plus a
+ * one-line recipe. So a hint reads "fetch stick · wood + wood" rather than a
+ * blank grid. Plus the curio collection. Paper cards, no slot chrome.
  */
 
-import { t } from '../i18n';
+import { t, tDyn } from '../i18n';
 import type { WorkshopState } from '../game/workshop/WorkshopState';
+import { patternByKey, patternRecipe } from '../game/workshop/patterns';
+import { GROUP_SWATCH, GROUP_LABELS } from './workshopRecipe';
 
 function div(cls: string): HTMLDivElement {
   const d = document.createElement('div');
@@ -29,14 +33,39 @@ export function renderNotebook(state: WorkshopState): HTMLDivElement {
 
   for (const hint of hints) {
     const card = div('ws-hint-card');
+    const pat = patternByKey(hint.pattern);
+
+    // Title: the thing this blueprint makes (named, so it's not a mystery).
+    if (pat) {
+      const title = div('ws-hint-title');
+      title.textContent = tDyn(`form.${pat.result}`);
+      card.append(title);
+    }
+
+    // The grid: revealed cells show their material-group swatch; the rest are
+    // faint blanks (still "discover the rest").
     const grid = div('ws-hint-grid');
     const revealed = new Set(hint.revealedCells);
     for (let i = 0; i < 9; i++) {
       const c = div('ws-hint-cell');
-      if (revealed.has(i)) c.classList.add('on');
+      if (pat && revealed.has(i) && pat.cells[i]) {
+        c.classList.add('on');
+        c.style.background = GROUP_SWATCH[pat.cells[i]!];
+        c.title = GROUP_LABELS[pat.cells[i]!]();
+      } else if (revealed.has(i)) {
+        c.classList.add('on');
+      }
       grid.append(c);
     }
     card.append(grid);
+
+    // One-line recipe from the pattern (what materials, how many).
+    if (pat) {
+      const recipe = div('ws-hint-recipe');
+      recipe.textContent = recipeLine(patternRecipe(pat));
+      card.append(recipe);
+    }
+
     if (hint.context) {
       const ctx = div('ws-hint-ctx');
       ctx.textContent = hint.context;
@@ -62,4 +91,10 @@ export function renderNotebook(state: WorkshopState): HTMLDivElement {
     wrap.append(row);
   }
   return wrap;
+}
+
+function recipeLine(need: Partial<Record<string, number>>): string {
+  return Object.entries(need)
+    .map(([g, n]) => `${GROUP_LABELS[g as keyof typeof GROUP_LABELS]()} ×${n}`)
+    .join(' · ');
 }
