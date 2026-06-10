@@ -45,15 +45,28 @@ one that matters: *does this make the user want to spend more time with the robo
 Build in **small phases and polish before expanding.** If a feature makes the
 product feel cheaper, simpler, or more cluttered, redesign it.
 
-## Direction reset (important context)
+## Current shape: the companion diorama (June 2026 refactor)
 
-Earlier work built a **500×500 m flat "park" exploration world** with a
-downloadable GLB scatter catalog (`docs/ASSET_CATALOG.md`, `docs/ENVIRONMENT_DESIGN.md`).
-That framing **predates `DESIGN_BASELINE.md` and is off-direction.** Do not keep
-scaling the park. New work moves toward the intimate, premium, robot-scale
-companion experience the baseline describes. Reuse the solid underlying systems
-(physics adapter, bond, want loop, deterministic seeding) where they still serve
-companionship; drop or rework what only served the big-park game.
+The old **500×500 m "park" exploration world** (WASD avatar, GLB scatter
+catalog, fetch/inventory) was **removed** in the diorama refactor on
+`feat/mujoco-physics` — see `docs/quadruped-game-design-research.md` for the
+gameplay rationale. What exists now:
+
+- **One hand-drawn glade diorama** (~13 m): Don't Starve's cutout technique
+  (ink-outlined canvas-drawn plates, billboarded in 3D) keyed to the baseline
+  palette. All art is generated in code (`src/art/`) with the seeded Rng —
+  no downloaded assets.
+- **Pointer-first play**: tap Datou to pet · hold to soothe · tap the glade to
+  explore together · drag to turn the diorama. No keyboard.
+- **Want loop** (`src/game/Companion.ts`): Datou surfaces one want via body
+  language; curious wants anchor on **daily date-seeded hidden discoveries**
+  (`src/world/Spots.ts` + `src/world/layout.ts`).
+- **Bond → milestones → memories**: bond, today's finds, and memory cards
+  persist in localStorage (`src/game/Bond.ts`, `Memories.ts`).
+- **Datou** is a segmented puppet rig (`src/datou/DatouRig.ts`): gait,
+  breathing, eye-plate emotion, sit/play-bow/curious postures.
+- **Console UI** (`src/ui/Console.ts` + index.html): status capsule, three
+  soft actions, thought chip, memories sheet. i18n EN/中文 in `src/i18n.ts`.
 
 The single product north star, confirmed with the user: **make Datou feel alive**
 — reactive, expressive, autonomous, with a personality that diverges over time.
@@ -62,18 +75,26 @@ The single product north star, confirmed with the user: **make Datou feel alive*
 
 - **Three.js 0.180** (only prod dep), **Vite 5**, **TypeScript strict**, **Vitest**.
 - Pluggable physics behind `src/physics/PhysicsAdapter.ts` (`PlaceholderPhysics`
-  default; optional MuJoCo WASM). **Don't break the adapter contract.**
+  default; optional MuJoCo WASM). **Don't break the adapter contract.** Both
+  backends are tuned to glade scale (≈1.7 m/s, 6 m bounds); MuJoCo gets its
+  obstacles from the pure `src/world/layout.ts`.
 - Deterministic, seeded RNG (`src/physics/mujoco/rng.ts`) for anything
-  gameplay-relevant (diary replay) — never `Math.random` for that.
+  gameplay-relevant (diary replay, daily spots, sprite plates) — never
+  `Math.random` for that (cosmetic-only randomness like blinks is fine).
 - `npm run dev` · `npm run build` · `npm run test` · `npm run lint`. Keep all green.
-- **Headless WebGL does not work in some sandboxes** — visual changes must be
-  eyeballed in a real browser (`npm run dev`); say so when you can't verify here.
+- Headless visual QA that has worked here: dev server + system Chrome
+  `--headless=new --use-angle=swiftshader --screenshot --virtual-time-budget=12000`,
+  then crop with PIL. Still eyeball real interactions in a browser when possible.
+- `public/robots/` holds user-supplied robot models (untracked) — don't delete.
 
 ## Key docs
 
 - `docs/DESIGN_BASELINE.md` — **binding** visual/UX/emotional rules (read first).
-- `docs/GAMEPLAY_DESIGN.md`, `docs/INTERACTION_VERBS.md` — companion systems
-  (wants, bond, verbs); align them to the baseline where they conflict.
-- `docs/ARCHITECTURE.md`, `docs/PHYSICS_INTEGRATION.md` — code structure & physics.
-- `docs/ENVIRONMENT_DESIGN.md`, `docs/ASSET_CATALOG.md` — the older park/asset
-  work; **off-direction per the reset above** — consult, don't extend blindly.
+- `docs/quadruped-game-design-research.md` — gameplay research behind the
+  diorama loop (wants/rapport, daily return, memories, personality axes).
+- `docs/GAMEPLAY_DESIGN.md`, `docs/INTERACTION_VERBS.md` — companion systems;
+  align them to the baseline where they conflict.
+- `docs/ARCHITECTURE.md`, `docs/PHYSICS_INTEGRATION.md` — code structure & physics
+  (pre-refactor in places; the physics adapter sections still hold).
+- `docs/ENVIRONMENT_DESIGN.md`, `docs/ASSET_CATALOG.md` — **historical** park/asset
+  work, removed from the codebase; don't rebuild from these.
