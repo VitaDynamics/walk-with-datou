@@ -1,7 +1,7 @@
 # walk-with-datou — agent guide
 
 A **front-end companion game for a quadruped robot (Datou, 大头)**. The point of
-the product is to make the user *want to spend time with the robot* — calm,
+the product is to make the user _want to spend time with the robot_ — calm,
 premium, emotionally engaging companionship, **not** an action game or a
 traditional web game.
 
@@ -40,7 +40,7 @@ how it serves companionship.
 **After** writing it, run the **Visual QA checklist** (end of DESIGN_BASELINE.md)
 and report: QA result · any prohibited pattern that slipped in · what changed ·
 what still needs polish · whether it stays on-baseline. The last QA question is the
-one that matters: *does this make the user want to spend more time with the robot?*
+one that matters: _does this make the user want to spend more time with the robot?_
 
 Build in **small phases and polish before expanding.** If a feature makes the
 product feel cheaper, simpler, or more cluttered, redesign it.
@@ -93,6 +93,9 @@ The single product north star, confirmed with the user: **make Datou feel alive*
 ## Key docs
 
 - `docs/DESIGN_BASELINE.md` — **binding** visual/UX/emotional rules (read first).
+- `docs/BUILDING_SYSTEM.md` — the Workshop plan: generative 1 000+ item space,
+  3×3 arrangement grammar, no-blueprint discovery, Datou inspirations &
+  foraging. Implement in its W1–W7 phases.
 - `docs/quadruped-game-design-research.md` — gameplay research behind the
   diorama loop (wants/rapport, daily return, memories, personality axes).
 - `docs/GAMEPLAY_DESIGN.md`, `docs/INTERACTION_VERBS.md` — companion systems;
