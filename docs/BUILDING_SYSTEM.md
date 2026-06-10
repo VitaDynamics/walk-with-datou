@@ -1,7 +1,7 @@
 # The Workshop — Building System Design
 
 **Status:** Design plan, approved direction (user request, June 2026). Implementation
-phased — see §10. Obeys `DESIGN_BASELINE.md` (binding) and extends
+phased — see §11. Obeys `DESIGN_BASELINE.md` (binding) and extends
 `quadruped-game-design-research.md` ("relationships embedded in the world's
 activities"; "the world remembers they were there").
 
@@ -46,12 +46,16 @@ ITEM = FORM( MATERIAL_PROFILE, SIZE, FINISH )
 
 Raw finds (existing + new gatherables):
 
-| group | materials                                                      |
-| ----- | -------------------------------------------------------------- |
-| wood  | twig, bark, plank\*, driftwood (lake), pine-branch (woods)     |
-| stone | pebble, flat-stone, clay-lump (lake shore), flint (ruins)      |
-| plant | grass-wisp, reed, flower, berry, mushroom, pinecone, acorn     |
-| found | feather, shell (lake), old-bolt (trail/ruins — robot-flavored) |
+| group | materials                                                                                   |
+| ----- | ------------------------------------------------------------------------------------------- |
+| wood  | twig, bark, plank\*, driftwood (lake), pine-branch (woods), **log** (Great Trees)           |
+| stone | pebble, flat-stone, **stone-block** (Boulders), clay-lump (Clay Seams), flint (Flint Lodes) |
+| plant | grass-wisp, reed, flower, berry, mushroom, pinecone, acorn                                  |
+| found | feather, shell (lake), old-bolt (Bolt Caches — robot-flavored)                              |
+
+Ground pickables stay the trickle; the **bulk** of wood/stone/mineral comes
+from resource nodes worked with tools (§8) — the Terraria/Minecraft economy
+that big structures need.
 
 \* plank is itself crafted (twig bundle → split). Materials carry a
 **profile**: color family (from the baseline palette), strength, flexibility,
@@ -174,6 +178,8 @@ tick (~90 s) with a seeded roll. Examples:
 | home + evening + tired             | mats, shelters, comfort forms            |
 | ruins + any + Explorer personality | flint, wheel, mechanism forms            |
 | winter season                      | cold-frame, warm forms (campfire family) |
+| sniffing a Great Tree, no axe yet  | the AXE pattern hint (tool bootstrap)    |
+| Bolt Cache + Explorer + high bond  | machined-tool patterns (tier 3)          |
 
 ### 5.2 Complexity gating (Datou's values)
 
@@ -237,7 +243,67 @@ Opens from the bench in-world, or the pack button long-press. Esc closes.
 
 ---
 
-## 8. Data model & determinism
+## 8. Resource nodes & tools — bulk materials, worked together
+
+The Terraria/Minecraft layer: a few **huge, landmark-sized sources** that
+yield materials in bulk — but only when Datou works them with the right tool.
+The player is the maker; **Datou is the worker robot** (he literally is one) —
+and it stays companionship: you crafted his tool, you stand by while he works,
+and the haul is _ours_.
+
+### 8.1 Node types
+
+| node            | where                                        | tool          | yields (per worked session)               |
+| --------------- | -------------------------------------------- | ------------- | ----------------------------------------- |
+| **Great Tree**  | woods hearts, 1–2 in the meadow              | axe           | 8–14 logs + bark + a twig burst           |
+| **Old Boulder** | meadow, ruins                                | pickaxe       | 8–14 stone-blocks + flat-stones + pebbles |
+| **Clay Seam**   | lake shore bank                              | pickaxe (t1+) | 6–10 clay-lumps                           |
+| **Flint Lode**  | ruin stones outcrop                          | pickaxe (t2+) | 6–10 flint + pebbles                      |
+| **Bolt Cache**  | "old machine site" (new far-corner setpiece) | pickaxe (t3)  | 4–8 old-bolts + a curio chance            |
+
+Nodes are extra-large hand-drawn plates (Great Tree ≈ 9 m) with **visible
+harvest states**: full → worked → stump/rubble → regrowing silhouette. They
+**always come back** (anti-FOMO): seeded daily charges; Great Trees regrow
+over ~2 days with visible stages; lodes refresh weekly.
+
+### 8.2 Tools — items in the same grammar
+
+Tools are just forms: `axe | pickaxe | shears | scoop` × material tier —
+discovered on the bench like everything else (the axe's first hint comes from
+Datou sniffing a Great Tree, §5.1). **Tiers gate nodes, Terraria-style:**
+
+- **t1 wooden** (twig/plank + cord): Great Trees, Old Boulders.
+- **t2 flint** (flint + beam): + Clay Seams, Flint Lodes; ~1.5× yield.
+- **t3 machined** (old-bolt + plank + cord): + Bolt Caches; ~2× yield, faster.
+
+Tools mount on Datou's back-bucket rig (visible plate). **Soft durability:**
+after ~30 swings a tool dulls (−50 % yield, drawn with a chipped edge); one
+pebble at the bench re-sharpens it instantly. Tools never break.
+
+### 8.3 The work loop
+
+Equip a tool → tap a node → Datou trots over, braces, and works in **calm
+beats** (3–6 swings, paper _tok_, a small plate shake on the node — never
+frantic): each beat drops a yield burst into his bucket; when the bucket
+fills he trots the haul back to you, dumps it with the happy pulse, and
+returns — until the node's daily charges are spent or you call him off.
+Standing close to "steady" the work gives +20 % yield (being together pays).
+First harvest of each node type stamps a memory card.
+
+**Care boundaries:** a tired Datou gently refuses heavy work and sits — the
+relationship outranks the economy (research-doc boundary rules). No tool
+equipped → he paws at the node and head-shakes: a readable "we need
+something for this", which doubles as the tool-hint nudge.
+
+### 8.4 Why this matters to the tree
+
+Bulk logs/blocks justify the heavy components (beams, panels, blocks) that
+tier-3 structures (pergola, bridge-plank, well, lookout-perch) consume in
+quantity — the economy finally has a supply side scaled to its demand side.
+
+---
+
+## 9. Data model & determinism
 
 ```ts
 ItemId = `${form}:${material}:${size}:${finish}`        // stable forever
@@ -248,6 +314,9 @@ InspirationRoll = Rng(daySeed ^ zone ^ weather ^ bondBucket)
 ```
 
 - Save: `wwd.workshop = { made: ItemId[], hints: {pattern, revealedCells}[], curios: number[] }`.
+- Nodes: `wwd.nodes = { [nodeId]: { charges, lastRefresh } }` (placements are
+  layout data + a seeded pass, like landmarks). Tools:
+  `wwd.tools = { equipped: ItemId | null, dullness: Record<ItemId, number> }`.
 - All sprites generated on demand and cached (`form template × material
 profile`), so memory stays flat regardless of the 1 000-item space.
 - Versioning: pattern tables and grammar are versioned; saves carry the
@@ -255,7 +324,7 @@ profile`), so memory stays flat regardless of the 1 000-item space.
 
 ---
 
-## 9. UI/UX & baseline compliance
+## 10. UI/UX & baseline compliance
 
 - Sketchbook visual language: ink on cream, pencil silhouettes, amber accents.
   ≤3 dominant colors. No slot-grid chrome, no rarity colors, no popup confetti.
@@ -268,17 +337,18 @@ profile`), so memory stays flat regardless of the 1 000-item space.
 
 ---
 
-## 10. Implementation roadmap
+## 11. Implementation roadmap
 
-| phase  | scope                                                                                                                                  | size |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| **W1** | Material/profile registry; form-template refactor of existing sprites; ItemId scheme; generated names (i18n composition)               | M    |
-| **W2** | Workbench item + Workshop window shell; 3×3 grid with stacks; exact-pattern matcher (first 40 patterns); assembly moment; memory cards | L    |
-| **W3** | Shape grammar (row/column/L/T/cross/ring/block/scatter + mass/size/finish); curio fizzle; near-miss pulse                              | L    |
-| **W4** | Tree tab (branch diagram, silhouettes, counts); neighbor-teaching                                                                      | M    |
-| **W5** | Weather + season service (seeded; world tint variants); inspiration engine + trigger matrix + Notebook tab                             | L    |
-| **W6** | Datou forage mode + back bucket rig plate + pin-a-material UX + autonomy hooks; speed rule audit                                       | M    |
-| **W7** | Pattern authoring pass to ~120 exacts; form templates to 40; balancing; personality gating (depends on personality axes landing)       | L    |
+| phase  | scope                                                                                                                                                                         | size |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| **W1** | Material/profile registry; form-template refactor of existing sprites; ItemId scheme; generated names (i18n composition)                                                      | M    |
+| **W2** | Workbench item + Workshop window shell; 3×3 grid with stacks; exact-pattern matcher (first 40 patterns); assembly moment; memory cards                                        | L    |
+| **W3** | Shape grammar (row/column/L/T/cross/ring/block/scatter + mass/size/finish); curio fizzle; near-miss pulse                                                                     | L    |
+| **W4** | Tree tab (branch diagram, silhouettes, counts); neighbor-teaching                                                                                                             | M    |
+| **W5** | Weather + season service (seeded; world tint variants); inspiration engine + trigger matrix + Notebook tab                                                                    | L    |
+| **W6** | Datou forage mode + back bucket rig plate + pin-a-material UX + autonomy hooks; speed rule audit                                                                              | M    |
+| **W7** | Pattern authoring pass to ~120 exacts; form templates to 40; balancing; personality gating (depends on personality axes landing)                                              | L    |
+| **W8** | Resource nodes & tools: node plates + harvest states + renewal; tool forms/tiers/mounting; work loop + poses; durability; bolt-cache setpiece (needs W1 registry + W6 bucket) | L    |
 
 Each phase ships green (tests for matcher canonicalization, grammar purity,
 inspiration determinism) and is QA'd visually before the next.
@@ -289,7 +359,7 @@ patterns-found per session · grammar-makes vs exact-makes ratio ·
 inspiration acceptance rate · forage deliveries per session · % of made items
 placed in the world within 5 min · Workshop dwell time.
 
-## 11. Risks
+## 12. Risks
 
 - **Space too opaque** → grammar guarantees output for any try; near-miss
   pulse; pity-timer inspirations.
@@ -297,5 +367,8 @@ placed in the world within 5 min · Workshop dwell time.
   scale; QA gate per form template.
 - **Scope** → W1–W3 alone already deliver "workbench + experimentation +
   ~300 reachable items"; later phases are additive.
+- **Tool walls** → t1 tools are discoverable in the first session (Great
+  Tree sniff hint + a 2-cell pattern); gating is about _reach_, never about
+  blocking the core loop.
 - **Baseline drift** → the sketchbook skin and the no-popup rule are
   non-negotiable; review each phase against the Visual QA checklist.
