@@ -252,8 +252,8 @@ export class DatouRig {
         target.bodyY = BODY_Y - 0.08;
         target.rearThighBias = 1.25;
         target.rearCalfBias = -1.9;
-        target.frontThighBias = 0.05;
-        target.frontCalfBias = -0.15;
+        target.frontThighBias = -0.35;
+        target.frontCalfBias = 0.85;
         target.headRot = -0.16;
         target.headLift = 0.02;
         break;
@@ -281,11 +281,11 @@ export class DatouRig {
     if (state.mood === 'happy') {
       target.headBob = Math.max(target.headBob, 0.035);
     } else if (state.mood === 'tired') {
+      // Body settles down onto the standing Z-fold; the droop lives in the
+      // head — folding the legs further would lift the feet off the ground.
       target.bodyY -= 0.05;
       target.headRot += 0.22; // head droops forward
       target.headLift -= 0.03;
-      target.frontThighBias += 0.12;
-      target.rearThighBias += 0.12;
     }
 
     // Smooth toward targets (calm easing, never snappy).
