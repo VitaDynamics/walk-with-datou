@@ -1,0 +1,51 @@
+import { describe, expect, it } from 'vitest';
+import { KIND_DEFS, LAKE, kindDef, scatterPickables, scatterStatic } from './scatter';
+import { WORLD_HALF, zoneAt } from './zones';
+
+describe('world scatter', () => {
+  it('is deterministic for the same seed', () => {
+    expect(scatterStatic(123)).toEqual(scatterStatic(123));
+    expect(scatterPickables(20260610)).toEqual(scatterPickables(20260610));
+  });
+
+  it('pickables re-roll with the daily seed; statics do not move', () => {
+    const a = scatterPickables(20260610);
+    const b = scatterPickables(20260611);
+    expect(a.map((i) => `${i.x},${i.z}`)).not.toEqual(b.map((i) => `${i.x},${i.z}`));
+  });
+
+  it('places a substantial, bounded world', () => {
+    const all = [...scatterStatic(1), ...scatterPickables(2)];
+    expect(all.length).toBeGreaterThan(1500);
+    for (const inst of all) {
+      expect(Math.hypot(inst.x, inst.z)).toBeLessThanOrEqual(WORLD_HALF);
+      expect(Math.hypot(inst.x, inst.z)).toBeGreaterThanOrEqual(12 - 1e-9);
+    }
+  });
+
+  it('keeps everything except reeds out of the lake', () => {
+    for (const inst of [...scatterStatic(1), ...scatterPickables(2)]) {
+      const d = Math.hypot(inst.x - LAKE.x, inst.z - LAKE.z);
+      if (inst.kind === 'reed') {
+        expect(d).toBeGreaterThan(LAKE.radius - 2.5);
+      } else {
+        expect(d, inst.id).toBeGreaterThan(LAKE.radius);
+      }
+    }
+  });
+
+  it('reeds only grow at the lake rim and pines mostly in the woods', () => {
+    const statics = scatterStatic(7);
+    const reeds = statics.filter((i) => i.kind === 'reed');
+    expect(reeds.length).toBeGreaterThan(50);
+    const pines = statics.filter((i) => i.kind === 'pine');
+    const inWoods = pines.filter((i) => zoneAt(i.x, i.z).id === 'woods').length;
+    expect(inWoods / pines.length).toBeGreaterThan(0.7);
+  });
+
+  it('ids are unique and every kind has a definition', () => {
+    const all = [...scatterStatic(1), ...scatterPickables(2)];
+    expect(new Set(all.map((i) => i.id)).size).toBe(all.length);
+    for (const def of KIND_DEFS) expect(kindDef(def.kind)).toBe(def);
+  });
+});

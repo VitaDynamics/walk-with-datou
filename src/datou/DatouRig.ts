@@ -29,12 +29,14 @@ import type { Expression } from '../game/Companion';
 
 /** Real-robot proportions (× a small readability factor). */
 const SCALE = 1.15;
-const HIP_Y = 0.4 * SCALE; // hip axis height when standing (legs Z-folded)
+// Hip height sits a little under full leg reach (0.41) so the standing legs
+// keep the real robot's visible Z-fold instead of locking out straight.
+const HIP_Y = 0.36 * SCALE;
 const HIP_X = 0.181 * SCALE;
 const THIGH_LEN = 0.1985 * SCALE;
 const CALF_LEN = 0.214 * SCALE;
-const BODY_Y = 0.46 * SCALE;
-const HEAD_BASE_Y = 0.55 * SCALE; // neck root on the front-top of the shell
+const BODY_Y = 0.42 * SCALE;
+const HEAD_BASE_Y = 0.51 * SCALE; // neck root on the front-top of the shell
 const HEAD_BASE_X = 0.2 * SCALE;
 
 /** Smoothed pose targets — everything expressions/moods drive. */
@@ -50,16 +52,21 @@ interface Pose {
   headBob: number; // extra head bob amplitude (happy)
 }
 
-/** Standing Z-fold: thigh leans back, calf swings forward to plant the foot. */
+/**
+ * Standing Z-fold, matching the real robot's default pose: the thigh slopes
+ * BACK from the hip (knee behind, like every Go1-class quadruped), and the
+ * calf swings forward to plant the foot under the hip. Positive rotation.z
+ * swings a hanging segment toward +X (forward).
+ */
 const REST_POSE: Pose = {
   bodyRot: 0,
   bodyY: BODY_Y,
   headRot: 0,
   headLift: 0,
-  frontThighBias: 0.32,
-  frontCalfBias: -0.62,
-  rearThighBias: 0.38,
-  rearCalfBias: -0.7,
+  frontThighBias: -0.45,
+  frontCalfBias: 1.0,
+  rearThighBias: -0.52,
+  rearCalfBias: 1.06,
   headBob: 0,
 };
 

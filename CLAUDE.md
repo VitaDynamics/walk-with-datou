@@ -45,28 +45,31 @@ one that matters: *does this make the user want to spend more time with the robo
 Build in **small phases and polish before expanding.** If a feature makes the
 product feel cheaper, simpler, or more cluttered, redesign it.
 
-## Current shape: the companion diorama (June 2026 refactor)
+## Current shape: the 500 m walk (June 2026, v2)
 
-The old **500×500 m "park" exploration world** (WASD avatar, GLB scatter
-catalog, fetch/inventory) was **removed** in the diorama refactor on
-`feat/mujoco-physics` — see `docs/quadruped-game-design-research.md` for the
-gameplay rationale. What exists now:
+A **hand-drawn 500×500 m park you walk through WITH Datou** — Don't Starve's
+cutout technique (ink-outlined canvas-drawn plates billboarded in 3D, all art
+generated in code from the seeded Rng, `src/art/`) keyed to the baseline
+palette. See `docs/quadruped-game-design-research.md` for the gameplay frame.
 
-- **One hand-drawn glade diorama** (~13 m): Don't Starve's cutout technique
-  (ink-outlined canvas-drawn plates, billboarded in 3D) keyed to the baseline
-  palette. All art is generated in code (`src/art/`) with the seeded Rng —
-  no downloaded assets.
-- **Pointer-first play**: tap Datou to pet · hold to soothe · tap the glade to
-  explore together · drag to turn the diorama. No keyboard.
-- **Want loop** (`src/game/Companion.ts`): Datou surfaces one want via body
-  language; curious wants anchor on **daily date-seeded hidden discoveries**
-  (`src/world/Spots.ts` + `src/world/layout.ts`).
-- **Bond → milestones → memories**: bond, today's finds, and memory cards
-  persist in localStorage (`src/game/Bond.ts`, `Memories.ts`).
-- **Datou** is a segmented puppet rig (`src/datou/DatouRig.ts`): gait,
-  breathing, eye-plate emotion, sit/play-bow/curious postures.
-- **Console UI** (`src/ui/Console.ts` + index.html): status capsule, three
-  soft actions, thought chip, memories sheet. i18n EN/中文 in `src/i18n.ts`.
+- **You are a human puppet** (`src/human/`): WASD / tap-to-walk, Shift run.
+  Datou (chibi VITA mascot rig, `src/datou/DatouRig.ts` — real vita01evt
+  joint layout: 2-segment Z-fold legs, neck head, no tail) walks with you on
+  an inked **leash** (follow) or off (potters nearby). Tap to pet, hold to
+  soothe.
+- **World** (`src/world/`): zones (home/woods/lake/trail/meadow,
+  `zones.ts`), one painted floor canvas (`art/worldPaint.ts` — paths, lake,
+  baked prop shadows, hand-cut edge), ~2 800 scattered plates as
+  InstancedMesh batches (`scatter.ts` pure + `World.ts` renderer).
+- **Gather → craft → place** (`src/game/Backpack.ts`, `Crafting.ts`):
+  daily-renewing pickables; recipes (fetch stick / cairn / garland /
+  lantern); place keepsakes into the world; **fetch** mini-game
+  (`Fetch.ts`). Tap any bush/rock/tree → Datou reacts in character.
+- **Want loop + daily discoveries** (`Companion.ts`, `world/Spots.ts`):
+  6 date-seeded hidden finds across zones; walking Datou past one reveals
+  it. Bond → milestones → memory cards, all persisted (localStorage).
+- **Console UI** (`src/ui/Console.ts`): status capsule, leash/backpack/
+  memories actions, thought chip. i18n EN/中文 in `src/i18n.ts`.
 
 The single product north star, confirmed with the user: **make Datou feel alive**
 — reactive, expressive, autonomous, with a personality that diverges over time.
