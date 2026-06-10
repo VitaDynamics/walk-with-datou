@@ -89,6 +89,11 @@ string table.
 Authoring cost is **forms × templates**, not items: ~40 drawing templates
 (~25 already exist in some form) + 18 material palettes.
 
+**Scaling authoring with agents:** new forms/materials/patterns are generated
+by LLM agents using `docs/ITEM_AUTHORING_TEMPLATE.md` (a self-contained prompt
+with the palette, draw-op language, schema and review checklist); output is
+validated JSON compiled straight into the registry.
+
 ---
 
 ## 3. The workbench
