@@ -52,6 +52,7 @@ import { Memories } from './Memories';
 import { Pointer } from './Pointer';
 import { t, tDyn } from '../i18n';
 import { Workshop } from '../ui/Workshop';
+import { ForageMenu, type ForageOption } from '../ui/ForageMenu';
 import { WorkshopState } from './workshop/WorkshopState';
 import type { Outcome } from './workshop/bench';
 import { parseItemId, itemName, itemId, sizesFor, finishesFor } from './workshop/items';
@@ -150,6 +151,7 @@ export class Game {
   private minimap: Minimap | null = null;
   private readonly workshopState = new WorkshopState();
   private workshop!: Workshop;
+  private forageMenu!: ForageMenu;
   private placingItem: string | null = null;
   // Resource nodes & tools (W8).
   private readonly nodeState = new NodeState();
@@ -167,6 +169,7 @@ export class Game {
   private inspoTickIn = 90;
   private inspoCooldown = 0;
   private inspoTickId = 0;
+  private forageMenuRefreshIn = 0;
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
@@ -295,6 +298,18 @@ export class Game {
     document
       .getElementById('btn-workshop')
       ?.addEventListener('click', () => this.workshop.toggle());
+
+    // The Fetch menu — the discoverable "ask Datou to find & pick things" (§7).
+    this.forageMenu = new ForageMenu({
+      options: () => this.forageOptions(),
+      send: (id) => this.gatherMaterial(id as MaterialId),
+      callBack: () => this.callDatouBack(),
+      status: () => this.forageStatus(),
+    });
+    document.getElementById('btn-fetch')?.addEventListener('click', () => {
+      this.ui.notifyInteracted();
+      this.forageMenu.toggle();
+    });
     for (const b of this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []))
       this.placeWorkshopItem(b.id, b.x, b.z, false);
     this.placeNodes();
@@ -712,6 +727,104 @@ export class Game {
     );
   }
 
+  /** Send Datou after a SPECIFIC material (forage a pickable, else work its node). */
+  private gatherMaterial(mat: MaterialId): void {
+    if (this.isPackResource(mat)) {
+      this.startForage(mat);
+      return;
+    }
+    const node = this.workableNodeForMaterial(mat);
+    if (node) {
+      this.tapNode(node);
+      return;
+    }
+    if (this.anyNodeForMaterial(mat)) this.ui.toast(t('node.needTool'));
+    else this.ui.toast(t('forage.cantFind'));
+  }
+
+  private workableNodeForMaterial(mat: MaterialId): NodePlacement | null {
+    const eq = this.tools.equippedTool();
+    let best: NodePlacement | null = null;
+    let bestD = Infinity;
+    for (const p of NODE_PLACEMENTS) {
+      const def = NODE_DEFS[p.type];
+      if (!def.yields.some((y) => y.material === mat)) continue;
+      if (!eq || eq.kind !== def.tool || eq.tier < def.minTier) continue;
+      if (this.nodeState.charges(p.id) <= 0) continue;
+      const d = Math.hypot(p.x - this.player.x, p.z - this.player.z);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  private anyNodeForMaterial(mat: MaterialId): NodePlacement | null {
+    return NODE_PLACEMENTS.find((p) => NODE_DEFS[p.type].yields.some((y) => y.material === mat)) ?? null;
+  }
+
+  /** Materials Datou could fetch right now, for the Fetch menu. */
+  private forageOptions(): ForageOption[] {
+    const out: ForageOption[] = [];
+    const seen = new Set<MaterialId>();
+    // Ground pickables that actually exist in the world right now.
+    for (const mat of MATERIAL_IDS) {
+      if (!this.isPackResource(mat)) continue;
+      if (this.world.nearestPickableOfKind(mat, this.player.x, this.player.z, 240)) {
+        out.push({ id: mat, via: 'forage' });
+        seen.add(mat);
+      }
+    }
+    // Bulk node materials: workable (tool ok) → enabled; else blocked w/ reason.
+    for (const p of NODE_PLACEMENTS) {
+      const def = NODE_DEFS[p.type];
+      for (const y of def.yields) {
+        if (seen.has(y.material)) continue;
+        seen.add(y.material);
+        const eq = this.tools.equippedTool();
+        const canWork = !!eq && eq.kind === def.tool && eq.tier >= def.minTier;
+        out.push(
+          canWork
+            ? { id: y.material, via: 'node' }
+            : { id: y.material, via: 'blocked', note: t('forage.needTool') },
+        );
+      }
+    }
+    return out;
+  }
+
+  /** Current forage/harvest status for the Fetch menu banner. */
+  private forageStatus(): { active: boolean; label: string; fill: number; capacity: number } {
+    if (this.harvest.active) {
+      const id = this.harvest.workingNodeId;
+      const p = NODE_PLACEMENTS.find((n) => n.id === id);
+      return {
+        active: true,
+        label: p ? t(`node.name.${p.type}`) : t('forage.somewhere'),
+        fill: this.harvest.fill,
+        capacity: this.forage.bucketCapacity,
+      };
+    }
+    if (this.forage.active) {
+      const mat = this.forage.pinnedMaterial;
+      return {
+        active: true,
+        label: mat ? tDyn(`material.${mat}`) : t('forage.somewhere'),
+        fill: this.forage.fill,
+        capacity: this.forage.bucketCapacity,
+      };
+    }
+    return { active: false, label: '', fill: 0, capacity: this.forage.bucketCapacity };
+  }
+
+  private callDatouBack(): void {
+    if (this.harvest.active) this.harvest.stop();
+    else if (this.forage.active) this.forage.stop();
+    this.datouRig.setBucketFill(0);
+    this.datouRig.setCarrying(false);
+  }
+
   /**
    * The bench confirmed a make. Materials were already pulled from the pack as
    * they were placed on cells, so here we just record knowledge, stamp the
@@ -1055,6 +1168,7 @@ export class Game {
     this.datouRig.setBucketFill(fill, this.forage.bucketCapacity);
     if (!this.harvest.active && !this.forage.active) this.datouRig.setCarrying(false);
     this.ui.toast(t('forage.delivered', { n: String(items.length) }));
+    this.forageMenu.refresh();
     if (items.length >= this.forage.bucketCapacity) {
       this.memories.add({
         ts: Date.now(),
@@ -1238,6 +1352,15 @@ export class Game {
 
     // Datou's muse: a slow seeded inspiration tick (§5).
     this.updateInspiration(dt, state.position.x, state.position.z, state.mood);
+
+    // Keep the Fetch menu's working banner (bucket dots) live while open.
+    if (this.forageMenu.isOpen()) {
+      this.forageMenuRefreshIn -= dt;
+      if (this.forageMenuRefreshIn <= 0) {
+        this.forageMenuRefreshIn = 0.5;
+        this.forageMenu.refresh();
+      }
+    }
 
     // --- render layers ---
     const camYaw = this.cameraRig.azimuth;
