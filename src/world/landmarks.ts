@@ -14,7 +14,13 @@
 import type { FormId } from '../game/workshop/forms';
 import type { MaterialId } from '../game/workshop/materials';
 
-export type LandmarkId = 'repair-commons' | 'pump-garden' | 'relay-camp';
+export type LandmarkId =
+  | 'repair-commons'
+  | 'pump-garden'
+  | 'relay-camp'
+  | 'ruin-stones'
+  | 'watch-knoll'
+  | 'meadow-orchard';
 
 /**
  * How far the player has come with a place:
@@ -83,7 +89,38 @@ export const LANDMARK_DEFS: readonly LandmarkDef[] = [
     activityRadius: 10,
     // A narrow field case in the hollow beneath the Old Pine.
     coffer: { x: -119, z: -108.5, blueprintForm: 'wayfinder', materials: { 'old-bolt': 3, pebble: 2 } },
-    // The next mystery is the ruin stones — already standing, not a landmark.
+    clueTo: 'ruin-stones',
+  },
+  {
+    // D. The Ruin Stones — the park's first shelter, far NE corner. The relay
+    // response originates here; the ring-and-notch mark is traced with Datou,
+    // and the recovered network sketch opens the west and north areas.
+    id: 'ruin-stones',
+    center: { x: 168, z: -160 },
+    noticeRadius: 75,
+    activityRadius: 11,
+    // An old waxed satchel beneath the fallen lintel stone.
+    coffer: { x: 163.5, z: -157, blueprintForm: 'lantern', materials: { reed: 3, feather: 1, twig: 2 } },
+    clueTo: 'watch-knoll',
+  },
+  {
+    // E. The Watchers' Knoll — a birdwatching rise in the south-west meadow.
+    id: 'watch-knoll',
+    center: { x: -98, z: 88 },
+    noticeRadius: 65,
+    activityRadius: 9,
+    // The watchers' weathered kit chest in the long grass.
+    coffer: { x: -94, z: 91, blueprintForm: 'field-glass', materials: { 'old-bolt': 2, twig: 2 } },
+    clueTo: 'meadow-orchard',
+  },
+  {
+    // F. The Meadow Orchard — planted rows in the high north meadow.
+    id: 'meadow-orchard',
+    center: { x: 60, z: -110 },
+    noticeRadius: 65,
+    activityRadius: 10,
+    // The planters' seed chest at the row end.
+    coffer: { x: 55, z: -106, blueprintForm: 'bug-hotel', materials: { twig: 7, flower: 2 } },
   },
 ];
 
@@ -100,7 +137,7 @@ export interface Clearing {
  *  Order matters — placeable() honours the first containing circle. */
 export const CLEARINGS: readonly Clearing[] = LANDMARK_DEFS.flatMap((d) => [
   { x: d.center.x, z: d.center.z, r: d.activityRadius, density: 0 },
-  { x: d.center.x, z: d.center.z, r: 26, density: 0.4 },
+  { x: d.center.x, z: d.center.z, r: 30, density: 0.4 },
 ]);
 
 export interface LandmarkArea {

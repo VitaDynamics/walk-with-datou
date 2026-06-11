@@ -35,6 +35,7 @@ import type { PhysicsAdapter } from '../physics/PhysicsAdapter';
 import { Console } from '../ui/Console';
 import { Minimap } from '../ui/Minimap';
 import { Cutout } from '../world/Cutout';
+import { LANDMARK_DEFS } from '../world/landmarks';
 import { SPOT_ANCHORS } from '../world/layout';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
@@ -231,8 +232,8 @@ export class Game {
     if (lmQa === 'arrived' || lmQa === 'completed') {
       this.saveJson('wwd.landmarks', {
         v: 1,
-        areas: (['repair-commons', 'pump-garden', 'relay-camp'] as const).map((id) => ({
-          id,
+        areas: LANDMARK_DEFS.map((d) => ({
+          id: d.id,
           progress: lmQa,
           cofferOpened: lmQa === 'completed',
         })),

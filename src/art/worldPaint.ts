@@ -82,17 +82,17 @@ export function paintWorld(
   // packed pale earth where volunteers walk, one quiet amber-ochre note.
   g.save();
   g.globalAlpha = 0.8;
-  blob(g, rng, px(126), pz(-28), 16 * S, 13 * S, { fill: GROUND.path }, 14, 0.1);
+  blob(g, rng, px(126), pz(-28), 20 * S, 16 * S, { fill: GROUND.path }, 14, 0.1);
   g.globalAlpha = 0.16;
-  blob(g, rng, px(127), pz(-28.5), 10 * S, 8 * S, { fill: '#d9a441' }, 12, 0.12);
+  blob(g, rng, px(127), pz(-28.5), 12 * S, 10 * S, { fill: '#d9a441' }, 12, 0.12);
   g.restore();
   // B. Reedwater Pump Garden (14,110): a wet basin spreading from the pump,
   // with two painted irrigation channels curving toward the lake water.
   g.save();
   g.globalAlpha = 0.55;
-  blob(g, rng, px(14), pz(110), 14 * S, 11 * S, { fill: WATER.sand }, 14, 0.1);
+  blob(g, rng, px(14), pz(110), 17 * S, 14 * S, { fill: WATER.sand }, 14, 0.1);
   g.globalAlpha = 0.5;
-  blob(g, rng, px(15), pz(112), 9 * S, 7 * S, { fill: WATER.edge }, 12, 0.12);
+  blob(g, rng, px(15), pz(112), 11 * S, 9 * S, { fill: WATER.edge }, 12, 0.12);
   g.strokeStyle = WATER.edge;
   g.lineCap = 'round';
   g.lineWidth = 1.3 * S;
@@ -111,7 +111,7 @@ export function paintWorld(
   // its pale triangle ground-mark readable from above.
   g.save();
   g.globalAlpha = 0.55;
-  blob(g, rng, px(-114), pz(-104), 12 * S, 10 * S, { fill: GROUND.path }, 12, 0.12);
+  blob(g, rng, px(-114), pz(-104), 14 * S, 12 * S, { fill: GROUND.path }, 12, 0.12);
   g.globalAlpha = 0.5;
   g.strokeStyle = '#efe8d6';
   g.lineWidth = 1.1 * S;
@@ -122,6 +122,76 @@ export function paintWorld(
   g.lineTo(px(-117.2), pz(-101.8));
   g.closePath();
   g.stroke();
+  g.restore();
+  // D. Ruin Stones (168,−160): a stone-dust ground with the giant, half-worn
+  // ring-and-notch mark — the corner finally has a face from above.
+  g.save();
+  g.globalAlpha = 0.6;
+  blob(g, rng, px(168), pz(-160), 13 * S, 11 * S, { fill: '#e3ddc8' }, 13, 0.1);
+  g.globalAlpha = 0.45;
+  g.strokeStyle = '#cfc6a8';
+  g.lineWidth = 1.4 * S;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.arc(px(168), pz(-160), 6 * S, 0.6, Math.PI * 2);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(px(172.2), pz(-164.2));
+  g.lineTo(px(175.5), pz(-167.5));
+  g.stroke();
+  g.restore();
+  // E. Watchers' Knoll (−98,88): a sun-paled rise with a worn sitting spot.
+  g.save();
+  g.globalAlpha = 0.7;
+  blob(g, rng, px(-98), pz(88), 12 * S, 10 * S, { fill: GROUND.blotchC }, 12, 0.12);
+  g.globalAlpha = 0.5;
+  blob(g, rng, px(-97), pz(87), 4 * S, 3 * S, { fill: GROUND.path }, 10, 0.15);
+  g.restore();
+  // F. Meadow Orchard (60,−110): four tilled rows — unmistakable from the sky.
+  g.save();
+  g.globalAlpha = 0.4;
+  blob(g, rng, px(60), pz(-110), 14 * S, 11 * S, { fill: SAGE.light }, 12, 0.1);
+  g.globalAlpha = 0.55;
+  g.strokeStyle = GROUND.path;
+  g.lineWidth = 1.5 * S;
+  g.lineCap = 'round';
+  for (let row = 0; row < 4; row++) {
+    const oz = -114.5 + row * 3.2;
+    g.beginPath();
+    g.moveTo(px(52), pz(oz + 0.4));
+    g.quadraticCurveTo(px(60), pz(oz - 0.4), px(68), pz(oz + 0.3));
+    g.stroke();
+  }
+  g.restore();
+
+  // Faint spur paths to the outlying areas — less travelled than the main
+  // home→zone paths, but the network finally reads as a network.
+  g.save();
+  g.strokeStyle = GROUND.path;
+  g.lineCap = 'round';
+  g.globalAlpha = 0.75;
+  g.lineWidth = 2.2 * S;
+  const spurs: Array<[number, number, number, number]> = [
+    [138, -52, 168, -160], // trail loop → ruin stones
+    [-12, 8, -98, 88], // home meadow → watchers' knoll
+    [10, -14, 60, -110], // home meadow → orchard rows
+  ];
+  for (const [sx, sz, ex, ez] of spurs) {
+    const steps = 12;
+    g.beginPath();
+    g.moveTo(px(sx), pz(sz));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const wob = Math.sin(t * Math.PI * 2.2 + ex) * 7 + (rng.next() * 2 - 1) * 4;
+      const dx = sx + (ex - sx) * t;
+      const dz = sz + (ez - sz) * t;
+      const len = Math.hypot(ex - sx, ez - sz) || 1;
+      const nx = -(ez - sz) / len;
+      const nz = (ex - sx) / len;
+      g.lineTo(px(dx + nx * wob), pz(dz + nz * wob));
+    }
+    g.stroke();
+  }
   g.restore();
 
   // Worn paths from home to each zone heart (under the lake/woods features).

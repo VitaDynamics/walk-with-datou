@@ -16,20 +16,27 @@ import { drawCoffer } from '../art/props';
 import {
   drawBlueCoffer,
   drawBlueStake,
+  drawButterflies,
   drawCableSpool,
   drawChannel,
   drawChimeStand,
+  drawCloverPatch,
   drawCrate,
   drawDonatedChime,
   drawDragonfly,
   drawEchoBell,
+  drawFallenLintel,
   drawFastener,
+  drawFeatherWand,
   drawFieldCase,
   drawFloatingPlanter,
   drawHoseCoil,
   drawInkcap,
   drawLeanTo,
   drawLogSeat,
+  drawMarkedStone,
+  drawMoonFern,
+  drawMoth,
   drawPatchBall,
   drawPatchedFence,
   drawPennantMast,
@@ -42,16 +49,26 @@ import {
   drawRelayMast,
   drawRelayTag,
   drawRibbonScrap,
+  drawRowMarker,
+  drawSapling,
+  drawSeedRattle,
   drawSignalVane,
+  drawSpotterTube,
   drawSquirrel,
+  drawStoneOrb,
   drawToolShelter,
   drawTrailBloom,
   drawTriangleMark,
+  drawWatchPost,
+  drawWaterBarrel,
   drawWaterIris,
+  drawWheelingBirds,
+  drawWindGrass,
 } from '../art/landmarkProps';
 import { Rng } from '../physics/mujoco/rng';
 import { Cutout } from '../world/Cutout';
 import {
+  LANDMARK_DEFS,
   LANDMARKS_VERSION,
   LandmarkField,
   type LandmarkArea,
@@ -97,7 +114,17 @@ export interface LandmarkDirectorDeps {
 
 /** What a world tap near a landmark interactive resolves to. */
 export interface LandmarkTarget {
-  kind: 'chime' | 'coffer' | 'channel' | 'vane' | 'socket' | 'hollow' | 'toy';
+  kind:
+    | 'chime'
+    | 'coffer'
+    | 'channel'
+    | 'vane'
+    | 'socket'
+    | 'hollow'
+    | 'toy'
+    | 'stone'
+    | 'tube'
+    | 'sapling';
   area: LandmarkId;
   /** Which channel/vane (0 or 1) for the paired interactives. */
   index?: 0 | 1;
@@ -186,11 +213,40 @@ const TRI_MARK_IN = { x: -114.5, z: -101.8, h: 0.3 };
 // findable only after the relay wakes (Phase 3 secret).
 const HOLLOW = { x: -120, z: -110 };
 
+// --- D. Ruin Stones composition --------------------------------------------------
+// The existing ruin rocks (168,−162 · 171,−158.5 · 165.5,−159) are the bones;
+// we add the marked slab, the fallen lintel sheltering the satchel, and life.
+const MARKED_STONE = { x: 169.5, z: -163.5, h: 1.9 };
+const LINTEL = { x: 164.5, z: -157.8, h: 0.7 };
+const MOTH = { x: 166.8, z: -161.5, h: 0.3 };
+
+// --- E. Watchers' Knoll composition ------------------------------------------------
+const WATCH_POST = { x: -99.5, z: 86, h: 2.2 };
+const SPOTTER = { x: -96.5, z: 88.5, h: 1.4 };
+const BIRDS = { x: -98, z: 85, h: 2.6 };
+
+// --- F. Meadow Orchard composition ---------------------------------------------------
+// Three saplings in a row; the middle one slipped its stake (the activity).
+const SAPLINGS = [
+  { x: 57, z: -112.5, leaning: false },
+  { x: 61, z: -109, leaning: true },
+  { x: 64.5, z: -113, leaning: false },
+] as const;
+const BARREL = { x: 56.5, z: -107.5, h: 0.95 };
+const ROW_MARKERS = [
+  { x: 54, z: -111.5 },
+  { x: 66.5, z: -110.5 },
+];
+const BUTTERFLIES = { x: 62, z: -107.8, h: 0.5 };
+
 /** Datou's toy per area — left by the volunteers, his to play with. */
 const TOYS: Record<LandmarkId, { x: number; z: number; h: number }> = {
   'repair-commons': { x: 128.8, z: -26.2, h: 0.42 },
   'pump-garden': { x: 12.5, z: 114.2, h: 0.42 },
   'relay-camp': { x: -112.2, z: -108.2, h: 0.72 },
+  'ruin-stones': { x: 171.5, z: -156.5, h: 0.4 },
+  'watch-knoll': { x: -95, z: 90.5, h: 0.5 },
+  'meadow-orchard': { x: 63.5, z: -106.8, h: 0.35 },
 };
 
 const REACH = 1.4; // Datou close enough to brace/work
@@ -203,6 +259,9 @@ const COFFER_LOOK: Record<LandmarkId, { h: number; draw: (open: boolean) => Retu
   'repair-commons': { h: 0.7, draw: (open) => drawCoffer(74, open, true) },
   'pump-garden': { h: 0.7, draw: (open) => drawBlueCoffer(81, open) },
   'relay-camp': { h: 0.55, draw: (open) => drawFieldCase(82, open) },
+  'ruin-stones': { h: 0.6, draw: (open) => drawCoffer(118, open) },
+  'watch-knoll': { h: 0.6, draw: (open) => drawCoffer(119, open, true) },
+  'meadow-orchard': { h: 0.6, draw: (open) => drawCoffer(127, open) },
 };
 
 type BeatPhase = 'idle' | 'datou-coming' | 'working';
@@ -222,11 +281,9 @@ export class LandmarkDirector {
   private readonly deps: LandmarkDirectorDeps;
 
   // One cooperative beat per area (chime brace / pump run / relay wake).
-  private readonly beats: Record<LandmarkId, Beat> = {
-    'repair-commons': { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
-    'pump-garden': { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
-    'relay-camp': { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
-  };
+  private readonly beats = Object.fromEntries(
+    LANDMARK_DEFS.map((d) => [d.id, { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null }]),
+  ) as Record<LandmarkId, Beat>;
   private tellCooldown = 0;
   /** Passing the repaired chime re-lures with its quiet ring (§7A). */
   private relureCooldown = 0;
@@ -244,6 +301,9 @@ export class LandmarkDirector {
   private socketCut: Cutout | null = null;
   private relayCut: Cutout | null = null;
   private vaneCuts: (Cutout | null)[] = [null, null];
+  private stoneCut: Cutout | null = null;
+  private tubeCut: Cutout | null = null;
+  private saplingCuts: (Cutout | null)[] = SAPLINGS.map(() => null);
   private readonly cofferCuts = new Map<LandmarkId, Cutout>();
   private commonsCluesPlaced = false;
   private gardenCluesPlaced = false;
@@ -254,6 +314,9 @@ export class LandmarkDirector {
     this.placeCommons();
     this.placeGarden();
     this.placeCamp();
+    this.placeRuins();
+    this.placeKnoll();
+    this.placeOrchard();
   }
 
   // --- world dressing --------------------------------------------------------
@@ -355,6 +418,76 @@ export class LandmarkDirector {
     this.placeMadeItem('mat', 'grass-wisp', -115.5, -99.5);
     const toyC = TOYS['relay-camp'];
     this.plate(drawEchoBell(126), toyC.x, toyC.z, toyC.h, 0.3);
+  }
+
+  private placeRuins(): void {
+    const done = this.completed('ruin-stones');
+    this.stoneCut = this.plate(
+      drawMarkedStone(this.vary(112, done), done),
+      MARKED_STONE.x,
+      MARKED_STONE.z,
+      MARKED_STONE.h,
+      0.7,
+    );
+    this.plate(drawFallenLintel(113), LINTEL.x, LINTEL.z, LINTEL.h, 0.8);
+    this.placeCoffer('ruin-stones');
+    // Life: moon-fern among the stones, a patient moth, things visitors left.
+    this.clusterPlates(drawMoonFern, 6, 168, -160, 4, 10, 0.45, 0x7a14);
+    this.plate(drawMoth(114), MOTH.x, MOTH.z, MOTH.h, 0.08);
+    this.placeMadeItem('cairn', 'pebble', 166, -163.8);
+    this.placeMadeItem('memory-frame', 'driftwood', 171.8, -161.8);
+    const toy = TOYS['ruin-stones'];
+    this.plate(drawStoneOrb(115), toy.x, toy.z, toy.h, 0.22);
+  }
+
+  private placeKnoll(): void {
+    const done = this.completed('watch-knoll');
+    this.plate(drawWatchPost(116), WATCH_POST.x, WATCH_POST.z, WATCH_POST.h, 0.6);
+    this.tubeCut = this.plate(
+      drawSpotterTube(this.vary(117, done), done),
+      SPOTTER.x,
+      SPOTTER.z,
+      SPOTTER.h,
+      0.5,
+    );
+    this.placeCoffer('watch-knoll');
+    // Life: wind-grass silvering the rise, the watchers' bench, a regular.
+    this.clusterPlates(drawWindGrass, 8, -98, 88, 3, 9, 0.7, 0x7a15);
+    this.plate(drawPerchedBird(128), -101.5, 85, 0.42, 0.1);
+    this.placeMadeItem('bench', 'plank', -101, 89.5);
+    const toy = TOYS['watch-knoll'];
+    this.plate(drawFeatherWand(129), toy.x, toy.z, toy.h, 0.12);
+    if (done) this.placeKnollBirds();
+  }
+
+  /** The knoll's completion made visible: swifts wheeling over the rise. */
+  private placeKnollBirds(): void {
+    this.plate(drawWheelingBirds(130), BIRDS.x, BIRDS.z, BIRDS.h, 0);
+  }
+
+  private placeOrchard(): void {
+    const done = this.completed('meadow-orchard');
+    for (const [i, sap] of SAPLINGS.entries()) {
+      this.saplingCuts[i] = this.plate(
+        drawSapling(this.vary(131 + i, done), sap.leaning && !done, done),
+        sap.x,
+        sap.z,
+        1.9,
+        0.6,
+      );
+    }
+    this.plate(drawWaterBarrel(134), BARREL.x, BARREL.z, BARREL.h, 0.5);
+    for (const [i, m] of ROW_MARKERS.entries())
+      this.plate(drawRowMarker(135 + i), m.x, m.z, 0.5, 0.1);
+    this.placeCoffer('meadow-orchard');
+    // Life: clover sown for the bees, pollinators, the planters' furnishings.
+    this.clusterPlates(drawCloverPatch, 6, 60, -110, 3, 9, 0.35, 0x7a16);
+    this.plate(drawButterflies(137), BUTTERFLIES.x, BUTTERFLIES.z, BUTTERFLIES.h, 0);
+    this.placeMadeItem('birdbath', 'flat-stone', 58.5, -114.5);
+    this.placeMadeItem('stool', 'log', 65.5, -107.5);
+    const toy = TOYS['meadow-orchard'];
+    this.plate(drawSeedRattle(138), toy.x, toy.z, toy.h, 0.12);
+    if (done) this.plate(drawButterflies(139), 59, -113.2, 0.5, 0);
   }
 
   private placeCoffer(id: LandmarkId): void {
@@ -534,6 +667,16 @@ export class LandmarkDirector {
     if (this.completed('relay-camp') && !this.field.capsuleFound && near(HOLLOW.x, HOLLOW.z, 1.7)) {
       return { kind: 'hollow', area: 'relay-camp', x: HOLLOW.x, z: HOLLOW.z };
     }
+    if (near(MARKED_STONE.x, MARKED_STONE.z, 1.8)) {
+      return { kind: 'stone', area: 'ruin-stones', x: MARKED_STONE.x, z: MARKED_STONE.z };
+    }
+    if (near(SPOTTER.x, SPOTTER.z, 1.6)) {
+      return { kind: 'tube', area: 'watch-knoll', x: SPOTTER.x, z: SPOTTER.z };
+    }
+    const lean = SAPLINGS.find((sp) => sp.leaning)!;
+    if (near(lean.x, lean.z, 1.7)) {
+      return { kind: 'sapling', area: 'meadow-orchard', x: lean.x, z: lean.z };
+    }
     for (const a of this.field.areas) {
       const toy = TOYS[a.def.id];
       if (near(toy.x, toy.z, 1.5)) {
@@ -568,7 +711,108 @@ export class LandmarkDirector {
       case 'toy':
         this.engageToy(target.area);
         break;
+      case 'stone':
+        this.engageStone();
+        break;
+      case 'tube':
+        this.engageTube();
+        break;
+      case 'sapling':
+        this.engageSapling();
+        break;
     }
+  }
+
+  // --- D. tracing the mark -------------------------------------------------------
+
+  private engageStone(): void {
+    if (this.completed('ruin-stones')) {
+      this.deps.toast(this.dailyLine('landmark.ruins.again', 2));
+      return;
+    }
+    if (this.startBeat('ruin-stones', MARKED_STONE, () => this.completeRuins())) {
+      this.deps.toast(t('landmark.ruins.trace'));
+    }
+  }
+
+  private completeRuins(): void {
+    this.field.complete('ruin-stones');
+    this.persist();
+    this.stoneCut = this.replate(
+      this.stoneCut,
+      drawMarkedStone(112, true),
+      MARKED_STONE.x,
+      MARKED_STONE.z,
+      MARKED_STONE.h,
+      0.7,
+    );
+    this.deps.datouBeat();
+    this.deps.cue('response'); // the mark and the relay share a voice
+    this.deps.memory('landmark.ruin-stones');
+    // The recovered network sketch is the clue onward: a watchers' rise west
+    // of home, planted rows in the high meadow — qualities, never arrows.
+    this.deps.toast(t('landmark.ruins.done'));
+  }
+
+  // --- E. steadying the tube --------------------------------------------------------
+
+  private engageTube(): void {
+    if (this.completed('watch-knoll')) {
+      this.deps.toast(this.dailyLine('landmark.knoll.again', 2));
+      return;
+    }
+    if (this.startBeat('watch-knoll', SPOTTER, () => this.completeKnoll())) {
+      this.deps.toast(t('landmark.knoll.steady'));
+    }
+  }
+
+  private completeKnoll(): void {
+    this.field.complete('watch-knoll');
+    this.persist();
+    this.tubeCut = this.replate(
+      this.tubeCut,
+      drawSpotterTube(117, true),
+      SPOTTER.x,
+      SPOTTER.z,
+      SPOTTER.h,
+      0.5,
+    );
+    this.placeKnollBirds();
+    this.deps.datouBeat();
+    this.deps.memory('landmark.watch-knoll');
+    this.deps.toast(t('landmark.knoll.done'));
+  }
+
+  // --- F. re-staking the sapling -------------------------------------------------------
+
+  private engageSapling(): void {
+    if (this.completed('meadow-orchard')) {
+      this.deps.toast(this.dailyLine('landmark.orchard.again', 2));
+      return;
+    }
+    const lean = SAPLINGS.find((sp) => sp.leaning)!;
+    if (this.startBeat('meadow-orchard', lean, () => this.completeOrchard())) {
+      this.deps.toast(t('landmark.orchard.stake'));
+    }
+  }
+
+  private completeOrchard(): void {
+    this.field.complete('meadow-orchard');
+    this.persist();
+    for (const [i, sap] of SAPLINGS.entries()) {
+      this.saplingCuts[i] = this.replate(
+        this.saplingCuts[i],
+        drawSapling(131 + i, false, true),
+        sap.x,
+        sap.z,
+        1.9,
+        0.6,
+      );
+    }
+    this.plate(drawButterflies(139), 59, -113.2, 0.5, 0);
+    this.deps.datouBeat();
+    this.deps.memory('landmark.meadow-orchard');
+    this.deps.toast(t('landmark.orchard.done'));
   }
 
   /** Datou's toy: he trots over, plays a round, and is pleased with himself.
