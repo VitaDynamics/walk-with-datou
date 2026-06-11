@@ -4,7 +4,20 @@
  * place some of them back into the world. Counts persist across sessions.
  */
 
-export type ResourceId = 'twig' | 'pebble' | 'berry' | 'flower' | 'mushroom' | 'pinecone';
+export type ResourceId =
+  | 'twig'
+  | 'pebble'
+  | 'berry'
+  | 'flower'
+  | 'mushroom'
+  | 'pinecone'
+  // Orchard food (E4) — shaken from trees / pulled from the rows.
+  | 'apple'
+  | 'pear'
+  | 'plum'
+  | 'pumpkin'
+  | 'turnip'
+  | 'carrot';
 /** Coffer-granted finds — not gatherable from the ground, but they sit in the
  *  pack and feed the Workshop bench like any material (landmark plan §9). */
 export type FoundId = 'feather' | 'reed' | 'old-bolt';
@@ -39,6 +52,12 @@ export const RESOURCE_IDS: readonly ResourceId[] = [
   'flower',
   'mushroom',
   'pinecone',
+  'apple',
+  'pear',
+  'plum',
+  'pumpkin',
+  'turnip',
+  'carrot',
 ];
 
 export class Backpack {

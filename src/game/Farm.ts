@@ -10,9 +10,29 @@
  * Pure logic + storage; the game layer renders plots and routes taps.
  */
 
-export type CropKind = 'berry' | 'flower' | 'mushroom';
+export type CropKind =
+  | 'berry'
+  | 'flower'
+  | 'mushroom'
+  // Orchard food (E4): replant what you shook down / pulled up.
+  | 'apple'
+  | 'pear'
+  | 'plum'
+  | 'pumpkin'
+  | 'turnip'
+  | 'carrot';
 
-export const CROP_KINDS: readonly CropKind[] = ['berry', 'flower', 'mushroom'];
+export const CROP_KINDS: readonly CropKind[] = [
+  'berry',
+  'flower',
+  'mushroom',
+  'apple',
+  'pear',
+  'plum',
+  'pumpkin',
+  'turnip',
+  'carrot',
+];
 
 /** Growth: 0 → 3 (mature). */
 export const MATURE = 3;
@@ -24,7 +44,17 @@ const OFFLINE_HOURS_PER_STAGE = 3;
 export const TEND_RANGE = 3.5;
 const TEND_BOOST = 1.6;
 /** Harvest yield per crop. */
-export const YIELD: Record<CropKind, number> = { berry: 3, flower: 3, mushroom: 2 };
+export const YIELD: Record<CropKind, number> = {
+  berry: 3,
+  flower: 3,
+  mushroom: 2,
+  apple: 3,
+  pear: 3,
+  plum: 3,
+  pumpkin: 2,
+  turnip: 3,
+  carrot: 3,
+};
 
 export interface PlotState {
   id: number;

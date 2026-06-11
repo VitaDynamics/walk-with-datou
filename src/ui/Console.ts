@@ -41,6 +41,7 @@ import {
   drawTwig,
   drawWindchime,
 } from '../art/props';
+import { drawFood } from '../art/orchard';
 
 export interface ConsoleCallbacks {
   onLeashToggle(): void;
@@ -62,6 +63,13 @@ const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }>
   flower: drawFlower,
   mushroom: drawMushroom,
   pinecone: drawPinecone,
+  // The Meadow Orchard (E4).
+  apple: (seed) => drawFood('apple', seed),
+  pear: (seed) => drawFood('pear', seed),
+  plum: (seed) => drawFood('plum', seed),
+  pumpkin: (seed) => drawFood('pumpkin', seed),
+  turnip: (seed) => drawFood('turnip', seed),
+  carrot: (seed) => drawFood('carrot', seed),
   // Coffer-granted finds (landmark plan §9).
   feather: (seed) => drawDiscovery('feather', seed),
   reed: drawReed,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { __tables, t } from './i18n';
 import { MAJOR_PROPS, SPOT_ANCHORS } from './world/layout';
 import { SETPIECES } from './world/setpieces';
+import { ORCHARD_TREES, VEG_ROWS } from './world/orchard';
 import { KIND_DEFS } from './world/scatter';
 import { NODE_DEFS } from './game/workshop/nodes';
 import { BOND_UNLOCKS } from './game/Bond';
@@ -45,6 +46,20 @@ describe('i18n tables', () => {
       expect(en[`setpiece.${sp.id}.line.1`], `setpiece.${sp.id}.line.1`).toBeDefined();
       expect(en[`setpiece.${sp.id}.line.2`], `setpiece.${sp.id}.line.2`).toBeDefined();
       expect(en[`memory.setpiece.${sp.id}`], `memory.setpiece.${sp.id}`).toBeDefined();
+    }
+  });
+
+  it('covers the orchard: trees, rows, food things and materials (E4)', () => {
+    const en = __tables.UI.en as Record<string, string>;
+    for (const tree of ORCHARD_TREES) {
+      expect(en[`orchard.tree.${tree.kind}`], `orchard.tree.${tree.kind}`).toBeDefined();
+    }
+    for (const row of VEG_ROWS) {
+      expect(en[`orchard.row.${row.kind}`], `orchard.row.${row.kind}`).toBeDefined();
+    }
+    for (const food of ['apple', 'pear', 'plum', 'pumpkin', 'turnip', 'carrot']) {
+      expect(en[`thing.${food}`], `thing.${food}`).toBeDefined();
+      expect(en[`material.${food}`], `material.${food}`).toBeDefined();
     }
   });
 

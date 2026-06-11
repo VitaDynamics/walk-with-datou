@@ -73,6 +73,13 @@ export const MATERIALS = {
   mushroom: { group: 'plant', fill: CLAY.pale, shade: CLAY.blossom, strength: 0.15, flexibility: 0.3, warmth: 0.6 },
   pinecone: { group: 'plant', fill: CLAY.mid, shade: CLAY.deep, strength: 0.4, flexibility: 0.1, warmth: 0.6 },
   acorn: { group: 'plant', fill: CLAY.light, shade: CLAY.deep, strength: 0.5, flexibility: 0.1, warmth: 0.65 },
+  // Orchard food (E4) — warm, soft, mostly for vessels, garlands & offerings.
+  apple: { group: 'plant', fill: CLAY.blossom, shade: CLAY.deep, strength: 0.15, flexibility: 0.2, warmth: 0.9 },
+  pear: { group: 'plant', fill: SAGE.light, shade: SAGE.mid, strength: 0.15, flexibility: 0.2, warmth: 0.85 },
+  plum: { group: 'plant', fill: CLAY.deep, shade: INK.soft, strength: 0.12, flexibility: 0.2, warmth: 0.8 },
+  pumpkin: { group: 'plant', fill: CLAY.mid, shade: CLAY.deep, strength: 0.35, flexibility: 0.1, warmth: 0.95 },
+  turnip: { group: 'plant', fill: CLAY.pale, shade: CLAY.light, strength: 0.2, flexibility: 0.1, warmth: 0.7 },
+  carrot: { group: 'plant', fill: CLAY.blossom, shade: CLAY.mid, strength: 0.2, flexibility: 0.15, warmth: 0.8 },
 
   // found --------------------------------------------------------------------
   feather: { group: 'found', fill: CLAY.pale, shade: SAGE.mid, strength: 0.05, flexibility: 0.95, warmth: 0.7 },

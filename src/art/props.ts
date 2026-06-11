@@ -578,7 +578,16 @@ export function drawSoil(seed: number): PropSprite {
 
 /** A crop at a growth stage: 0 sprout · 1 young · 2 growing · 3 mature. */
 export function drawCrop(
-  crop: 'berry' | 'flower' | 'mushroom',
+  crop:
+    | 'berry'
+    | 'flower'
+    | 'mushroom'
+    | 'apple'
+    | 'pear'
+    | 'plum'
+    | 'pumpkin'
+    | 'turnip'
+    | 'carrot',
   stage: number,
   seed: number,
 ): PropSprite {
@@ -653,6 +662,60 @@ export function drawCrop(
           outline: INK.line,
           lineWidth: 3.5,
         });
+      }
+      break;
+    }
+    case 'apple':
+    case 'pear':
+    case 'plum': {
+      // A sapling growing into a small fruit tree (E4).
+      const h = 36 + 64 * grown;
+      wobblyLine(g, rng, 80, baseY, 80 + (rng.next() * 6 - 3), baseY - h, 6, CLAY.mid, 1.2, 4);
+      blob(g, rng, 80, baseY - h - 10, 22 + 24 * grown, 16 + 18 * grown, {
+        fill: SAGE.mid,
+        outline: INK.line,
+        lineWidth: 3.5,
+      });
+      if (s === 3) {
+        const fill = crop === 'pear' ? SAGE.light : crop === 'plum' ? CLAY.deep : CLAY.blossom;
+        for (let i = 0; i < 3; i++) {
+          g.fillStyle = fill;
+          g.beginPath();
+          g.arc(62 + rng.next() * 36, baseY - h - 16 + rng.next() * 20, 5, 0, Math.PI * 2);
+          g.fill();
+          g.strokeStyle = INK.soft;
+          g.lineWidth = 1.8;
+          g.stroke();
+        }
+      }
+      break;
+    }
+    case 'pumpkin':
+    case 'turnip':
+    case 'carrot': {
+      // Leafy tops, the vegetable showing through at maturity (E4).
+      const tops = 1 + s;
+      for (let i = 0; i < tops; i++) {
+        const x = 52 + i * 22 + rng.next() * 6;
+        grassStroke(g, rng, x, baseY, 30 + 26 * grown, (rng.next() * 2 - 1) * 10, 4, SAGE.shade);
+      }
+      if (s === 3) {
+        if (crop === 'pumpkin') {
+          blob(g, rng, 80, baseY - 12, 26, 17, { fill: CLAY.mid, outline: INK.line, lineWidth: 3.5 }, 9, 0.08);
+        } else if (crop === 'turnip') {
+          blob(g, rng, 76, baseY - 8, 14, 10, { fill: CLAY.pale, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+          blob(g, rng, 100, baseY - 8, 12, 9, { fill: CLAY.pale, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+        } else {
+          for (const x of [70, 92]) {
+            g.fillStyle = CLAY.blossom;
+            g.beginPath();
+            g.ellipse(x, baseY - 8, 6, 10, 0.3, 0, Math.PI * 2);
+            g.fill();
+            g.strokeStyle = INK.soft;
+            g.lineWidth = 2;
+            g.stroke();
+          }
+        }
       }
       break;
     }

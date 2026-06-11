@@ -53,6 +53,18 @@ import type { LandmarkInspection } from '../world/landmarks';
 import { MAJOR_PROPS, SPOT_ANCHORS, type MajorProp } from '../world/layout';
 import { SETPIECES, setpieceNear, type Setpiece } from '../world/setpieces';
 import { drawBeatBit, drawSetpiece } from '../art/setpieces';
+import {
+  ORCHARD_TREES,
+  ROW_CHARGES,
+  TREE_CHARGES,
+  VEG_ROWS,
+  orchardTreeNear,
+  treeStageFor,
+  vegRowNear,
+  type OrchardTree,
+  type VegRow,
+} from '../world/orchard';
+import { drawFood, drawFruitTree, drawVegRow, type FruitKind } from '../art/orchard';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
@@ -211,6 +223,15 @@ export class Game {
   private activeBeat: { sp: Setpiece; t: number; spawned: number; echoed: boolean } | null = null;
   private beatCooldown = 0;
   private setpieceHintIn = 150;
+  // The Meadow Orchard (E4): tended food, daily charges, Datou shakes trunks.
+  private readonly vegRowCuts = new Map<string, Cutout>();
+  private orchardUsed: Record<string, { day: string; used: number }> = {};
+  private pendingShake: OrchardTree | null = null;
+  /** Fruit mid-fall (eased drop), then resting on the ground until picked.
+   *  Fallen fruit is session-local — overnight, the squirrels get it. */
+  private readonly fallingFruit: { kind: FruitKind; x: number; z: number; cut: Cutout; t: number }[] = [];
+  private readonly fallenFruit: { kind: FruitKind; x: number; z: number; cut: Cutout }[] = [];
+  private pendingFruit: { kind: FruitKind; x: number; z: number; cut: Cutout } | null = null;
   private readonly beatFx: {
     cut: Cutout;
     t: number;
@@ -504,6 +525,7 @@ export class Game {
     });
     this.placeNodes();
     this.placeSetpieces();
+    this.placeOrchard();
     this.placeCoffer();
 
     this.pointer = new Pointer(canvas, {
@@ -735,6 +757,36 @@ export class Game {
       this.ui.showName(tDyn(`setpiece.${sp.id}.name`), tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`));
       this.companion.investigate(sp.x, sp.z);
       this.armedSetpiece = sp;
+      return;
+    }
+
+    // Fallen fruit (E4) → walk over and pocket it.
+    const fruit = this.fallenFruitNear(p.x, p.z);
+    if (fruit) {
+      if (Math.hypot(fruit.x - this.player.x, fruit.z - this.player.z) <= GATHER_REACH) {
+        this.pickFruit(fruit);
+      } else {
+        this.player.walkTo(fruit.x, fruit.z);
+        this.pendingFruit = fruit;
+      }
+      return;
+    }
+
+    // An orchard tree (E4) → Datou trots over and nudges the trunk.
+    const tree = orchardTreeNear(p.x, p.z);
+    if (tree) {
+      this.tapOrchardTree(tree);
+      return;
+    }
+
+    // A vegetable row (E4) → pull one (walk over first).
+    const row = vegRowNear(p.x, p.z);
+    if (row) {
+      if (Math.hypot(row.x - this.player.x, row.z - this.player.z) <= 2.6) {
+        this.pullVeg(row);
+      } else {
+        this.player.walkTo(row.x, row.z);
+      }
       return;
     }
 
@@ -1741,6 +1793,171 @@ export class Game {
     if (best) this.companion.promptCurious({ id: `setpiece:${best.id}`, x: best.x, z: best.z });
   }
 
+  // --- The Meadow Orchard: tended food (E4) ---
+
+  private placeOrchard(): void {
+    this.orchardUsed = this.loadJson<Record<string, { day: string; used: number }>>(
+      'wwd.orchard',
+      {},
+    );
+    const stage = treeStageFor(seasonFor());
+    for (const tree of ORCHARD_TREES) {
+      const seed = (Math.round(tree.x * 17 + tree.z * 5) ^ 0x70a1) >>> 0;
+      const h = tree.kind === 'pear' ? 3.4 : tree.kind === 'plum' ? 3.0 : 3.2;
+      const cut = new Cutout(drawFruitTree(tree.kind, stage, seed), {
+        height: h,
+        shadowRadius: h * 0.3,
+      });
+      this.world.placeCutout(cut, tree.x, tree.z);
+    }
+    for (const row of VEG_ROWS) this.replateVegRow(row);
+  }
+
+  private replateVegRow(row: VegRow): void {
+    const old = this.vegRowCuts.get(row.id);
+    if (old) {
+      old.group.removeFromParent();
+      old.dispose();
+    }
+    const seed = (Math.round(row.x * 11 + row.z * 3) ^ 0x33d) >>> 0;
+    const cut = new Cutout(drawVegRow(row.kind, this.usedToday(row.id) * 2, seed), {
+      height: 3.4,
+      decal: true,
+      renderOrder: 2,
+    });
+    this.world.placeCutout(cut, row.x, row.z);
+    this.vegRowCuts.set(row.id, cut);
+  }
+
+  /** Charges used today for an orchard id (trees and rows share the store). */
+  private usedToday(id: string): number {
+    const rec = this.orchardUsed[id];
+    return rec && rec.day === dailyKey() ? rec.used : 0;
+  }
+
+  private spendOrchard(id: string, n = 1): void {
+    this.orchardUsed[id] = { day: dailyKey(), used: this.usedToday(id) + n };
+    this.saveJson('wwd.orchard', this.orchardUsed);
+  }
+
+  private tapOrchardTree(tree: OrchardTree): void {
+    const name = tDyn(`orchard.tree.${tree.kind}`);
+    const stage = treeStageFor(seasonFor());
+    if (stage === 'blossom') {
+      this.ui.showName(name, t('orchard.blossom'));
+      return;
+    }
+    if (stage === 'bare') {
+      this.ui.showName(name, t('orchard.bare'));
+      return;
+    }
+    if (this.usedToday(tree.id) >= TREE_CHARGES) {
+      this.ui.showName(name, t('orchard.spent'));
+      return;
+    }
+    this.ui.showName(name, t('orchard.shake'));
+    this.companion.investigate(tree.x, tree.z);
+    this.pendingShake = tree;
+  }
+
+  /** Datou reached the trunk: a nudge, and one or two fruit ease down. */
+  private shakeTree(tree: OrchardTree): void {
+    this.pendingShake = null;
+    const used = this.usedToday(tree.id);
+    const left = TREE_CHARGES - used;
+    if (left <= 0) return;
+    const n = Math.min(left, 1 + ((dailySeed() ^ (used * 7) ^ tree.id.length) % 2));
+    this.spendOrchard(tree.id, n);
+    this.datouRig.pulse();
+    this.datouRig.reach();
+    this.personality.note('work');
+    for (let i = 0; i < n; i++) {
+      const a = ((used + i) * 2.4 + tree.x) % (Math.PI * 2);
+      const x = tree.x + Math.cos(a) * 0.8;
+      const z = tree.z + Math.sin(a) * 0.8;
+      const cut = new Cutout(drawFood(tree.kind, (used + i) * 31 + 7), {
+        height: 0.26,
+        shadowRadius: 0.14,
+      });
+      this.world.placeCutout(cut, x, z);
+      cut.setPosition(x, z, 2.0);
+      this.fallingFruit.push({ kind: tree.kind, x, z, cut, t: 0 });
+    }
+  }
+
+  private fallenFruitNear(
+    x: number,
+    z: number,
+  ): { kind: FruitKind; x: number; z: number; cut: Cutout } | null {
+    let best: (typeof this.fallenFruit)[number] | null = null;
+    let bestD = 0.9;
+    for (const f of this.fallenFruit) {
+      const d = Math.hypot(f.x - x, f.z - z);
+      if (d <= bestD) {
+        bestD = d;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  private pickFruit(fruit: { kind: FruitKind; x: number; z: number; cut: Cutout }): void {
+    const i = this.fallenFruit.indexOf(fruit);
+    if (i < 0) return;
+    this.fallenFruit.splice(i, 1);
+    fruit.cut.group.removeFromParent();
+    fruit.cut.dispose();
+    this.backpack.add(fruit.kind);
+    this.bond.add('discovery', 1);
+    this.ui.toast(t('gather.toast', { thing: tDyn(`thing.${fruit.kind}`) }));
+  }
+
+  private pullVeg(row: VegRow): void {
+    const name = tDyn(`orchard.row.${row.kind}`);
+    if (this.usedToday(row.id) >= ROW_CHARGES) {
+      this.ui.showName(name, t('orchard.rowSpent'));
+      return;
+    }
+    this.spendOrchard(row.id);
+    this.replateVegRow(row);
+    this.backpack.add(row.kind);
+    this.bond.add('discovery', 1);
+    this.ui.showName(name, t('gather.toast', { thing: tDyn(`thing.${row.kind}`) }));
+    this.datouRig.pulse();
+  }
+
+  /** Falling fruit ease down, land, and become pickable; deferred picks land. */
+  private updateOrchard(dt: number, datou: DatouState): void {
+    if (
+      this.pendingShake &&
+      Math.hypot(datou.position.x - this.pendingShake.x, datou.position.z - this.pendingShake.z) <=
+        1.3
+    ) {
+      this.shakeTree(this.pendingShake);
+    }
+    for (let i = this.fallingFruit.length - 1; i >= 0; i--) {
+      const f = this.fallingFruit[i];
+      f.t += dt;
+      const k = Math.min(1, f.t / 0.9);
+      f.cut.setPosition(f.x, f.z, 2.0 * (1 - k * k) + 0.02);
+      if (k >= 1) {
+        this.fallingFruit.splice(i, 1);
+        this.fallenFruit.push({ kind: f.kind, x: f.x, z: f.z, cut: f.cut });
+      }
+    }
+    if (this.pendingFruit) {
+      const f = this.pendingFruit;
+      if (!this.fallenFruit.includes(f)) {
+        this.pendingFruit = null;
+      } else if (Math.hypot(f.x - this.player.x, f.z - this.player.z) <= GATHER_REACH) {
+        this.pendingFruit = null;
+        this.pickFruit(f);
+      } else if (!this.player.hasTarget) {
+        this.pendingFruit = null;
+      }
+    }
+  }
+
   /** Re-draw a node's plate if its harvest state changed (depletion/regrow). */
   private replateNode(nodeId: string): void {
     const p = NODE_PLACEMENTS.find((n) => n.id === nodeId);
@@ -2050,6 +2267,7 @@ export class Game {
     this.maybeHintNode(dt);
     this.maybeHintSetpiece(dt);
     this.updateBeat(dt, state);
+    this.updateOrchard(dt, state);
 
     // Deferred gather: arrived next to the tapped pickable?
     if (this.pendingGather) {
