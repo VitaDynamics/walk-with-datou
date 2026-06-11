@@ -102,6 +102,9 @@ The single product north star, confirmed with the user: **make Datou feel alive*
   character bible in `docs/基于角色个性特征的机器狗行为模式探索.pdf`); trait/
   emotion/behavior engines, motion language, phases C1–C8. Canon for *who*
   Datou is; the baseline still governs *how it looks*.
+- `docs/WORLD_ENRICHMENT_PLAN.md` — the Living Park plan (E1–E8): named/
+  touchable world, large interactive setpieces, visible resource nodes,
+  orchard fruit/veg, animals, world-side use of the 501 forms.
 - `docs/BUILDING_SYSTEM.md` — the Workshop plan: generative 1 000+ item space,
   3×3 arrangement grammar, no-blueprint discovery, Datou inspirations &
   foraging. Implement in its W1–W7 phases.
