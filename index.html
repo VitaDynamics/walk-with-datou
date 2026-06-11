@@ -372,6 +372,34 @@
         text-align: center;
       }
 
+      /* --- Name chip (what you touched — quiet two-line pill) --- */
+      #name-chip {
+        position: absolute;
+        left: 50%;
+        bottom: 198px;
+        transform: translateX(-50%);
+        z-index: 6;
+        padding: 8px 18px;
+        border-radius: 18px;
+        background: var(--surface-strong);
+        box-shadow: var(--shadow-card);
+        text-align: center;
+        pointer-events: none;
+        user-select: none;
+        transition: opacity 400ms ease;
+        max-width: 70vw;
+      }
+      #name-chip-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      #name-chip-line {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 1px;
+      }
+
       /* --- Action bar (bottom-center) --- */
       #action-bar {
         position: absolute;
@@ -812,6 +840,12 @@
     <!-- Quiet toast -->
     <div id="toast" hidden></div>
 
+    <!-- Name chip (what you touched) -->
+    <div id="name-chip" role="status" aria-live="polite" hidden>
+      <div id="name-chip-title"></div>
+      <div id="name-chip-line"></div>
+    </div>
+
     <!-- Action bar -->
     <div id="action-bar">
       <button id="btn-leash" type="button" data-i18n="console.leash">Leash</button>
@@ -864,7 +898,7 @@
         <button type="button" class="lang-btn" data-lang="zh">中文</button>
       </div>
 
-      <div class="panel-title" data-i18n="settings.walker">Walker</div>
+      <div class="panel-title" data-i18n="settings.walker">Human companion</div>
       <div id="char-toggle" class="lang-toggle">
         <button type="button" class="lang-btn char-btn" data-char="mei" data-i18n="settings.mei">
           Mei
@@ -874,7 +908,7 @@
         </button>
       </div>
 
-      <div class="panel-sub" data-i18n="settings.outfit">Outfit</div>
+      <div class="panel-sub" data-i18n="settings.outfit">Shared moment</div>
       <div id="outfit-toggle" class="lang-toggle outfit-toggle">
         <button
           type="button"
@@ -882,7 +916,7 @@
           data-outfit="scout"
           data-i18n="settings.outfit.scout"
         >
-          Scout
+          Field notes
         </button>
         <button
           type="button"
@@ -890,7 +924,7 @@
           data-outfit="pajama"
           data-i18n="settings.outfit.pajama"
         >
-          Pajama
+          Workshop AM
         </button>
         <button
           type="button"
@@ -898,7 +932,7 @@
           data-outfit="cape"
           data-i18n="settings.outfit.cape"
         >
-          Cape
+          Night walk
         </button>
         <button
           type="button"
@@ -906,7 +940,7 @@
           data-outfit="picnic"
           data-i18n="settings.outfit.picnic"
         >
-          Picnic
+          Slow Sunday
         </button>
         <button
           type="button"
@@ -914,7 +948,7 @@
           data-outfit="rain"
           data-i18n="settings.outfit.rain"
         >
-          Rain
+          Rain shelter
         </button>
       </div>
 

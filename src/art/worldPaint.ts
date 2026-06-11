@@ -408,6 +408,8 @@ export function paintWorld(
     [-10, -170, 8, GROUND.blotchB, 0.55], // star circle
     [-160, -145, 9, SAGE.mid, 0.3], // fern hollow (deeper green)
     [-185, -10, 9, '#e3ddc8', 0.55], // quarry floor
+    [-18, -26, 6, GROUND.blotchA, 0.5], // starter great tree (E3)
+    [22, 18, 5, '#e3ddc8', 0.5], // starter boulder (E3)
     [-65, -45, 7, GROUND.blotchA, 0.45], // hollow oak
     [-34, -70, 7, SAGE.light, 0.3], // swing tree clover
     [38, -64, 8, '#e8d8cb', 0.3], // bee meadow blossom ground

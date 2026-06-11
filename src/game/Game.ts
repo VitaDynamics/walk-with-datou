@@ -50,7 +50,7 @@ import { Minimap } from '../ui/Minimap';
 import { Cutout } from '../world/Cutout';
 import { LANDMARK_DEFS } from '../world/landmarks';
 import type { LandmarkInspection } from '../world/landmarks';
-import { SPOT_ANCHORS } from '../world/layout';
+import { MAJOR_PROPS, SPOT_ANCHORS, type MajorProp } from '../world/layout';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
@@ -102,6 +102,22 @@ const TRUST_FULL = 120;
 const COMFORT_MEMORY_SECONDS = 2.5;
 const GATHER_REACH = 1.9;
 const REACT_COOLDOWN = 6;
+
+/** Datou's in-character reaction to each curated landmark prop kind (E1). */
+const MAJOR_VERB: Record<MajorProp['kind'], string> = {
+  tree: 'sniff',
+  pine: 'sniff',
+  bush: 'rustle',
+  rock: 'hop',
+  stump: 'peer',
+  lamp: 'watch',
+  bench: 'watch',
+  signpost: 'watch',
+  jetty: 'watch',
+  picnic: 'watch',
+  bulletin: 'watch',
+  mushroom: 'peer',
+};
 /** The starter coffer sits just off the home pad, in easy first-walk reach. */
 const COFFER_POS = { x: -1.8, z: 4.0 } as const;
 
@@ -180,6 +196,8 @@ export class Game {
   private lastPointer: { x: number; y: number } | null = null;
   // Resource nodes & tools (W8).
   private readonly nodeState = new NodeState();
+  /** Countdown to Datou's next supply-sense gaze (E3). */
+  private nodeHintIn = 90;
   private readonly personality = new PersonalityModel();
   private readonly tools = new Tools();
   private readonly harvest: Harvest;
@@ -552,7 +570,7 @@ export class Game {
     requestAnimationFrame(this.tick);
   }
 
-  /** Live character swap (Mei/An) from ⚙ settings. */
+  /** Live human-companion swap (Mei/An) from settings. */
   setCharacter(char: CharId): void {
     this.humanRig.setCharacter(char);
   }
@@ -691,9 +709,10 @@ export class Game {
       return;
     }
 
-    // An interactable prop → Datou trots over and reacts.
+    // An interactable prop → name it, and Datou trots over and reacts.
     const prop = this.world.nearestInstance(p.x, p.z, 1.2, false);
     if (prop && kindDef(prop.kind).verb !== 'none' && !kindDef(prop.kind).pickable) {
+      this.showPropName(prop.kind, prop.seed);
       // A sudden tap right next to him startles before it intrigues.
       const ds = this.physics.getDatouState();
       if (Math.hypot(prop.x - ds.position.x, prop.z - ds.position.z) < 1.5) {
@@ -702,6 +721,20 @@ export class Game {
       }
       this.companion.investigate(prop.x, prop.z);
       this.pendingReaction = { verb: kindDef(prop.kind).verb, x: prop.x, z: prop.z };
+      return;
+    }
+
+    // A curated landmark prop (the hero cutouts) → same: name + reaction.
+    const major = this.majorPropNear(p.x, p.z);
+    if (major) {
+      this.showPropName(major.kind, major.seed);
+      const ds = this.physics.getDatouState();
+      if (Math.hypot(major.x - ds.position.x, major.z - ds.position.z) < 1.5) {
+        this.emotion.apply('startle');
+        this.say('startled');
+      }
+      this.companion.investigate(major.x, major.z);
+      this.pendingReaction = { verb: MAJOR_VERB[major.kind], x: major.x, z: major.z };
       return;
     }
 
@@ -1357,7 +1390,37 @@ export class Game {
       'clay-seam': 1.2,
       'flint-lode': 1.8,
       'bolt-cache': 2.4,
+      'reed-bed': 1.8,
+      'shell-bank': 1.1,
+      driftwood: 1.4,
     }[type];
+  }
+
+  /**
+   * Datou senses supply (E3): with the right tool clamped in, he now and then
+   * gazes toward the nearest workable node with charges left — navigation by
+   * companion, never by map marker.
+   */
+  private maybeHintNode(dt: number): void {
+    this.nodeHintIn -= dt;
+    if (this.nodeHintIn > 0) return;
+    this.nodeHintIn = 120;
+    if (this.companion.activeWant || this.harvest.active) return;
+    const eq = this.tools.equippedTool();
+    if (!eq) return;
+    let best: NodePlacement | null = null;
+    let bestD = 60;
+    for (const p of NODE_PLACEMENTS) {
+      const def = NODE_DEFS[p.type];
+      if (def.tool !== eq.kind || def.minTier > eq.tier) continue;
+      if (this.nodeState.charges(p.id) <= 0) continue;
+      const d = Math.hypot(p.x - this.player.x, p.z - this.player.z);
+      if (d >= 8 && d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    if (best) this.companion.promptCurious({ id: `node:${best.id}`, x: best.x, z: best.z });
   }
 
   private placeNodes(): void {
@@ -1479,21 +1542,43 @@ export class Game {
   }
 
   /** Tapped near a node: send Datou to work it with the equipped tool (§8.3). */
+  /** Name chip for a touched prop: kind name + a seeded observation (E1). */
+  private showPropName(kind: string, seed: number): void {
+    this.ui.showName(tDyn(`prop.${kind}`), tDyn(`obs.${kind}.${1 + (seed % 2)}`));
+  }
+
+  /** Nearest curated hero prop under a tap (they're big — generous radius). */
+  private majorPropNear(x: number, z: number): MajorProp | null {
+    let best: MajorProp | null = null;
+    let bestD = Infinity;
+    for (const m of MAJOR_PROPS) {
+      const r = Math.max(1.6, m.shadowRadius + 0.6);
+      const d = Math.hypot(m.x - x, m.z - z);
+      if (d <= r && d < bestD) {
+        bestD = d;
+        best = m;
+      }
+    }
+    return best;
+  }
+
   private tapNode(p: NodePlacement): void {
     if (this.harvest.active) {
       this.harvest.stop();
       return;
     }
     const def = NODE_DEFS[p.type];
+    const name = tDyn(`node.name.${p.type}`);
     const eq = this.tools.equippedTool();
     if (!eq || eq.kind !== def.tool || eq.tier < def.minTier) {
-      this.ui.toast(t('node.needTool'));
+      this.ui.showName(name, t('node.needTool'));
       return;
     }
     if (this.nodeState.charges(p.id) <= 0) {
-      this.ui.toast(t('node.spent'));
+      this.ui.showName(name, t('node.spent'));
       return;
     }
+    this.ui.showName(name, tDyn(`node.line.${p.type}`));
     if (this.leashOn) {
       this.leashOn = false;
       this.ui.setLeash(false);
@@ -1744,6 +1829,7 @@ export class Game {
     const playerMoving = Math.hypot(this.player.vx, this.player.vz) > 0.05;
     this.playerIdleS = playerMoving ? 0 : this.playerIdleS + dt;
     this.behaviors.update(dt);
+    this.maybeHintNode(dt);
 
     // Deferred gather: arrived next to the tapped pickable?
     if (this.pendingGather) {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { __tables, t } from './i18n';
-import { SPOT_ANCHORS } from './world/layout';
+import { MAJOR_PROPS, SPOT_ANCHORS } from './world/layout';
+import { KIND_DEFS } from './world/scatter';
+import { NODE_DEFS } from './game/workshop/nodes';
 import { BOND_UNLOCKS } from './game/Bond';
 
 const ART_KINDS = ['sprout', 'shiny', 'feather', 'mushroom', 'ladybug'] as const;
@@ -33,6 +35,22 @@ describe('i18n tables', () => {
     for (const u of BOND_UNLOCKS)
       expect(en[`milestone.${u.id}`], `milestone.${u.id}`).toBeDefined();
     for (const m of MOODS) expect(en[`mood.${m}`], `mood.${m}`).toBeDefined();
+  });
+
+  it('names every touchable prop and resource node (E1)', () => {
+    const en = __tables.UI.en as Record<string, string>;
+    const kinds = new Set<string>();
+    for (const k of KIND_DEFS) if (!k.pickable && k.verb !== 'none') kinds.add(k.kind);
+    for (const m of MAJOR_PROPS) kinds.add(m.kind);
+    for (const kind of kinds) {
+      expect(en[`prop.${kind}`], `prop.${kind}`).toBeDefined();
+      expect(en[`obs.${kind}.1`], `obs.${kind}.1`).toBeDefined();
+      expect(en[`obs.${kind}.2`], `obs.${kind}.2`).toBeDefined();
+    }
+    for (const type of Object.keys(NODE_DEFS)) {
+      expect(en[`node.name.${type}`], `node.name.${type}`).toBeDefined();
+      expect(en[`node.line.${type}`], `node.line.${type}`).toBeDefined();
+    }
   });
 
   it('interpolates {vars}', () => {

@@ -100,6 +100,9 @@ export class Console {
   private readonly landmarkInfoTitle = el<HTMLDivElement>('landmark-info-title');
   private readonly landmarkInfoBody = el<HTMLDivElement>('landmark-info-body');
   private readonly toastEl = el<HTMLDivElement>('toast');
+  private readonly nameChip = el<HTMLDivElement>('name-chip');
+  private readonly nameChipTitle = el<HTMLDivElement>('name-chip-title');
+  private readonly nameChipLine = el<HTMLDivElement>('name-chip-line');
   private readonly memoriesPanel = el<HTMLDivElement>('memories-panel');
   private readonly memoriesList = el<HTMLDivElement>('memories-list');
   private readonly packPanel = el<HTMLDivElement>('pack-panel');
@@ -117,6 +120,7 @@ export class Console {
   private mood: DatouMood = 'calm';
   private garlandWorn = false;
   private toastTimer: number | null = null;
+  private nameTimer: number | null = null;
   private hintDismissed = false;
   private currentLandmarkInfo: LandmarkInspection | null = null;
 
@@ -276,6 +280,22 @@ export class Console {
     this.landmarkInfoArea.textContent = tDyn(`landmark.${info.area}.arrive`);
     this.landmarkInfoTitle.textContent = tDyn(`landmark.inspect.${info.key}.name`);
     this.landmarkInfoBody.textContent = tDyn(`landmark.inspect.${info.key}.desc`);
+  }
+
+  /** Name what was touched (E1): one quiet two-line pill, one at a time. */
+  showName(title: string, line: string): void {
+    this.nameChipTitle.textContent = title;
+    this.nameChipLine.textContent = line;
+    this.nameChipLine.hidden = line === '';
+    this.nameChip.hidden = false;
+    this.nameChip.style.opacity = '1';
+    if (this.nameTimer !== null) window.clearTimeout(this.nameTimer);
+    this.nameTimer = window.setTimeout(() => {
+      this.nameChip.style.opacity = '0';
+      this.nameTimer = window.setTimeout(() => {
+        this.nameChip.hidden = true;
+      }, 400);
+    }, 2600);
   }
 
   toast(text: string): void {

@@ -13,7 +13,15 @@
 import type { ToolKind, ToolTier } from './tools';
 import type { MaterialId } from './materials';
 
-export type NodeType = 'great-tree' | 'old-boulder' | 'clay-seam' | 'flint-lode' | 'bolt-cache';
+export type NodeType =
+  | 'great-tree'
+  | 'old-boulder'
+  | 'clay-seam'
+  | 'flint-lode'
+  | 'bolt-cache'
+  | 'reed-bed'
+  | 'shell-bank'
+  | 'driftwood';
 
 export interface NodeDef {
   /** Tool kind required to work it. */
@@ -75,6 +83,37 @@ export const NODE_DEFS: Record<NodeType, NodeDef> = {
     charges: 7,
     regrowDays: 7,
   },
+  // The lake-rim trio (E3): gives shears and scoop their first real work.
+  'reed-bed': {
+    tool: 'shears',
+    minTier: 1,
+    yields: [
+      { material: 'reed', weight: 4 },
+      { material: 'grass-wisp', weight: 2 },
+    ],
+    charges: 10,
+    regrowDays: 2,
+  },
+  'shell-bank': {
+    tool: 'scoop',
+    minTier: 1,
+    yields: [
+      { material: 'shell', weight: 3 },
+      { material: 'pebble', weight: 2 },
+    ],
+    charges: 9,
+    regrowDays: 3,
+  },
+  driftwood: {
+    tool: 'axe',
+    minTier: 1,
+    yields: [
+      { material: 'driftwood', weight: 4 },
+      { material: 'bark', weight: 1 },
+    ],
+    charges: 9,
+    regrowDays: 3,
+  },
 };
 
 export interface NodePlacement {
@@ -96,6 +135,27 @@ export const NODE_PLACEMENTS: readonly NodePlacement[] = [
   { id: 'clay-lake-1', type: 'clay-seam', x: -10, z: 128 },
   { id: 'flint-ruin-1', type: 'flint-lode', x: 174, z: -150 },
   { id: 'bolt-corner-1', type: 'bolt-cache', x: 214, z: 196 },
+  // E3: the starter pair — visible from the home glade, minute-one teach.
+  { id: 'tree-home-1', type: 'great-tree', x: -18, z: -26 },
+  { id: 'boulder-home-1', type: 'old-boulder', x: 22, z: 18 },
+  // E3: the quarry — finally what the painted cart ruts lead to.
+  { id: 'boulder-quarry-1', type: 'old-boulder', x: -183, z: -7 },
+  { id: 'boulder-quarry-2', type: 'old-boulder', x: -190, z: -15 },
+  { id: 'flint-quarry-1', type: 'flint-lode', x: -179, z: -17 },
+  // E3: every zone gets a reachable bulk source.
+  { id: 'tree-woods-2', type: 'great-tree', x: -90, z: -140 },
+  { id: 'tree-trail-1', type: 'great-tree', x: 148, z: 12 },
+  { id: 'tree-meadow-2', type: 'great-tree', x: -118, z: 58 },
+  { id: 'boulder-trail-1', type: 'old-boulder', x: 104, z: -58 },
+  { id: 'clay-lake-2', type: 'clay-seam', x: 76, z: 134 },
+  { id: 'flint-woods-1', type: 'flint-lode', x: -152, z: -138 },
+  // E3: the lake-rim trio (shears / scoop / axe shoreline work).
+  { id: 'reed-bed-1', type: 'reed-bed', x: -25, z: 173 },
+  { id: 'reed-bed-2', type: 'reed-bed', x: 84, z: 150 },
+  { id: 'shell-bank-1', type: 'shell-bank', x: 30, z: 222 },
+  { id: 'shell-bank-2', type: 'shell-bank', x: -27, z: 150 },
+  { id: 'driftwood-1', type: 'driftwood', x: 96, z: 188 },
+  { id: 'driftwood-2', type: 'driftwood', x: 2, z: 216 },
 ];
 
 /** Harvest visual states by remaining-charge fraction (§8.1). */
