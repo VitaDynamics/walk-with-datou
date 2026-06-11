@@ -120,6 +120,8 @@ export interface LandmarksSave {
   areas: SavedArea[];
   /** The one scripted first-hook want toward the Commons fired already (§6). */
   firstHookDone: boolean;
+  /** The garden's donation socket holds the player's crafted planter (§7B). */
+  socketFilled?: boolean;
 }
 
 export const LANDMARKS_VERSION = 1;
@@ -128,6 +130,8 @@ export class LandmarkField {
   readonly areas: LandmarkArea[];
   /** Set once the scripted first want toward the Commons has played. */
   firstHookDone = false;
+  /** The garden donation socket holds the player's planter. */
+  socketFilled = false;
 
   constructor(defs: readonly LandmarkDef[] = LANDMARK_DEFS) {
     this.areas = defs.map((def) => ({ def, progress: 'unseen', cofferOpened: false }));
@@ -218,6 +222,7 @@ export class LandmarkField {
         cofferOpened: a.cofferOpened,
       })),
       firstHookDone: this.firstHookDone,
+      socketFilled: this.socketFilled,
     };
   }
 
@@ -236,5 +241,6 @@ export class LandmarkField {
       }
     }
     if (s.firstHookDone === true) this.firstHookDone = true;
+    if (s.socketFilled === true) this.socketFilled = true;
   }
 }

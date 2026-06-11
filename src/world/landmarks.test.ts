@@ -127,9 +127,15 @@ describe('LandmarkField', () => {
     f.openCoffer('repair-commons');
     f.arrive('pump-garden');
     f.firstHookDone = true;
+    f.socketFilled = true;
     const g = new LandmarkField();
     g.restore(JSON.parse(JSON.stringify(f.serialize())));
     expect(g.serialize()).toEqual(f.serialize());
+    expect(g.socketFilled).toBe(true);
+    // Older saves without the socket flag stay valid.
+    const h = new LandmarkField();
+    h.restore({ v: 1, areas: [], firstHookDone: false });
+    expect(h.socketFilled).toBe(false);
   });
 
   it('never re-grants a coffer across reloads (the §9 idempotence guard)', () => {

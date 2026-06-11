@@ -421,3 +421,713 @@ export function drawPumpNotice(seed: number): PropSprite {
   g.stroke();
   return { canvas: c, aspect: 160 / 192 };
 }
+
+// --- B. The Reedwater Pump Garden (accent: water-blue + curving lines) -------
+
+/**
+ * The pump wheel + sails — the garden's identity silhouette (~3.6 m): a
+ * crooked wheel on a timber frame with two water-blue cloth sails strung
+ * above the reed line. `running` bakes a thin water curve from the spout —
+ * the loop is alive again. No spin, no flutter: calm plates.
+ */
+export function drawPumpWheel(seed: number, running = false): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 576);
+  // Timber A-frame.
+  wobblyLine(g, rng, 120, 552, 168, 220, 13, CLAY.deep, 1.4, 5);
+  wobblyLine(g, rng, 230, 552, 178, 222, 13, CLAY.mid, 1.4, 5);
+  wobblyLine(g, rng, 134, 470, 218, 472, 8, CLAY.mid, 1.4, 4);
+  // The crooked wheel (slightly off-axis ellipse + spokes).
+  g.save();
+  g.translate(176, 200);
+  g.rotate(running ? 0.18 : -0.08);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 6;
+  g.beginPath();
+  g.ellipse(0, 0, 88, 80, 0.12, 0, Math.PI * 2);
+  g.stroke();
+  g.lineWidth = 4;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.26;
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(Math.cos(a) * 84, Math.sin(a) * 76);
+    g.stroke();
+  }
+  // Paddle cups on the rim.
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.26;
+    blob(g, rng, Math.cos(a) * 84, Math.sin(a) * 76, 13, 9, { fill: CLAY.light, outline: INK.line, lineWidth: 3 }, 7, 0.12);
+  }
+  g.restore();
+  // Hub.
+  blob(g, rng, 176, 200, 14, 14, { fill: ROBOT.dark, outline: INK.line, lineWidth: 4 }, 8, 0.06);
+  // Sail line swept to the right, two blue cloth sails (rectangles, calm).
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(176, 96);
+  g.quadraticCurveTo(280, 80, 352, 120);
+  g.stroke();
+  wobblyLine(g, rng, 176, 200, 176, 92, 7, CLAY.deep, 1.2, 4);
+  for (const [px, py, w, h] of [
+    [236, 116, 44, 56],
+    [316, 130, 38, 48],
+  ] as const) {
+    g.save();
+    g.translate(px, py);
+    g.rotate(0.06);
+    g.fillStyle = WATER.mid;
+    g.fillRect(-w / 2, 0, w, h);
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 3;
+    g.strokeRect(-w / 2, 0, w, h);
+    g.restore();
+  }
+  // Spout + (running) the thin water curve into a catch basin.
+  g.beginPath();
+  g.moveTo(96, 300);
+  g.lineTo(150, 286);
+  g.lineTo(150, 306);
+  g.lineTo(100, 318);
+  g.closePath();
+  g.fillStyle = CLAY.light;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.stroke();
+  if (running) {
+    g.strokeStyle = WATER.deep;
+    g.lineWidth = 5;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(102, 312);
+    g.quadraticCurveTo(86, 380, 92, 470);
+    g.stroke();
+    blob(g, rng, 92, 492, 30, 10, { fill: WATER.mid, outline: INK.soft, lineWidth: 3 }, 8, 0.15);
+  }
+  return { canvas: c, aspect: 384 / 576 };
+}
+
+/**
+ * A water channel piece on low trestles (~0.9 m). Three readable states:
+ * swung out of line and dry → reconnected (aligned) → carrying water (a blue
+ * line down the trough). The player's two taps put the loop back together.
+ */
+export function drawChannel(seed: number, connected: boolean, wet: boolean): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 224);
+  // Trestle legs.
+  wobblyLine(g, rng, 90, 210, 96, 130, 9, CLAY.deep, 1.4, 4);
+  wobblyLine(g, rng, 290, 210, 284, 130, 9, CLAY.mid, 1.4, 4);
+  // The trough — aligned when connected, swung when not.
+  g.save();
+  g.translate(192, 118);
+  g.rotate(connected ? -0.02 : 0.22);
+  g.beginPath();
+  g.moveTo(-160, -16);
+  g.lineTo(160, -10);
+  g.lineTo(154, 18);
+  g.lineTo(-154, 12);
+  g.closePath();
+  g.fillStyle = CLAY.light;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Inner trough line; water when wet.
+  g.strokeStyle = wet ? WATER.deep : CLAY.mid;
+  g.lineWidth = wet ? 8 : 4;
+  g.beginPath();
+  g.moveTo(-144, 0);
+  g.quadraticCurveTo(0, wet ? 6 : 2, 144, 2);
+  g.stroke();
+  g.restore();
+  if (!connected) {
+    // The dropped end rests on a stone — quietly wrong.
+    blob(g, rng, 320, 196, 22, 12, { fill: CLAY.pale, outline: INK.line, lineWidth: 3.5 }, 8, 0.12);
+  }
+  return { canvas: c, aspect: 384 / 224 };
+}
+
+/** A floating planter box among the reeds (~0.7 m): wilted grey paper plants,
+ *  or lifted and in color once the water loop runs. */
+export function drawFloatingPlanter(seed: number, lifted: boolean): PropSprite {
+  void seed; // stateless plate — both states are fully authored
+  const { c, g } = sprite(256, 224);
+  // Water line it sits in.
+  g.strokeStyle = WATER.mid;
+  g.lineWidth = 5;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(28, 196);
+  for (let x = 28; x <= 228; x += 25) g.quadraticCurveTo(x + 12, 190, x + 25, 196);
+  g.stroke();
+  // The box.
+  g.beginPath();
+  g.moveTo(60, 140);
+  g.lineTo(196, 140);
+  g.lineTo(188, 188);
+  g.lineTo(68, 188);
+  g.closePath();
+  g.fillStyle = CLAY.mid;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.stroke();
+  // Plants: wilted = drooping soft-ink strokes; lifted = upright + blossoms.
+  g.lineWidth = 4;
+  g.lineCap = 'round';
+  if (!lifted) {
+    g.strokeStyle = SAGE.mid;
+    for (const [x, lean] of [
+      [92, -30],
+      [128, 26],
+      [164, -24],
+    ] as const) {
+      g.beginPath();
+      g.moveTo(x, 140);
+      g.quadraticCurveTo(x + lean * 0.3, 108, x + lean, 122);
+      g.stroke();
+    }
+  } else {
+    g.strokeStyle = SAGE.deep;
+    for (const [x, lean] of [
+      [92, -8],
+      [128, 4],
+      [164, -5],
+    ] as const) {
+      g.beginPath();
+      g.moveTo(x, 140);
+      g.quadraticCurveTo(x + lean, 96, x + lean * 1.4, 72);
+      g.stroke();
+      g.fillStyle = CLAY.blossom;
+      g.beginPath();
+      g.arc(x + lean * 1.4, 68, 7, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK.soft;
+      g.lineWidth = 2;
+      g.stroke();
+      g.strokeStyle = SAGE.deep;
+      g.lineWidth = 4;
+    }
+  }
+  return { canvas: c, aspect: 256 / 224 };
+}
+
+/** The garden's donation socket (~0.6 m): an empty planter frame waiting at
+ *  the water's edge — `filled` shows the player's planter settled in. */
+export function drawPlanterSocket(seed: number, filled: boolean): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(224, 192);
+  // The frame: four corner posts + rails outlining an empty bed.
+  for (const [x, y] of [
+    [56, 160],
+    [168, 160],
+    [48, 178],
+    [176, 178],
+  ] as const) {
+    wobblyLine(g, rng, x, y, x + 2, y - 38, 7, CLAY.deep, 1.3, 3);
+  }
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.strokeRect(44, 130, 136, 44);
+  if (!filled) {
+    // Empty: a faint dashed waiting outline inside.
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.setLineDash([6, 5]);
+    g.strokeRect(58, 138, 108, 28);
+    g.setLineDash([]);
+  } else {
+    // The player's planter sits inside, plants up.
+    g.fillStyle = CLAY.light;
+    g.fillRect(54, 134, 116, 36);
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.strokeRect(54, 134, 116, 36);
+    g.strokeStyle = SAGE.deep;
+    g.lineWidth = 3.5;
+    g.lineCap = 'round';
+    for (const x of [84, 112, 140] as const) {
+      g.beginPath();
+      g.moveTo(x, 134);
+      g.quadraticCurveTo(x + 4, 104, x + 2, 88);
+      g.stroke();
+      g.fillStyle = CLAY.blossom;
+      g.beginPath();
+      g.arc(x + 2, 84, 5.5, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  return { canvas: c, aspect: 224 / 192 };
+}
+
+/** The blue-lidded planter tool chest (garden coffer). */
+export function drawBlueCoffer(seed: number, open = false): PropSprite {
+  void seed; // stateless plate
+  const { c, g } = sprite(256, 224);
+  const baseY = 196;
+  // Body.
+  g.beginPath();
+  g.moveTo(50, 122);
+  g.lineTo(56, baseY);
+  g.lineTo(200, baseY);
+  g.lineTo(206, 122);
+  g.closePath();
+  g.fillStyle = CLAY.pale;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Rope handle.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 4;
+  g.beginPath();
+  g.arc(128, 168, 16, 0.2, Math.PI - 0.2);
+  g.stroke();
+  if (!open) {
+    // Water-blue lid.
+    g.beginPath();
+    g.moveTo(46, 124);
+    g.quadraticCurveTo(128, 76, 210, 124);
+    g.lineTo(206, 134);
+    g.quadraticCurveTo(128, 90, 50, 134);
+    g.closePath();
+    g.fillStyle = WATER.mid;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 5;
+    g.stroke();
+    // Two catches (the player releases them).
+    for (const x of [86, 170] as const) {
+      g.fillStyle = ROBOT.dark;
+      g.fillRect(x - 5, 124, 10, 12);
+      g.strokeStyle = INK.line;
+      g.lineWidth = 2.5;
+      g.strokeRect(x - 5, 124, 10, 12);
+    }
+  } else {
+    // Open mouth + tipped blue lid + a rolled sketch.
+    g.beginPath();
+    g.ellipse(128, 120, 76, 17, 0, 0, Math.PI * 2);
+    g.fillStyle = CLAY.deep;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.stroke();
+    g.beginPath();
+    g.moveTo(56, 112);
+    g.quadraticCurveTo(118, 46, 196, 62);
+    g.quadraticCurveTo(152, 78, 94, 116);
+    g.closePath();
+    g.fillStyle = WATER.mid;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 5;
+    g.stroke();
+    g.save();
+    g.translate(134, 106);
+    g.rotate(-0.18);
+    g.fillStyle = '#fbf7ec';
+    g.fillRect(-20, -9, 40, 18);
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.strokeRect(-20, -9, 40, 18);
+    g.restore();
+  }
+  return { canvas: c, aspect: 256 / 224 };
+}
+
+/** A painted irrigation stake with a blue band (~0.5 m) — the garden's
+ *  approach breadcrumb (the ribbon scraps "become hose and stakes"). */
+export function drawBlueStake(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(96, 160);
+  wobblyLine(g, rng, 48, 150, 50 + (rng.next() * 6 - 3), 36, 9, CLAY.light, 1.3, 4);
+  // The blue band near the top.
+  g.fillStyle = WATER.mid;
+  g.fillRect(38, 48, 22, 16);
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  g.strokeRect(38, 48, 22, 16);
+  // A short length of hose coiled at the foot.
+  g.strokeStyle = WATER.deep;
+  g.lineWidth = 4;
+  g.beginPath();
+  g.ellipse(48, 146, 24, 8, 0, 0, Math.PI * 2);
+  g.stroke();
+  return { canvas: c, aspect: 96 / 160 };
+}
+
+/** The stamped relay tag (~0.35 m) that does not belong at the lake — the
+ *  garden's clue toward the camp: pine needles + a charcoal triangle mark. */
+export function drawRelayTag(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 128);
+  // A few pine needles.
+  g.strokeStyle = SAGE.shade;
+  g.lineWidth = 2.5;
+  g.lineCap = 'round';
+  for (let i = 0; i < 5; i++) {
+    const a = -0.4 + rng.next() * 0.8;
+    g.beginPath();
+    g.moveTo(40 + i * 10, 112);
+    g.lineTo(40 + i * 10 + Math.sin(a) * 26, 86 + Math.cos(a) * 6);
+    g.stroke();
+  }
+  // The tag.
+  g.save();
+  g.translate(64, 70);
+  g.rotate(0.12);
+  g.fillStyle = CLAY.pale;
+  g.fillRect(-26, -18, 52, 36);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.strokeRect(-26, -18, 52, 36);
+  // The stamped triangle (charcoal — the camp's mark).
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 3.5;
+  g.beginPath();
+  g.moveTo(0, -9);
+  g.lineTo(11, 9);
+  g.lineTo(-11, 9);
+  g.closePath();
+  g.stroke();
+  g.restore();
+  // Tie string.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(40, 58);
+  g.quadraticCurveTo(28, 48, 30, 36);
+  g.stroke();
+  return { canvas: c, aspect: 1 };
+}
+
+// --- C. The Old Pine Relay Camp (accent: charcoal + triangles) ---------------
+
+/**
+ * The relay mast (~7.5 m): a narrow charcoal lattice mast with three offset
+ * triangular vanes breaking the tree line. `awake` bakes one soft amber
+ * breath dot at the crown and a faint warm wash — the slow 4–6 s breathing is
+ * parallax through the pines, never a blink.
+ */
+export function drawRelayMast(seed: number, awake = false): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(256, 960);
+  const cx = 128;
+  // Lattice: two rails + cross ties.
+  wobblyLine(g, rng, cx - 14, 936, cx - 8, 72, 8, ROBOT.dark, 1.1, 6);
+  wobblyLine(g, rng, cx + 14, 936, cx + 8, 72, 8, ROBOT.darkShade, 1.1, 6);
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 4;
+  for (let y = 880; y > 100; y -= 64) {
+    g.beginPath();
+    g.moveTo(cx - 13, y);
+    g.lineTo(cx + 13, y - 30);
+    g.stroke();
+  }
+  // Three offset triangular vanes (the silhouette signature).
+  const vanes: Array<[number, number, number]> = [
+    [cx + 34, 180, 0.15],
+    [cx - 36, 300, -0.25],
+    [cx + 30, 430, 0.45],
+  ];
+  for (const [vx, vy, rot] of vanes) {
+    g.save();
+    g.translate(vx, vy);
+    g.rotate(rot);
+    g.beginPath();
+    g.moveTo(0, -26);
+    g.lineTo(30, 16);
+    g.lineTo(-30, 16);
+    g.closePath();
+    g.fillStyle = awake ? ROBOT.dark : ROBOT.darkShade;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.lineJoin = 'round';
+    g.stroke();
+    g.restore();
+    // Strut back to the mast.
+    g.strokeStyle = ROBOT.dark;
+    g.lineWidth = 3.5;
+    g.beginPath();
+    g.moveTo(vx, vy + 8);
+    g.lineTo(cx, vy + 34);
+    g.stroke();
+  }
+  // Crown: the breath lamp.
+  if (awake) {
+    const halo = g.createRadialGradient(cx, 60, 4, cx, 60, 64);
+    halo.addColorStop(0, LAMP_WARM);
+    halo.addColorStop(1, 'rgba(233, 196, 124, 0)');
+    g.fillStyle = halo;
+    g.fillRect(cx - 64, 0, 128, 128);
+  }
+  g.fillStyle = awake ? '#f2d9a0' : ROBOT.darkShade;
+  g.beginPath();
+  g.arc(cx, 60, 9, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.stroke();
+  // Guy rope.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(cx + 10, 150);
+  g.lineTo(cx + 86, 930);
+  g.stroke();
+  return { canvas: c, aspect: 256 / 960 };
+}
+
+/** A signal vane on a tripod (~1.3 m) — one of the two the player turns.
+ *  `pos` is its bearing (0–2): the triangle pointer rotates between plates. */
+export function drawSignalVane(seed: number, pos: 0 | 1 | 2): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 288);
+  // Tripod.
+  wobblyLine(g, rng, 96, 130, 64, 272, 7, ROBOT.dark, 1.2, 4);
+  wobblyLine(g, rng, 96, 130, 128, 272, 7, ROBOT.darkShade, 1.2, 4);
+  wobblyLine(g, rng, 96, 134, 96, 262, 6, ROBOT.dark, 1.2, 4);
+  // Bearing plate with three notch ticks.
+  blob(g, rng, 96, 128, 26, 10, { fill: CLAY.light, outline: INK.line, lineWidth: 3.5 }, 8, 0.08);
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  for (const a of [-0.7, 0, 0.7] as const) {
+    g.beginPath();
+    g.moveTo(96 + Math.sin(a) * 20, 124 - Math.cos(a) * 6);
+    g.lineTo(96 + Math.sin(a) * 28, 124 - Math.cos(a) * 10);
+    g.stroke();
+  }
+  // The triangle pointer at the chosen bearing.
+  const rot = (pos - 1) * 0.7;
+  g.save();
+  g.translate(96, 92);
+  g.rotate(rot);
+  g.beginPath();
+  g.moveTo(0, -42);
+  g.lineTo(24, 10);
+  g.lineTo(-24, 10);
+  g.closePath();
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.lineJoin = 'round';
+  g.stroke();
+  g.restore();
+  return { canvas: c, aspect: 192 / 288 };
+}
+
+/** The camp's tool shelter (~2 m): a charcoal-roofed lean shelter with a
+ *  triangle pediment mark — quiet, weathered, kept. */
+export function drawToolShelter(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(448, 384);
+  // Posts.
+  wobblyLine(g, rng, 96, 364, 94, 150, 12, CLAY.deep, 1.4, 5);
+  wobblyLine(g, rng, 352, 364, 356, 150, 12, CLAY.mid, 1.4, 5);
+  // Charcoal roof slab.
+  g.beginPath();
+  g.moveTo(56, 156);
+  g.lineTo(392, 156);
+  g.lineTo(366, 96);
+  g.lineTo(82, 96);
+  g.closePath();
+  g.fillStyle = ROBOT.dark;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // The pediment triangle mark.
+  g.strokeStyle = CLAY.pale;
+  g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(224, 108);
+  g.lineTo(238, 134);
+  g.lineTo(210, 134);
+  g.closePath();
+  g.stroke();
+  // A shelf of resting tools.
+  g.beginPath();
+  g.moveTo(120, 268);
+  g.lineTo(330, 272);
+  g.lineTo(328, 290);
+  g.lineTo(122, 286);
+  g.closePath();
+  g.fillStyle = CLAY.light;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.stroke();
+  for (const [x, h] of [
+    [160, 44],
+    [206, 36],
+    [262, 50],
+  ] as const) {
+    wobblyLine(g, rng, x, 268, x + 3, 268 - h, 6, CLAY.deep, 1.2, 3);
+  }
+  return { canvas: c, aspect: 448 / 384 };
+}
+
+/** A wound cable spool (~1 m) resting by the camp. */
+export function drawCableSpool(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(224, 224);
+  // Two flanges + the wound middle.
+  for (const x of [70, 154] as const) {
+    g.beginPath();
+    g.ellipse(x, 140, 22, 58, 0, 0, Math.PI * 2);
+    g.fillStyle = CLAY.light;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4.5;
+    g.stroke();
+  }
+  g.fillStyle = ROBOT.darkShade;
+  g.fillRect(70, 96, 84, 88);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  g.strokeRect(70, 96, 84, 88);
+  // Cable wraps.
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 3.5;
+  for (let i = 0; i < 5; i++) {
+    g.beginPath();
+    g.moveTo(72, 104 + i * 16);
+    g.lineTo(152, 108 + i * 16);
+    g.stroke();
+  }
+  // A loose end trailing to the ground.
+  g.beginPath();
+  g.moveTo(152, 180);
+  g.quadraticCurveTo(196, 196, 206, 212);
+  g.stroke();
+  blob(g, rng, 110, 206, 56, 9, { fill: CLAY.pale, outline: INK.soft, lineWidth: 2.5 }, 8, 0.12);
+  return { canvas: c, aspect: 1 };
+}
+
+/** The relay field case (~0.55 m): a narrow manufactured metal case in the
+ *  pine hollow — it only reads as out-of-place once you're close. */
+export function drawFieldCase(seed: number, open = false): PropSprite {
+  void seed; // stateless plate
+  const { c, g } = sprite(256, 176);
+  if (!open) {
+    // Closed: a slim ribbed case with two latches and a stenciled triangle.
+    g.beginPath();
+    g.moveTo(40, 92);
+    g.lineTo(216, 92);
+    g.lineTo(212, 152);
+    g.lineTo(44, 152);
+    g.closePath();
+    g.fillStyle = ROBOT.dark;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4.5;
+    g.lineJoin = 'round';
+    g.stroke();
+    g.strokeStyle = ROBOT.darkShade;
+    g.lineWidth = 3;
+    for (const x of [80, 128, 176] as const) {
+      g.beginPath();
+      g.moveTo(x, 96);
+      g.lineTo(x, 148);
+      g.stroke();
+    }
+    for (const x of [104, 152] as const) {
+      g.fillStyle = CLAY.pale;
+      g.fillRect(x - 6, 88, 12, 10);
+      g.strokeStyle = INK.line;
+      g.lineWidth = 2.5;
+      g.strokeRect(x - 6, 88, 12, 10);
+    }
+    g.strokeStyle = CLAY.pale;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(128, 112);
+    g.lineTo(138, 130);
+    g.lineTo(118, 130);
+    g.closePath();
+    g.stroke();
+  } else {
+    // Open: lid up, a soft warm interior, the fragment with the strange mark.
+    g.beginPath();
+    g.moveTo(44, 96);
+    g.lineTo(212, 96);
+    g.lineTo(208, 152);
+    g.lineTo(48, 152);
+    g.closePath();
+    g.fillStyle = ROBOT.dark;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4.5;
+    g.stroke();
+    // Lid hinged up and back.
+    g.beginPath();
+    g.moveTo(52, 94);
+    g.lineTo(96, 34);
+    g.lineTo(224, 40);
+    g.lineTo(204, 94);
+    g.closePath();
+    g.fillStyle = ROBOT.darkShade;
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.lineJoin = 'round';
+    g.stroke();
+    const halo = g.createRadialGradient(128, 96, 4, 128, 96, 54);
+    halo.addColorStop(0, LAMP_WARM);
+    halo.addColorStop(1, 'rgba(233, 196, 124, 0)');
+    g.fillStyle = halo;
+    g.fillRect(64, 56, 128, 72);
+    // The fragment: a pale shard with an unfamiliar ring-and-notch mark.
+    g.save();
+    g.translate(128, 112);
+    g.rotate(-0.1);
+    g.fillStyle = CLAY.pale;
+    g.fillRect(-24, -12, 48, 24);
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.strokeRect(-24, -12, 48, 24);
+    g.strokeStyle = ROBOT.dark;
+    g.beginPath();
+    g.arc(0, 0, 7, 0.6, Math.PI * 2);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(5, -5);
+    g.lineTo(10, -10);
+    g.stroke();
+    g.restore();
+  }
+  return { canvas: c, aspect: 256 / 176 };
+}
+
+/** A triangular waymark (~0.3 m) — charcoal triangles on pale chips winding
+ *  the route into the camp (the approach breadcrumb). */
+export function drawTriangleMark(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(96, 96);
+  // The chip it's painted on.
+  blob(g, rng, 48, 66, 26, 14, { fill: CLAY.pale, outline: INK.soft, lineWidth: 2.5 }, 8, 0.14);
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 3.5;
+  g.lineJoin = 'round';
+  const rot = (rng.next() - 0.5) * 0.5;
+  g.save();
+  g.translate(48, 62);
+  g.rotate(rot);
+  g.beginPath();
+  g.moveTo(0, -11);
+  g.lineTo(10, 8);
+  g.lineTo(-10, 8);
+  g.closePath();
+  g.stroke();
+  g.restore();
+  return { canvas: c, aspect: 1 };
+}

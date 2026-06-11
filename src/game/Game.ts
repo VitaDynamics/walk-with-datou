@@ -230,7 +230,11 @@ export class Game {
     if (lmQa === 'arrived' || lmQa === 'completed') {
       this.saveJson('wwd.landmarks', {
         v: 1,
-        areas: [{ id: 'repair-commons', progress: lmQa, cofferOpened: lmQa === 'completed' }],
+        areas: (['repair-commons', 'pump-garden', 'relay-camp'] as const).map((id) => ({
+          id,
+          progress: lmQa,
+          cofferOpened: lmQa === 'completed',
+        })),
         firstHookDone: true,
       });
     }
@@ -450,6 +454,12 @@ export class Game {
 
     // Placement mode: the next ground tap drops the made item into the world.
     if (this.placingItem) {
+      // A planter tapped onto the garden's donation socket installs there (§7B).
+      const form = parseItemId(this.placingItem)?.form;
+      if (form && this.landmarks.tryDonate(p.x, p.z, form)) {
+        this.placingItem = null;
+        return;
+      }
       this.placeWorkshopItem(this.placingItem, p.x, p.z, true);
       this.placingItem = null;
       return;
