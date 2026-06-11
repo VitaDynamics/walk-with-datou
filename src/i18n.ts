@@ -24,8 +24,7 @@ const UI = {
     'console.pack': 'Backpack',
     'console.memories': 'Memories',
     'console.foundToday': 'Found today · {n}/{total}',
-    'hint.firstSteps':
-      'WASD / tap to walk · tap Datou to pet, hold to soothe · tap small plants to gather',
+    'hint.firstSteps': 'WASD / tap to walk · tap Datou to pet, hold to soothe · tap small plants to gather',
     'pack.title': 'Backpack',
     'pack.empty': 'Nothing gathered yet — tap twigs, pebbles and flowers as you walk.',
     'use.throw': 'Throw',
@@ -117,6 +116,11 @@ const UI = {
     'name.order': '{size} {material} {form}',
     'name.sizeAdj.S': 'little',
     'name.sizeAdj.L': 'tall',
+    'rarity.common': 'Common',
+    'rarity.uncommon': 'Uncommon',
+    'rarity.rare': 'Rare',
+    'rarity.epic': 'Epic',
+    'rarity.legendary': 'Legendary',
     // --- The Workshop (BUILDING_SYSTEM §6) -------------------------------
     'console.workshop': 'Workshop',
     'workshop.title': 'Workshop',
@@ -566,6 +570,11 @@ const UI = {
     'name.order': '{size}{material}{form}',
     'name.sizeAdj.S': '小',
     'name.sizeAdj.L': '高',
+    'rarity.common': '普通',
+    'rarity.uncommon': '优秀',
+    'rarity.rare': '稀有',
+    'rarity.epic': '史诗',
+    'rarity.legendary': '传说',
     // --- The Workshop (BUILDING_SYSTEM §6) -------------------------------
     'console.workshop': '工坊',
     'workshop.title': '工坊',
@@ -944,8 +953,7 @@ export function setLang(lang: Lang): void {
   } catch {
     // Ignore persistence failures.
   }
-  if (typeof document !== 'undefined')
-    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  if (typeof document !== 'undefined') document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   for (const fn of listeners) fn(lang);
 }
 

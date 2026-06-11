@@ -20,7 +20,15 @@
  */
 
 import { tDyn } from '../../i18n';
-import { FORMS, FORM_IDS, form as formDef, type FormId, type Size, type Finish } from './forms';
+import {
+  FORMS,
+  FORM_IDS,
+  form as formDef,
+  type FormId,
+  type Size,
+  type Finish,
+  type ItemRarity,
+} from './forms';
 import { MATERIALS, type MaterialId } from './materials';
 
 export interface ItemSpec {
@@ -111,6 +119,24 @@ export function itemCount(): number {
 
 // --- Names (§2.3): composed, never tabled ------------------------------------
 
+/** Localized authored name, or a readable generated name for catalog forms. */
+export function formName(form: FormId): string {
+  const key = `form.${form}`;
+  const translated = tDyn(key);
+  if (translated !== key) return translated;
+  return form.replaceAll('-', ' ');
+}
+
+/** Localized rarity label. */
+export function rarityName(rarity: ItemRarity): string {
+  return tDyn(`rarity.${rarity}`);
+}
+
+/** Rarity is owned by the form and shared by all of its material variants. */
+export function rarityFor(form: FormId): ItemRarity {
+  return formDef(form).rarity;
+}
+
 /**
  * Display name = material + form, with a size adjective for S/L (M is the
  * unmarked base). All three fragments come from the i18n table by *id*, so two
@@ -122,7 +148,7 @@ export function itemCount(): number {
  */
 export function itemName(spec: ItemSpec): string {
   const material = tDyn(`material.${spec.material}`);
-  const form = tDyn(`form.${spec.form}`);
+  const form = formName(spec.form);
   const sizeAdj = spec.size === 'M' ? '' : tDyn(`name.sizeAdj.${spec.size}`);
   // `name.order` is a localized template with {size} {material} {form} slots;
   // empty {size} collapses cleanly (the template trims doubled separators).

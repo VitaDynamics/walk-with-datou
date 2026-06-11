@@ -8,12 +8,21 @@
  * swatches = an arrangement.
  */
 
-import { t, tDyn } from '../i18n';
+import { t } from '../i18n';
 import { CLAY, SAGE, ROBOT, WATER } from '../art/palette';
 import type { MaterialGroup } from '../game/workshop/materials';
 import { patternForForm, patternRecipe } from '../game/workshop/patterns';
 import { itemSpriteUrl, cachedItemSpriteUrl } from '../game/workshop/sprites';
-import { materialsAcceptedBy, sizesFor, finishesFor, itemId, type ItemId } from '../game/workshop/items';
+import {
+  materialsAcceptedBy,
+  sizesFor,
+  finishesFor,
+  itemId,
+  formName,
+  rarityFor,
+  rarityName,
+  type ItemId,
+} from '../game/workshop/items';
 import type { FormId } from '../game/workshop/forms';
 
 /** A small color swatch per material group (representative palette tone). */
@@ -74,9 +83,15 @@ export function recipeCard(form: FormId, cb: RecipeCardCallbacks): HTMLDivElemen
   img.src = cachedItemSpriteUrl(id) ?? itemSpriteUrl(id);
   img.alt = '';
   plate.append(img);
+  const title = div('ws-recipe-title');
   const name = div('ws-recipe-name');
-  name.textContent = tDyn(`form.${form}`);
-  head.append(plate, name);
+  name.textContent = formName(form);
+  const rarity = div('ws-recipe-rarity');
+  const level = rarityFor(form);
+  rarity.dataset.rarity = level;
+  rarity.textContent = rarityName(level);
+  title.append(name, rarity);
+  head.append(plate, title);
   card.append(head);
 
   const pat = patternForForm(form);

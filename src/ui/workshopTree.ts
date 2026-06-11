@@ -9,36 +9,18 @@
  * from what you've made.
  */
 
-import { t, tDyn } from '../i18n';
+import { t } from '../i18n';
 import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { FORM_IDS, FORMS, type FormFamily, type FormId } from '../game/workshop/forms';
-import {
-  materialsAcceptedBy,
-  parseItemId,
-  isValid,
-  sizesFor,
-  finishesFor,
-  itemId,
-  type ItemId,
-} from '../game/workshop/items';
+import { materialsAcceptedBy, parseItemId, isValid, sizesFor, finishesFor, itemId, formName, rarityFor, rarityName, type ItemId } from '../game/workshop/items';
 import { cachedItemSpriteUrl, itemSpriteUrl } from '../game/workshop/sprites';
 import { EXACT_PATTERNS } from '../game/workshop/patterns';
 import { canonical } from '../game/workshop/pattern';
 import { recipeCard, type RecipeCardCallbacks } from './workshopRecipe';
 
 const FAMILY_ORDER: FormFamily[] = ['component', 'furnishing', 'structure', 'datou', 'keepsake', 'tool'];
-const FORMS_BY_FAMILY = new Map(
-  FAMILY_ORDER.map((family) => [
-    family,
-    FORM_IDS.filter((id) => FORMS[id].family === family),
-  ]),
-);
-const VARIANT_COUNTS = new Map(
-  FORM_IDS.map((form) => [
-    form,
-    materialsAcceptedBy(form).length * sizesFor(form).length * finishesFor(form).length,
-  ]),
-);
+const FORMS_BY_FAMILY = new Map(FAMILY_ORDER.map((family) => [family, FORM_IDS.filter((id) => FORMS[id].family === family)]));
+const VARIANT_COUNTS = new Map(FORM_IDS.map((form) => [form, materialsAcceptedBy(form).length * sizesFor(form).length * finishesFor(form).length]));
 const REPRESENTATIVE_ITEMS = new Map(
   FORM_IDS.map((form) => {
     const material = materialsAcceptedBy(form)[0];
@@ -53,15 +35,7 @@ const REPRESENTATIVE_ITEMS = new Map(
     ];
   }),
 );
-const FAMILY_VARIANT_COUNTS = new Map(
-  FAMILY_ORDER.map((family) => [
-    family,
-    (FORMS_BY_FAMILY.get(family) ?? []).reduce(
-      (total, form) => total + (VARIANT_COUNTS.get(form) ?? 0),
-      0,
-    ),
-  ]),
-);
+const FAMILY_VARIANT_COUNTS = new Map(FAMILY_ORDER.map((family) => [family, (FORMS_BY_FAMILY.get(family) ?? []).reduce((total, form) => total + (VARIANT_COUNTS.get(form) ?? 0), 0)]));
 
 function div(cls: string): HTMLDivElement {
   const d = document.createElement('div');
@@ -73,7 +47,7 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
   const wrap = div('ws-tree');
   const madeByForm = groupMadeItems(state.madeIds());
   const hinted = hintedForms(state);
-  const taughtTiers = taughtFamilyTiers(madeByForm);
+  const taught = taughtNeighborForms(madeByForm);
   const pendingSprites: Array<{ img: HTMLImageElement; id: ItemId }> = [];
   let openPop: HTMLDivElement | null = null;
   const closePop = (): void => {
@@ -106,7 +80,7 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
       // Show a form node if you've made any variant, OR it's hinted/neighbor-
       // taught. Otherwise it stays in the branch's "still to find" count.
       // God mode reveals the whole tree so anything can be conjured.
-      if (!recipeCb?.god && made.length === 0 && !isHinted && !taughtTiers.has(familyTier(form))) continue;
+      if (!recipeCb?.god && made.length === 0 && !isHinted && !taught.has(form)) continue;
       const node = div('ws-node');
       const plate = div('ws-node-plate');
       const img = document.createElement('img');
@@ -118,12 +92,16 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
       plate.append(img);
       const name = div('ws-node-name');
       if (made.length > 0) {
-        name.textContent = tDyn(`form.${form}`);
+        name.textContent = formName(form);
       } else {
         node.classList.add('silhouette');
-        name.textContent = tDyn(`form.${form}`);
+        name.textContent = formName(form);
       }
-      node.append(plate, name);
+      const rarity = div('ws-node-rarity');
+      const level = rarityFor(form);
+      rarity.dataset.rarity = level;
+      rarity.textContent = rarityName(level);
+      node.append(plate, name, rarity);
       // Click a node → toggle a recipe popover. The popover is fixed-positioned
       // in the viewport (not nested in the scroll container) and clamped on-
       // screen, so edge/bottom nodes never spill out or get clipped.
@@ -198,20 +176,22 @@ function groupMadeItems(ids: ItemId[]): Map<FormId, ItemId[]> {
   return grouped;
 }
 
-function taughtFamilyTiers(madeByForm: ReadonlyMap<FormId, readonly ItemId[]>): Set<string> {
-  const taught = new Set<string>();
-  for (const form of madeByForm.keys()) taught.add(familyTier(form));
+function taughtNeighborForms(madeByForm: ReadonlyMap<FormId, readonly ItemId[]>): Set<FormId> {
+  const taught = new Set<FormId>();
+  for (const made of madeByForm.keys()) {
+    const siblings = FORMS_BY_FAMILY.get(FORMS[made].family) ?? [];
+    const center = siblings.indexOf(made);
+    const first = Math.max(0, center - 2);
+    const last = Math.min(siblings.length - 1, center + 2);
+    for (let i = first; i <= last; i++) {
+      const candidate = siblings[i];
+      if (FORMS[candidate].tier === FORMS[made].tier) taught.add(candidate);
+    }
+  }
   return taught;
 }
 
-function familyTier(form: FormId): string {
-  return `${FORMS[form].family}:${FORMS[form].tier}`;
-}
-
-function hydrateSprites(
-  wrap: HTMLDivElement,
-  pending: Array<{ img: HTMLImageElement; id: ItemId }>,
-): void {
+function hydrateSprites(wrap: HTMLDivElement, pending: Array<{ img: HTMLImageElement; id: ItemId }>): void {
   if (pending.length === 0) return;
   let cursor = 0;
   const next = (): void => {

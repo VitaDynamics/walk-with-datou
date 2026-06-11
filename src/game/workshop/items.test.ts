@@ -3,15 +3,18 @@ import {
   allItemIds,
   accepts,
   finishesFor,
+  formName,
   isValid,
   itemCount,
   itemId,
   itemName,
   materialsAcceptedBy,
   parseItemId,
+  rarityFor,
   sizesFor,
 } from './items';
-import { FORMS, FORM_IDS, type Form, type FormId } from './forms';
+import { FORMS, FORM_IDS, ITEM_RARITIES, type Form, type FormId } from './forms';
+import { CATALOG_FORMS } from './formCatalog';
 import { MATERIALS, MATERIAL_IDS, materialsInGroup } from './materials';
 import { setLang } from '../../i18n';
 
@@ -42,6 +45,11 @@ describe('Workshop materials', () => {
 });
 
 describe('Workshop forms', () => {
+  it('offers at least 500 distinct forms', () => {
+    expect(FORM_IDS.length).toBeGreaterThanOrEqual(500);
+    expect(Object.keys(CATALOG_FORMS)).toHaveLength(450);
+  });
+
   it('every form accepts at least one group and has a valid tier', () => {
     for (const id of FORM_IDS) {
       const f = FORMS[id];
@@ -53,6 +61,53 @@ describe('Workshop forms', () => {
   it('every form has at least one eligible material', () => {
     for (const id of FORM_IDS) {
       expect(materialsAcceptedBy(id).length, id).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives every form a complete visual identity card', () => {
+    const fingerprints = new Set<string>();
+    for (const id of FORM_IDS) {
+      const identity = FORMS[id].identity;
+      expect(identity.name.length, id).toBeGreaterThan(2);
+      expect(identity.functionalCue.length, id).toBeGreaterThan(20);
+      expect(identity.signatureFeatures, id).toHaveLength(3);
+      expect(identity.duplicateGroup.length, id).toBeGreaterThan(2);
+      const fingerprint = JSON.stringify(identity);
+      expect(fingerprints.has(fingerprint), `duplicate identity: ${id}`).toBe(false);
+      fingerprints.add(fingerprint);
+    }
+  });
+
+  it('does not treat style, rarity, or condition adjectives as separate forms', () => {
+    const retired = [
+      'simple-chair',
+      'rustic-chair',
+      'painted-chair',
+      'moonlit-chair',
+      'heirloom-chair',
+      'rough-wall-section',
+      'clockwork-wall-section',
+      'ancient-cabin',
+      'starlit-windmill',
+      'masterwork-hammer',
+    ];
+    for (const id of retired) expect(FORM_IDS).not.toContain(id);
+  });
+
+  it('assigns every form one of all five rarity levels', () => {
+    const seen = new Set();
+    for (const id of FORM_IDS) {
+      expect(ITEM_RARITIES, id).toContain(rarityFor(id));
+      seen.add(rarityFor(id));
+    }
+    expect(seen).toEqual(new Set(ITEM_RARITIES));
+  });
+
+  it('gives generated catalog forms readable fallback names', () => {
+    const generated = Object.keys(CATALOG_FORMS) as FormId[];
+    for (const id of generated.slice(0, 30)) {
+      expect(formName(id), id).not.toContain('form.');
+      expect(formName(id), id).not.toContain('-');
     }
   });
 });
@@ -80,8 +135,7 @@ describe('ItemId scheme', () => {
       for (const m of MATERIAL_IDS) {
         const def: Form = FORMS[f];
         const expected =
-          def.accepts.includes(MATERIALS[m].group) &&
-          (!def.materials || def.materials.includes(m));
+          def.accepts.includes(MATERIALS[m].group) && (!def.materials || def.materials.includes(m));
         expect(accepts(f, m)).toBe(expected);
       }
     }

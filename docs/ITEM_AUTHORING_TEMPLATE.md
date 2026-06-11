@@ -1,5 +1,11 @@
 # Item Authoring Template (LLM agent prompt)
 
+> **Asset concept note:** use `docs/ITEM_PROMPT.md` first for identity design,
+> six structural variants, image generation, and CLIP/VLM duplicate filtering.
+> This document is the narrower implementation schema for converting an
+> approved identity into Workshop metadata, recipes, and procedural op lists.
+> Never create adjective/material/rarity reskins as separate forms.
+
 **Purpose:** paste this whole document as the prompt for an LLM agent that
 generates new Workshop content for _Walk with Datou_. The agent fills the
 schema in §4 and returns ONLY valid JSON. Output is machine-validated and

@@ -5,8 +5,9 @@
  * baseline tokens; styles injected once.
  *
  * Baseline discipline (§10): cream page · ink headers · soft rounded cells (no
- * slot-grid chrome, no rarity colors, no confetti). One focal element — the
- * 3×3 grid. The only "system" feedback is the amber near-miss dot (slow
+ * slot-grid chrome or confetti). Rarity stays a small ink label rather than
+ * loot-card chrome. One focal element — the 3×3 grid. The only "system"
+ * feedback is the amber near-miss dot (slow
  * breathing, never a flash) and the calm assembly beat. Emotion-first.
  */
 
@@ -16,7 +17,7 @@ import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { Bench, type Outcome } from '../game/workshop/bench';
 import { itemSpriteUrl, materialSpriteUrl } from '../game/workshop/sprites';
 import { parseItemId } from '../game/workshop/items';
-import { itemName } from '../game/workshop/items';
+import { itemName, rarityFor, rarityName } from '../game/workshop/items';
 import { MATERIAL_IDS, type MaterialId } from '../game/workshop/materials';
 import { renderTree } from './workshopTree';
 import { renderNotebook } from './workshopNotebook';
@@ -467,10 +468,17 @@ export class Workshop {
       plate.append(img);
     }
     const label = div('ws-result-label');
+    let rarity: HTMLDivElement | null = null;
     if (outcome.kind === 'curio') label.textContent = t('workshop.curio');
     else {
       const spec = parseItemId(outcome.id);
       label.textContent = spec ? itemName(spec) : '';
+      if (spec) {
+        rarity = div('ws-result-rarity');
+        const level = rarityFor(spec.form);
+        rarity.dataset.rarity = level;
+        rarity.textContent = rarityName(level);
+      }
     }
     const makeBtn = document.createElement('button');
     makeBtn.type = 'button';
@@ -479,7 +487,9 @@ export class Workshop {
     makeBtn.textContent = t('workshop.make');
     makeBtn.addEventListener('click', () => this.confirmMake(outcome));
 
-    this.resultCard.append(plate, label, makeBtn);
+    this.resultCard.append(plate, label);
+    if (rarity) this.resultCard.append(rarity);
+    this.resultCard.append(makeBtn);
   }
 
   private confirmMake(outcome: Outcome): void {
@@ -610,6 +620,11 @@ const WORKSHOP_CSS = `
 .ws-plate img{max-width:100%;max-height:100%;object-fit:contain;}
 .ws-plate.curio{font-size:54px;color:var(--accent-warm);}
 .ws-result-label{font-size:13.5px;font-weight:500;color:var(--text-primary);text-align:center;}
+.ws-result-rarity,.ws-node-rarity,.ws-recipe-rarity{font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary);}
+.ws-result-rarity[data-rarity="uncommon"],.ws-node-rarity[data-rarity="uncommon"],.ws-recipe-rarity[data-rarity="uncommon"]{color:#617b65;}
+.ws-result-rarity[data-rarity="rare"],.ws-node-rarity[data-rarity="rare"],.ws-recipe-rarity[data-rarity="rare"]{color:#537a92;}
+.ws-result-rarity[data-rarity="epic"],.ws-node-rarity[data-rarity="epic"],.ws-recipe-rarity[data-rarity="epic"]{color:#806a98;}
+.ws-result-rarity[data-rarity="legendary"],.ws-node-rarity[data-rarity="legendary"],.ws-recipe-rarity[data-rarity="legendary"]{color:#a06d32;}
 .ws-make{border:none;background:var(--accent);color:#fff;font-family:inherit;font-size:13.5px;font-weight:500;
   padding:9px 26px;border-radius:999px;cursor:pointer;transition:transform var(--fast),background var(--fast);margin-top:4px;}
 .ws-make:hover{background:#6c7c6a;}
@@ -624,9 +639,10 @@ const WORKSHOP_CSS = `
 .ws-node{width:64px;text-align:center;}
 .ws-node-plate{width:64px;height:64px;border-radius:var(--radius-s);background:var(--bg);display:flex;align-items:center;justify-content:center;}
 .ws-node-plate img{width:80%;height:80%;object-fit:contain;}
-.ws-node.silhouette .ws-node-plate img{filter:grayscale(1) brightness(0) opacity(0.22);}
+.ws-node.silhouette .ws-node-plate img{filter:grayscale(1) saturate(0.15) contrast(0.92) opacity(0.5);}
 .ws-node.silhouette .ws-node-plate{border:1px dashed rgba(0,0,0,0.18);}
 .ws-node-name{font-size:10px;color:var(--text-secondary);margin-top:4px;line-height:1.3;}
+.ws-node-rarity{margin-top:2px;}
 .ws-node.silhouette .ws-node-name{color:var(--text-tertiary);}
 .ws-empty{font-size:13px;color:var(--text-tertiary);text-align:center;padding:30px;line-height:1.6;}
 .ws-hint-card{background:var(--bg);border-radius:var(--radius-s);padding:12px 14px;}
@@ -648,6 +664,7 @@ const WORKSHOP_CSS = `
 .ws-recipe-plate{width:44px;height:44px;background:var(--bg);border-radius:var(--radius-s);display:flex;align-items:center;justify-content:center;flex:none;}
 .ws-recipe-plate img{width:80%;height:80%;object-fit:contain;}
 .ws-recipe-name{font-size:13.5px;font-weight:600;color:var(--text-primary);}
+.ws-recipe-title{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .ws-recipe-needs{display:flex;flex-direction:column;gap:5px;}
 .ws-recipe-need{display:flex;align-items:center;gap:8px;}
 .ws-recipe-swatch{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.12);flex:none;}

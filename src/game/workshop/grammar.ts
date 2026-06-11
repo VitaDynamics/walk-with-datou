@@ -19,33 +19,14 @@
  * collectible, never nothing. Deterministic: no randomness, no dates.
  */
 
-import {
-  accepts,
-  finishesFor,
-  isValid,
-  itemId,
-  sizesFor,
-  type ItemId,
-  type ItemSpec,
-} from './items';
+import { accepts, finishesFor, isValid, itemId, sizesFor, type ItemId, type ItemSpec } from './items';
 import { FORM_IDS, form as formDef, type FormId, type FormFamily, type Finish, type Size } from './forms';
 import { groupOf, type MaterialGroup, type MaterialId } from './materials';
 import { filledCount, mass, type Arrangement } from './pattern';
 
-export type ShapeClass =
-  | 'row'
-  | 'column'
-  | 'L'
-  | 'T'
-  | 'cross'
-  | 'ring'
-  | 'block'
-  | 'diagonal'
-  | 'scatter';
+export type ShapeClass = 'row' | 'column' | 'L' | 'T' | 'cross' | 'ring' | 'block' | 'diagonal' | 'scatter';
 
-export type GrammarResult =
-  | { kind: 'item'; id: ItemId; spec: ItemSpec }
-  | { kind: 'curio'; tone: number };
+export type GrammarResult = { kind: 'item'; id: ItemId; spec: ItemSpec } | { kind: 'curio'; tone: number };
 
 // --- Shape classification ----------------------------------------------------
 
@@ -181,7 +162,7 @@ const SHAPE_FAMILY: Record<ShapeClass, FormFamily[]> = {
   cross: ['furnishing', 'keepsake'],
   ring: ['furnishing', 'structure'],
   block: ['structure', 'component'],
-  diagonal: ['component', 'tool'],
+  diagonal: ['tool', 'component'],
   scatter: ['keepsake', 'component'],
 };
 
@@ -197,26 +178,53 @@ function finishFromSecondary(secondary: MaterialGroup | null): Finish {
   return 'plain';
 }
 
+const RARITY_WEIGHT = {
+  common: 16,
+  uncommon: 8,
+  rare: 4,
+  epic: 2,
+  legendary: 1,
+} as const;
+
 /**
- * Pick the form for a (shapeClass, material) read: the first form, in registry
- * order, whose family the shape evokes AND that accepts the material's group.
- * Registry order makes this deterministic and gives lower-tier forms priority
- * (they come first), which suits the "any try yields something sensible" goal.
+ * Pick a form whose family the shape evokes and which accepts the material.
+ * The exact arrangement selects within that pool with rarity-weighted odds:
+ * common forms appear often, while legendary forms remain possible.
  */
-function pickForm(shape: ShapeClass, material: MaterialId): FormId | null {
-  const families = SHAPE_FAMILY[shape];
-  for (const fam of families) {
-    for (const id of FORM_IDS) {
-      const f = formDef(id);
-      if (f.family === fam && accepts(id, material) && f.use !== 'tool') return id;
+function pickForm(shape: ShapeClass, material: MaterialId, roll: number): FormId | null {
+  const families = new Set(SHAPE_FAMILY[shape]);
+  const pool = FORM_IDS.filter((id) => {
+    const f = formDef(id);
+    return families.has(f.family) && accepts(id, material);
+  });
+  if (pool.length > 0) return weightedForm(pool, roll);
+
+  // Fallback: any form that accepts the material at all.
+  const fallback = FORM_IDS.filter((id) => accepts(id, material));
+  return fallback.length > 0 ? weightedForm(fallback, roll) : null;
+}
+
+function weightedForm(pool: readonly FormId[], roll: number): FormId {
+  const total = pool.reduce((sum, id) => sum + RARITY_WEIGHT[formDef(id).rarity], 0);
+  let cursor = roll % total;
+  for (const id of pool) {
+    cursor -= RARITY_WEIGHT[formDef(id).rarity];
+    if (cursor < 0) return id;
+  }
+  return pool[pool.length - 1];
+}
+
+/** Stable arrangement hash; no random state and no date/session dependence. */
+function arrangementRoll(a: Arrangement): number {
+  let h = 2166136261;
+  for (let i = 0; i < 9; i++) {
+    const token = `${a.cells[i] ?? '-'}:${a.materials?.[i] ?? '-'}:${a.stacks[i]}|`;
+    for (let j = 0; j < token.length; j++) {
+      h ^= token.charCodeAt(j);
+      h = Math.imul(h, 16777619);
     }
   }
-  // Fallback: any form that accepts the material at all.
-  for (const id of FORM_IDS) {
-    const f = formDef(id);
-    if (accepts(id, material) && f.use !== 'tool') return id;
-  }
-  return null;
+  return h >>> 0;
 }
 
 /** Snap a size/finish into the form's supported range. */
@@ -243,15 +251,10 @@ export function grammarResult(a: Arrangement): GrammarResult {
   }
 
   const shape = classify(a);
-  const form = pickForm(shape, material);
+  const form = pickForm(shape, material, arrangementRoll(a));
   if (!form) return { kind: 'curio', tone: (mass(a) * 7 + n * 3) % 5 };
 
-  const spec = snapSpec(
-    form,
-    material,
-    sizeFromMass(mass(a)),
-    finishFromSecondary(secondaryGroup),
-  );
+  const spec = snapSpec(form, material, sizeFromMass(mass(a)), finishFromSecondary(secondaryGroup));
   // Guard: the snapped spec must be valid (form accepts material, size/finish
   // in range). pickForm already ensures material acceptance, so this holds; we
   // keep the check so a future table edit can't silently emit a bad id.

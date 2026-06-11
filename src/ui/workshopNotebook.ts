@@ -8,9 +8,11 @@
  * blank grid. Plus the curio collection. Paper cards, no slot chrome.
  */
 
-import { t, tDyn } from '../i18n';
+import { t } from '../i18n';
 import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { patternByKey, patternRecipe } from '../game/workshop/patterns';
+import { formName } from '../game/workshop/items';
+import type { FormId } from '../game/workshop/forms';
 import { GROUP_SWATCH, GROUP_LABELS } from './workshopRecipe';
 
 function div(cls: string): HTMLDivElement {
@@ -38,7 +40,7 @@ export function renderNotebook(state: WorkshopState): HTMLDivElement {
     // Title: the thing this blueprint makes (named, so it's not a mystery).
     if (pat) {
       const title = div('ws-hint-title');
-      title.textContent = tDyn(`form.${pat.result}`);
+      title.textContent = formName(pat.result as FormId);
       card.append(title);
     }
 

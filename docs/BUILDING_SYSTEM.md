@@ -62,7 +62,7 @@ that big structures need.
 "warmth". The profile drives both the sprite compositing and which forms accept
 it.
 
-### 2.2 Forms (F ≈ 40 at launch)
+### 2.2 Forms (F ≥ 500)
 
 A form is a parametric hand-drawn template (same canvas-procedural pipeline as
 today's `src/art/props.ts`, with material profile as input):
@@ -76,10 +76,24 @@ today's `src/art/props.ts`, with material profile as input):
   ball-run…
 - **Keepsakes:** memory-frame, postcard-stand, wind-vane, music-post…
 
+The registry now includes 500+ distinct forms. The broad catalog is
+**identity-first**: each id names a different object type and interaction
+(`rocking-chair`, `rain-barrel`, `scent-gate`), never an adjective/material/
+rarity reskin of another form. Every form carries silhouette, proportions,
+functional cues, signature features, and a duplicate-review group. Asset
+generation follows `ITEM_PROMPT.md`: six structural concepts are generated,
+then CLIP/VLM duplicate checks retain only the best one to three assets.
+
+Every form also has a discovery rarity:
+**common · uncommon · rare · epic · legendary**. The fallback shape grammar
+uses deterministic rarity-weighted selection, so unusual forms are genuinely
+less frequent while the same bench arrangement still produces the same result.
+
 ### 2.3 The count
 
 `F × eligible M × {sizes: S/M/L} × {finish: plain/banded/blossom}` —
-40 × ~9 eligible materials avg × 3 × ~1.1 ≈ **1 180 distinct items**, each with
+500+ forms × eligible materials × sizes × finishes yields **tens of thousands
+of distinct items**, each with
 a deterministic id (`form:material:size:finish`), a generated sprite (template
 recolored/re-detailed by material profile), and a generated name
 ("driftwood bench", "flint lantern", "tall reed trellis"). i18n via
