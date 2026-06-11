@@ -67,6 +67,7 @@ import {
 import { drawFood, drawFruitTree, drawVegRow, type FruitKind } from '../art/orchard';
 import { CritterSystem } from './Critters';
 import { drawAcorn } from '../art/critters';
+import { DRESSING, dressedNear } from '../world/dressing';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
@@ -532,6 +533,7 @@ export class Game {
     this.placeNodes();
     this.placeSetpieces();
     this.placeOrchard();
+    this.placeDressing();
     this.critters = new CritterSystem({
       add: (cut, x, z) => this.world.placeCutout(cut, x, z),
       remove: (cut) => {
@@ -828,6 +830,15 @@ export class Game {
       } else {
         this.player.walkTo(row.x, row.z);
       }
+      return;
+    }
+
+    // Community dressing (E6) → name it; its shape teaches the workshop.
+    const dressed = dressedNear(p.x, p.z);
+    if (dressed) {
+      const name = itemName(dressed.spec);
+      this.ui.showName(name, tDyn(`dressing.line.${1 + (Math.abs(Math.round(dressed.x)) % 2)}`));
+      this.teachForm(dressed.spec.form, name);
       return;
     }
 
@@ -1924,6 +1935,36 @@ export class Game {
       cut.setPosition(x, z, 2.0);
       this.fallingFruit.push({ kind: tree.kind, x, z, cut, t: 0 });
     }
+  }
+
+  /** Set the community's furniture into the world (E6) — same sprite pipeline
+   *  as player-placed items, but authored layout, not pickup-able. */
+  private placeDressing(): void {
+    for (const item of DRESSING) {
+      const seed = (Math.round(item.x * 19 + item.z * 23) ^ 0x6e55) >>> 0;
+      const vis = this.placedVisual(item.id, seed);
+      if (!vis) continue;
+      const cut = new Cutout(vis.sprite, {
+        height: vis.height,
+        shadowRadius: vis.shadowRadius,
+      });
+      this.world.placeCutout(cut, item.x, item.z);
+    }
+  }
+
+  /** Neighbor teaching (E6/§5): a dressed item's exact pattern, one cell. */
+  private teachForm(form: FormId, context: string): void {
+    const pat = patternForForm(form);
+    if (!pat) return;
+    const cells: number[] = [];
+    for (let i = 0; i < 9; i++) if (pat.cells[i]) cells.push(i);
+    const banked = this.workshopState.bankHint({
+      pattern: canonical(pat),
+      revealedCells: [cells[dailySeed() % cells.length]],
+      context,
+      day: dailyKey(),
+    });
+    if (banked) this.ui.toast(t('dressing.taught'));
   }
 
   /** The squirrel's gift (E5): an acorn rests at the oak roots until picked. */

@@ -32,6 +32,10 @@ import {
   drawStump,
   drawTree,
   drawTwig,
+  drawFallenLog,
+  drawFern,
+  drawCattail,
+  drawAnthill,
   type PropSprite,
 } from '../art/props';
 import { canvasTexture, paintContactShadow, paintGlade } from '../art/textures';
@@ -66,6 +70,10 @@ const DRAW: Record<ScatterKind, (seed: number) => PropSprite> = {
   pebble: drawPebble,
   berry: drawBerry,
   pinecone: drawPinecone,
+  'fallen-log': drawFallenLog,
+  fern: drawFern,
+  cattail: drawCattail,
+  anthill: drawAnthill,
 };
 
 const VARIANTS = 3;

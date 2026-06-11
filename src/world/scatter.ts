@@ -33,7 +33,12 @@ export type ScatterKind =
   | 'twig'
   | 'pebble'
   | 'berry'
-  | 'pinecone';
+  | 'pinecone'
+  // mid-size filler (E6): between the trees and the grass
+  | 'fallen-log'
+  | 'fern'
+  | 'cattail'
+  | 'anthill';
 
 export interface KindDef {
   kind: ScatterKind;
@@ -44,7 +49,7 @@ export interface KindDef {
   collider: number;
   pickable: boolean;
   /** Datou's reaction when guided to it (i18n key suffix + rig flavour). */
-  verb: 'sniff' | 'rustle' | 'hop' | 'watch' | 'drink' | 'none';
+  verb: 'sniff' | 'rustle' | 'hop' | 'watch' | 'drink' | 'peer' | 'none';
   /** Per-zone target counts. */
   counts: Partial<Record<ZoneId, number>>;
   /** Optional clumping: place in patches of `size` within `radius` metres —
@@ -215,6 +220,47 @@ export const KIND_DEFS: readonly KindDef[] = [
     cluster: { size: 6, radius: 3 },
     render: 'cross',
   },
+  // --- mid-size filler (E6) -------------------------------------------------
+  {
+    kind: 'fallen-log',
+    hMin: 0.55,
+    hMax: 0.8,
+    collider: 0.7,
+    pickable: false,
+    verb: 'hop',
+    counts: { woods: 40, meadow: 28, trail: 8 },
+  },
+  {
+    kind: 'fern',
+    hMin: 0.5,
+    hMax: 0.75,
+    collider: 0,
+    pickable: false,
+    verb: 'rustle',
+    counts: { woods: 380, meadow: 60 },
+    cluster: { size: 10, radius: 5 },
+    render: 'cross',
+  },
+  {
+    kind: 'cattail',
+    hMin: 1.0,
+    hMax: 1.5,
+    collider: 0,
+    pickable: false,
+    verb: 'watch',
+    counts: { lake: 180 },
+    cluster: { size: 7, radius: 4 },
+    render: 'cross',
+  },
+  {
+    kind: 'anthill',
+    hMin: 0.3,
+    hMax: 0.42,
+    collider: 0.25,
+    pickable: false,
+    verb: 'peer',
+    counts: { meadow: 22, trail: 8, woods: 8 },
+  },
 ];
 
 export interface ScatterInstance {
@@ -245,7 +291,8 @@ function placeable(
   // but small detail (grass, flowers, pickables) grows right up to home.
   if (r < (kind.collider > 0 ? 9 : 4.5)) return false;
   const lakeD = Math.hypot(x - LAKE.x, z - LAKE.z);
-  if (kind.kind === 'reed') return lakeD > LAKE.radius - 2 && lakeD < LAKE.radius + 9;
+  if (kind.kind === 'reed' || kind.kind === 'cattail')
+    return lakeD > LAKE.radius - 2 && lakeD < LAKE.radius + 9;
   if (lakeD < LAKE.radius + (kind.collider > 0 ? 3 : 1)) return false;
   // Landmark clearings: the activity ring stays clear so authored compositions
   // never compete with generic scatter; the approach ring is damped (§5).

@@ -26,10 +26,10 @@ describe('world scatter', () => {
     }
   });
 
-  it('keeps everything except reeds out of the lake', () => {
+  it('keeps everything except rim plants (reeds, cattails) out of the lake', () => {
     for (const inst of [...scatterStatic(1), ...scatterPickables(2)]) {
       const d = Math.hypot(inst.x - LAKE.x, inst.z - LAKE.z);
-      if (inst.kind === 'reed') {
+      if (inst.kind === 'reed' || inst.kind === 'cattail') {
         expect(d).toBeGreaterThan(LAKE.radius - 2.5);
       } else {
         expect(d, inst.id).toBeGreaterThan(LAKE.radius);
@@ -50,7 +50,7 @@ describe('world scatter', () => {
     const all = [...scatterStatic(1), ...scatterPickables(2)];
     for (const c of CLEARINGS.filter((c) => c.density === 0)) {
       for (const inst of all) {
-        if (inst.kind === 'reed') continue; // the pump garden's concealment
+        if (inst.kind === 'reed' || inst.kind === 'cattail') continue; // the rim screen
         expect(Math.hypot(inst.x - c.x, inst.z - c.z), inst.id).toBeGreaterThanOrEqual(c.r);
       }
     }

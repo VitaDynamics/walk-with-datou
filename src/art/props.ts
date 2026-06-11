@@ -1415,3 +1415,114 @@ export function drawCoffer(seed: number, open = false, patched = false): PropSpr
   }
   return { canvas: c, aspect: 256 / 224 };
 }
+
+/** A fallen log (E6) — mossy on top, hollow end showing. */
+export function drawFallenLog(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 224);
+  const y = 150;
+  g.beginPath();
+  g.moveTo(60, y - 34);
+  g.quadraticCurveTo(190, y - 52, 320, y - 30);
+  g.lineTo(326, y + 16);
+  g.quadraticCurveTo(190, y + 34, 56, y + 14);
+  g.closePath();
+  g.fillStyle = CLAY.mid;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Hollow end ring.
+  blob(g, rng, 322, y - 7, 18, 24, { fill: CLAY.deep, outline: INK.line, lineWidth: 4 }, 9, 0.08);
+  blob(g, rng, 322, y - 7, 8, 12, { fill: INK.line }, 8, 0.1);
+  // Moss saddle + grain.
+  blob(g, rng, 150, y - 40, 70, 18, { fill: SAGE.light }, 9, 0.18);
+  wobblyLine(g, rng, 80, y - 10, 300, y - 16, 2.5, CLAY.deep, 1.2, 6);
+  speckle(g, rng, 70, y - 40, 250, 70, 16, INK.grain, 0.12, 1.5);
+  return { canvas: c, aspect: 384 / 224 };
+}
+
+/** A fern clump (E6) — arched fronds, woods-floor green. */
+export function drawFern(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 160);
+  const baseY = 148;
+  const fronds = 5 + Math.floor(rng.next() * 3);
+  for (let i = 0; i < fronds; i++) {
+    const a = -Math.PI / 2 + (i - fronds / 2) * 0.38 + (rng.next() - 0.5) * 0.15;
+    const len = 60 + rng.next() * 42;
+    const tipX = 96 + Math.cos(a) * len;
+    const tipY = baseY + Math.sin(a) * len;
+    const tone = i % 2 === 0 ? SAGE.mid : SAGE.deep;
+    // The arched stem.
+    g.strokeStyle = tone;
+    g.lineWidth = 3.5;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(96, baseY);
+    g.quadraticCurveTo(96 + Math.cos(a) * len * 0.5, baseY + Math.sin(a) * len * 0.72, tipX, tipY);
+    g.stroke();
+    // Leaflets.
+    for (let k = 2; k < 7; k++) {
+      const t = k / 7;
+      const px = 96 + Math.cos(a) * len * t;
+      const py = baseY + Math.sin(a) * len * t * 0.86;
+      blob(g, rng, px, py, 9 * (1 - t * 0.5), 4, { fill: tone }, 6, 0.2);
+    }
+  }
+  return { canvas: c, aspect: 192 / 160 };
+}
+
+/** A cattail stand (E6) — stiff stems with velvet heads at the lake rim. */
+export function drawCattail(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(160, 256);
+  const baseY = 244;
+  const stems = 3 + Math.floor(rng.next() * 2);
+  for (let i = 0; i < stems; i++) {
+    const x = 44 + i * 28 + rng.next() * 10;
+    const h = 150 + rng.next() * 70;
+    wobblyLine(g, rng, x, baseY, x + (rng.next() * 8 - 4), baseY - h, 3.5, SAGE.shade, 1, 4);
+    // The velvet head.
+    g.fillStyle = CLAY.deep;
+    g.beginPath();
+    g.roundRect(x - 5, baseY - h - 26, 10, 30, 5);
+    g.fill();
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.stroke();
+    // Tip.
+    wobblyLine(g, rng, x, baseY - h - 26, x + 1, baseY - h - 40, 2, SAGE.shade, 0.6, 2);
+  }
+  // A blade or two.
+  grassStroke(g, rng, 36, baseY, 110, -18, 4, SAGE.mid);
+  grassStroke(g, rng, 120, baseY, 96, 22, 4, SAGE.mid);
+  return { canvas: c, aspect: 160 / 256 };
+}
+
+/** An anthill (E6) — a small worked mound with a dark door and tiny tracks. */
+export function drawAnthill(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 144);
+  const baseY = 124;
+  blob(g, rng, 96, baseY - 22, 56, 32, { fill: CLAY.light, outline: INK.line, lineWidth: 4 }, 10, 0.1);
+  blob(g, rng, 96, baseY - 38, 30, 14, { fill: CLAY.pale }, 8, 0.14);
+  // The door.
+  blob(g, rng, 96, baseY - 44, 7, 5, { fill: INK.line }, 7, 0.12);
+  // Tiny worked tracks fanning out.
+  g.save();
+  g.globalAlpha = 0.55;
+  for (const a of [-0.5, 0.1, 0.7]) {
+    wobblyLine(g, rng, 96 + Math.cos(a + Math.PI / 2) * 8, baseY - 6, 96 + Math.cos(a + Math.PI / 2) * 50, baseY + 6, 2, CLAY.deep, 1.4, 4);
+  }
+  g.restore();
+  // Three dot-ants on the move (drawn, not animated — they are BUSY).
+  g.fillStyle = INK.line;
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.arc(60 + rng.next() * 76, baseY - 4 + rng.next() * 8, 1.6, 0, Math.PI * 2);
+    g.fill();
+  }
+  return { canvas: c, aspect: 192 / 144 };
+}
