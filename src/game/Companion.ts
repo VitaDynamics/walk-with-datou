@@ -145,6 +145,11 @@ export class Companion {
     return this.expressionState;
   }
 
+  /** True while no want/approach is in flight — the behaviors layer's gap. */
+  get resting(): boolean {
+    return this.phase === 'rest';
+  }
+
   get activeWant(): WantKind | null {
     return this.phase === 'active' || this.phase === 'windup' ? (this.want?.kind ?? null) : null;
   }

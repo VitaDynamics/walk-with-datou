@@ -30,6 +30,9 @@ import {
 import { DatouRig } from '../datou/DatouRig';
 import { EmotionEngine } from '../datou/emotion';
 import { amplitude, clipAllowed, familiarityStage, gazeUrgency } from '../datou/character';
+import { Voice, type VoiceContext } from '../datou/voice';
+import { Behaviors } from '../datou/behaviors';
+import { Rng } from '../physics/mujoco/rng';
 import { HumanRig } from '../human/HumanRig';
 import {
   readSavedAge,
@@ -205,6 +208,13 @@ export class Game {
   private lastEmotionKind = 'neutral';
   private spinCooldown = 0;
   private shiverIn = 0;
+  // BOBO's voice (§C4): seeded line picker + the one quiet chip it feeds.
+  private readonly voice: Voice;
+  private saying: { text: string; left: number } | null = null;
+  private wonderIn = 50;
+  // BOBO's initiative (§C5): proactive acts + biological idles in the gaps.
+  private readonly behaviors: Behaviors;
+  private playerIdleS = 0;
 
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
@@ -249,6 +259,8 @@ export class Game {
     this.bond = new Bond(Number(this.loadRaw('wwd.bond')) || 0);
     this.spots = new SpotField(dailySeed(), SPOT_ANCHORS, SPOTS_PER_DAY);
     this.spots.restoreFound(this.loadJson<number[]>('wwd.spots.' + dailyKey(), []));
+    const voiceRng = new Rng((dailySeed() ^ 0xb0b0) >>> 0);
+    this.voice = new Voice(() => voiceRng.next());
     for (const s of this.spots.spots) if (s.found) this.world.revealSpot(s);
     // One placed list (`wwd.placed`); merge the two pre-unification arrays once.
     const oldBuilt = this.loadJson<LegacyBuilt[]>('wwd.built', []);
@@ -322,6 +334,7 @@ export class Game {
         onWantExpired: () => this.emotion.apply('ignoredWant'),
         onLandmarkNoticed: (id) => {
           this.emotion.apply('landmark');
+          this.say('landmark');
           this.landmarks.onNoticed(id);
         },
       },
@@ -347,6 +360,42 @@ export class Game {
         this.datouRig.setBucketFill(this.forage.fill, this.forage.bucketCapacity);
       },
       onDeliver: (items) => this.handleForageDeliver(items),
+    });
+    const behaveRng = new Rng((dailySeed() ^ 0xbe4a) >>> 0);
+    this.behaviors = new Behaviors({
+      rand: () => behaveRng.next(),
+      stage: () => familiarityStage(this.bond.level),
+      resting: () =>
+        this.companion.resting &&
+        !this.fetch.active &&
+        !this.forage.active &&
+        !this.harvest.active &&
+        !this.placingId &&
+        !this.comforting,
+      playerIdleSeconds: () => this.playerIdleS,
+      nearbyProp: () => {
+        const s = this.physics.getDatouState();
+        const prop = this.world.nearestInstance(s.position.x, s.position.z, 9, false);
+        if (!prop) return null;
+        const def = kindDef(prop.kind);
+        return def.verb !== 'none' && !def.pickable ? { x: prop.x, z: prop.z } : null;
+      },
+      placedKeepsake: () => {
+        if (this.placedItems.length === 0) return null;
+        const e = this.placedItems[Math.floor(behaveRng.next() * this.placedItems.length)].entry;
+        return { x: e.x, z: e.z };
+      },
+      investigate: (x, z) => {
+        this.companion.investigate(x, z);
+        // Arriving at a prop gets the usual in-character reaction beat.
+        const prop = this.world.nearestInstance(x, z, 0.6, false);
+        if (prop && kindDef(prop.kind).verb !== 'none') {
+          this.pendingReaction = { verb: kindDef(prop.kind).verb, x: prop.x, z: prop.z };
+        }
+      },
+      playClip: (c) => this.datouRig.playClip(c),
+      reach: () => this.datouRig.reach(),
+      say: (c) => this.say(c),
     });
     this.harvest = new Harvest({
       setMode: (m) => this.physics.setMode(m),
@@ -498,6 +547,7 @@ export class Game {
     this.running = true;
     // His friend is back — the day starts excited (希望能每天都和好朋友在一起).
     this.emotion.apply('greetPlayer');
+    this.say('greet');
     this.lastTime = performance.now();
     requestAnimationFrame(this.tick);
   }
@@ -521,6 +571,8 @@ export class Game {
 
   private handleTap(clientX: number, clientY: number): void {
     this.ui.notifyInteracted();
+    this.playerIdleS = 0;
+    this.behaviors.noteInput();
     const hit = this.pick(clientX, clientY);
     if (hit === 'datou') {
       this.events.petted = true;
@@ -538,6 +590,7 @@ export class Game {
         this.datouRig.playClip('spin')
       ) {
         this.spinCooldown = 20;
+        this.say('pet');
       }
       return;
     }
@@ -645,6 +698,7 @@ export class Game {
       const ds = this.physics.getDatouState();
       if (Math.hypot(prop.x - ds.position.x, prop.z - ds.position.z) < 1.5) {
         this.emotion.apply('startle');
+        this.say('startled');
       }
       this.companion.investigate(prop.x, prop.z);
       this.pendingReaction = { verb: kindDef(prop.kind).verb, x: prop.x, z: prop.z };
@@ -1234,6 +1288,7 @@ export class Game {
     // The inventor beat: something NEW exists — pride, and his excited tic.
     this.emotion.apply('craft');
     this.datouRig.playClip('stomp');
+    this.say('craft');
     return true;
   }
 
@@ -1287,6 +1342,7 @@ export class Game {
       this.datouRig.pulse();
       this.datouRig.reach();
       this.emotion.apply('discover'); // 灵感灯泡 — a fresh idea is a find
+      this.say('inspired');
       this.ui.toast(t('workshop.inspired'));
     }
   }
@@ -1580,6 +1636,7 @@ export class Game {
     this.physics.applyPet();
     this.datouRig.pulse();
     this.emotion.apply('fetch');
+    this.say('fetch');
     this.memories.add({
       ts: Date.now(),
       kind: 'want',
@@ -1611,6 +1668,7 @@ export class Game {
     this.world.revealSpot(spot);
     this.personality.note('explore');
     this.emotion.apply('discover');
+    this.say('discover');
     this.physics.applyPet();
     this.datouRig.pulse();
     this.datouRig.reach();
@@ -1624,6 +1682,13 @@ export class Game {
     this.ui.toast(this.ui.memoryText(entry));
     this.ui.setFoundToday(this.spots.foundCount, this.spots.spots.length);
     this.saveJson('wwd.spots.' + dailyKey(), this.spots.foundIds());
+  }
+
+  /** BOBO says one line for the moment, if his voice's quiet pacing allows. */
+  private say(context: VoiceContext): void {
+    const amp = amplitude(familiarityStage(this.bond.level));
+    const key = this.voice.request(context, amp);
+    if (key) this.saying = { text: tDyn(key), left: 4.5 };
   }
 
   private handleWantSatisfied(kind: WantKind): void {
@@ -1674,6 +1739,11 @@ export class Game {
     this.events.petted = false;
     this.events.comforted = false;
     this.events.guidedTo = null;
+
+    // BOBO's initiative runs in the gaps the systems above leave open.
+    const playerMoving = Math.hypot(this.player.vx, this.player.vz) > 0.05;
+    this.playerIdleS = playerMoving ? 0 : this.playerIdleS + dt;
+    this.behaviors.update(dt);
 
     // Deferred gather: arrived next to the tapped pickable?
     if (this.pendingGather) {
@@ -1786,6 +1856,7 @@ export class Game {
       const entry = { ts: Date.now(), kind: 'milestone' as const, key: unlock, mood: state.mood };
       this.memories.add(entry);
       this.emotion.apply('praise');
+      this.say('milestone');
       this.ui.toast(this.ui.memoryText(entry));
     }
 
@@ -1818,6 +1889,18 @@ export class Game {
     }
     // --- BOBO's feeling this frame → the rig's character channel ---
     this.emotion.update(dt);
+    this.voice.update(dt);
+    if (this.saying) {
+      this.saying.left -= dt;
+      if (this.saying.left <= 0) this.saying = null;
+    }
+    // Ambient wonder (话痨): in a companionable lull he sometimes just talks —
+    // the voice's familiarity-scaled floor keeps strangers nearly silent.
+    this.wonderIn -= dt;
+    if (this.wonderIn <= 0) {
+      this.wonderIn = 45 + Math.random() * 30; // cosmetic spacing only
+      if (!this.companion.activeWant && !this.fetch.active && !this.saying) this.say('wonder');
+    }
     if (this.spinCooldown > 0) this.spinCooldown -= dt;
     const stage = familiarityStage(this.bond.level);
     const feeling = this.emotion.state;
@@ -1829,8 +1912,10 @@ export class Game {
         clipAllowed('backTurn', stage)
       ) {
         this.datouRig.playClip('backTurn');
+        this.say('wronged'); // 委屈，然后讲道理
       } else if (feeling.kind === 'shy' && clipAllowed('shyTurn', stage)) {
         this.datouRig.playClip('shyTurn');
+        this.say('shy');
       }
       this.lastEmotionKind = feeling.kind;
     }
@@ -1899,6 +1984,20 @@ export class Game {
       );
     } else {
       this.ui.showWant(null);
+    }
+    // His voice rides the same anchor; the want chip keeps priority (one
+    // quiet chip at a time — never two voices over his head).
+    if (this.saying && (!want || this.fetch.active)) {
+      const head = new THREE.Vector3(state.position.x, 1.18, state.position.z).project(
+        this.cameraRig.camera,
+      );
+      this.ui.showSay(
+        this.saying.text,
+        ((head.x + 1) / 2) * window.innerWidth,
+        ((1 - head.y) / 2) * window.innerHeight,
+      );
+    } else {
+      this.ui.showSay(null);
     }
     if (this.inspectedLandmark) {
       const info = this.inspectedLandmark.info;

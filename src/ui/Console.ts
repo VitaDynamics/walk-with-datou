@@ -94,6 +94,7 @@ export class Console {
   private readonly foundToday = el<HTMLDivElement>('found-today');
   private readonly hint = el<HTMLDivElement>('hint-line');
   private readonly wantChip = el<HTMLDivElement>('want-chip');
+  private readonly sayChip = el<HTMLDivElement>('say-chip');
   private readonly landmarkInfo = el<HTMLDivElement>('landmark-info');
   private readonly landmarkInfoArea = el<HTMLDivElement>('landmark-info-area');
   private readonly landmarkInfoTitle = el<HTMLDivElement>('landmark-info-title');
@@ -194,6 +195,17 @@ export class Console {
     this.wantChip.hidden = false;
     this.wantChip.textContent = t(`want.${kind}`);
     this.wantChip.style.transform = `translate(${Math.round(screenX)}px, ${Math.round(screenY)}px) translate(-50%, -100%)`;
+  }
+
+  /** BOBO speaking — one quiet voice line floating near him (§C4). */
+  showSay(text: string | null, screenX = 0, screenY = 0): void {
+    if (!text) {
+      this.sayChip.hidden = true;
+      return;
+    }
+    if (this.sayChip.textContent !== text) this.sayChip.textContent = text;
+    this.sayChip.hidden = false;
+    this.sayChip.style.transform = `translate(${Math.round(screenX)}px, ${Math.round(screenY)}px) translate(-50%, -100%)`;
   }
 
   showLandmarkInfo(info: LandmarkInspection): void {

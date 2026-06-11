@@ -10,8 +10,8 @@ phases land.
 | C1 | `character.ts` + `emotion.ts` engines + Game wiring | **implemented** |
 | C2 | Rig motion language: limits, gaze, blink grammar, stagger, 小踏步 | **implemented** |
 | C3 | Signature clips, emotion grammar, ear light | **core implemented** (more clips + eye plates pending) |
-| C4 | Voice (`voice.ts`, i18n pools, chip rework) | planned (§5) |
-| C5 | Proactive behaviors (`behaviors.ts`) | planned (§6) |
+| C4 | Voice (`voice.ts`, i18n pools, chip rework) | **implemented** — 58-line starter pools (zh primary), say-chip beside the want chip, beat/ambient tiers, familiarity-scaled chatter floor |
+| C5 | Proactive behaviors (`behaviors.ts`) | **implemented** — biological idles (stranger+), showAndTell/ask/selfPlay (friend+), input-yield, seeded; greet = emotion+voice at session start. nightLead awaits C7 |
 | C6 | Inventor reframe | planned — blocked on INTERACTION_AUDIT §4 |
 | C7 | Day cycle + rain *scene* | planned (§7) — note: rain *data* already exists |
 | C8 | Divergence + bestFriend tier | planned (§8) |
