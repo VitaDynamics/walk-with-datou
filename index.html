@@ -191,6 +191,166 @@
         }
       }
 
+      /* --- Landmark object card (anchored over the clicked world item) --- */
+      #landmark-info[hidden] {
+        display: none;
+      }
+      #landmark-info {
+        position: absolute;
+        z-index: 5;
+        width: min(320px, calc(100vw - 32px));
+        transform: translate(-50%, calc(-100% - 14px));
+        padding: 13px 15px 14px;
+        border: 1px solid rgba(77, 72, 61, 0.12);
+        border-radius: 18px;
+        background: rgba(255, 253, 248, 0.94);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow: 0 16px 48px rgba(50, 45, 36, 0.14);
+        pointer-events: none;
+        user-select: none;
+        animation: landmark-info-in var(--normal) ease-out;
+      }
+      #landmark-info::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -7px;
+        width: 14px;
+        height: 14px;
+        transform: translateX(-50%) rotate(45deg);
+        border-right: 1px solid rgba(77, 72, 61, 0.12);
+        border-bottom: 1px solid rgba(77, 72, 61, 0.12);
+        background: rgba(255, 253, 248, 0.94);
+      }
+      #landmark-info-area {
+        margin-bottom: 6px;
+        color: var(--accent);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        line-height: 1.35;
+        text-transform: uppercase;
+      }
+      #landmark-info-title {
+        margin-bottom: 4px;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.25;
+      }
+      #landmark-info-body {
+        color: var(--text-secondary);
+        font-size: 12.5px;
+        line-height: 1.45;
+      }
+      @keyframes landmark-info-in {
+        from {
+          opacity: 0;
+          transform: translate(-50%, calc(-100% - 8px));
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, calc(-100% - 14px));
+        }
+      }
+
+      /* --- Placing bar (persistent while a keepsake waits for the ground) --- */
+      #placing-bar[hidden] {
+        display: none;
+      }
+      #placing-bar {
+        position: absolute;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        z-index: 6;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 10px 7px 18px;
+        border-radius: 999px;
+        background: var(--surface-strong);
+        box-shadow: var(--shadow-card);
+        font-size: 12.5px;
+        color: var(--text-primary);
+        user-select: none;
+        white-space: nowrap;
+        animation: chip-in var(--normal) ease-out;
+      }
+      #placing-cancel {
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background var(--fast) ease;
+      }
+      #placing-cancel:hover {
+        background: var(--accent-warm-soft);
+      }
+
+      /* --- Pickup card (anchored over a tapped keepsake) --- */
+      #pickup-card[hidden] {
+        display: none;
+      }
+      #pickup-card {
+        position: absolute;
+        z-index: 5;
+        transform: translate(-50%, calc(-100% - 14px));
+        padding: 11px 13px 12px;
+        border: 1px solid rgba(77, 72, 61, 0.12);
+        border-radius: 18px;
+        background: rgba(255, 253, 248, 0.94);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow: 0 16px 48px rgba(50, 45, 36, 0.14);
+        user-select: none;
+        white-space: nowrap;
+        animation: landmark-info-in var(--normal) ease-out;
+      }
+      #pickup-card::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -7px;
+        width: 14px;
+        height: 14px;
+        transform: translateX(-50%) rotate(45deg);
+        border-right: 1px solid rgba(77, 72, 61, 0.12);
+        border-bottom: 1px solid rgba(77, 72, 61, 0.12);
+        background: rgba(255, 253, 248, 0.94);
+      }
+      #pickup-title {
+        margin-bottom: 8px;
+        font-size: 13.5px;
+        font-weight: 650;
+        line-height: 1.25;
+        text-align: center;
+      }
+      .pickup-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      .pickup-actions button {
+        border: none;
+        padding: 6px 16px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 550;
+        cursor: pointer;
+        transition: background var(--fast) ease;
+      }
+      .pickup-actions button:hover {
+        background: var(--accent-warm-soft);
+      }
+
       /* --- Toast (memory saved / milestone) --- */
       #toast {
         position: absolute;
@@ -587,6 +747,19 @@
         background: var(--accent);
         color: #fff;
       }
+      /* The outfit picker has five options — let it wrap and breathe. */
+      .outfit-toggle {
+        display: flex;
+        flex-wrap: wrap;
+        border: none;
+        gap: 6px;
+        margin: 4px 0 12px;
+      }
+      .outfit-toggle .lang-btn {
+        padding: 5px 12px;
+        border-radius: var(--radius-s);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+      }
     </style>
   </head>
   <body>
@@ -610,6 +783,28 @@
 
     <!-- Thought chip (floats near Datou) -->
     <div id="want-chip" hidden></div>
+
+    <!-- Clicked landmark object explanation -->
+    <div id="landmark-info" role="status" aria-live="polite" hidden>
+      <div id="landmark-info-area"></div>
+      <div id="landmark-info-title"></div>
+      <div id="landmark-info-body"></div>
+    </div>
+
+    <!-- Placement mode: what's in hand + how to set it down / cancel -->
+    <div id="placing-bar" role="status" hidden>
+      <span id="placing-label"></span>
+      <button id="placing-cancel" type="button" aria-label="Cancel">✕</button>
+    </div>
+
+    <!-- Pickup card (anchored over a tapped placed keepsake) -->
+    <div id="pickup-card" hidden>
+      <div id="pickup-title"></div>
+      <div class="pickup-actions">
+        <button id="pickup-take" type="button"></button>
+        <button id="pickup-move" type="button"></button>
+      </div>
+    </div>
 
     <!-- Quiet toast -->
     <div id="toast" hidden></div>
@@ -667,22 +862,79 @@
       </div>
 
       <div class="panel-title" data-i18n="settings.walker">Walker</div>
-      <div id="avatar-toggle" class="lang-toggle">
+      <div id="char-toggle" class="lang-toggle">
+        <button type="button" class="lang-btn char-btn" data-char="mei" data-i18n="settings.mei">
+          Mei
+        </button>
+        <button type="button" class="lang-btn char-btn" data-char="an" data-i18n="settings.an">
+          An
+        </button>
+      </div>
+
+      <div class="panel-sub" data-i18n="settings.outfit">Outfit</div>
+      <div id="outfit-toggle" class="lang-toggle outfit-toggle">
         <button
           type="button"
-          class="lang-btn avatar-btn"
-          data-avatar="boy"
-          data-i18n="settings.boy"
+          class="lang-btn outfit-btn"
+          data-outfit="scout"
+          data-i18n="settings.outfit.scout"
         >
-          Boy
+          Scout
         </button>
         <button
           type="button"
-          class="lang-btn avatar-btn"
-          data-avatar="girl"
-          data-i18n="settings.girl"
+          class="lang-btn outfit-btn"
+          data-outfit="pajama"
+          data-i18n="settings.outfit.pajama"
         >
-          Girl
+          Pajama
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="cape"
+          data-i18n="settings.outfit.cape"
+        >
+          Cape
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="picnic"
+          data-i18n="settings.outfit.picnic"
+        >
+          Picnic
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="rain"
+          data-i18n="settings.outfit.rain"
+        >
+          Rain
+        </button>
+      </div>
+
+      <div class="panel-sub" data-i18n="settings.age">Age</div>
+      <div id="age-toggle" class="lang-toggle">
+        <button type="button" class="lang-btn age-btn" data-age="kid" data-i18n="settings.age.kid">
+          Kid
+        </button>
+        <button
+          type="button"
+          class="lang-btn age-btn"
+          data-age="teen"
+          data-i18n="settings.age.teen"
+        >
+          Teen
+        </button>
+        <button
+          type="button"
+          class="lang-btn age-btn"
+          data-age="adult"
+          data-i18n="settings.age.adult"
+        >
+          Adult
         </button>
       </div>
 

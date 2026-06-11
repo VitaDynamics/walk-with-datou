@@ -11,9 +11,11 @@ import { applyStaticI18n, onLangChange, t, tDyn } from '../i18n';
 import type { DatouMood } from '../physics/PhysicsAdapter';
 import type { Memories, MemoryEntry } from '../game/Memories';
 import type { WantKind } from '../game/Companion';
-import type { Backpack, CraftedId, ItemId } from '../game/Backpack';
-import { RECIPES } from '../game/Crafting';
+import type { Backpack, ItemId, PackId } from '../game/Backpack';
+import type { LandmarkInspection } from '../world/landmarks';
+import { verbFor } from '../game/placed';
 import { parseItemId, itemName } from '../game/workshop/items';
+import { itemSpriteUrl } from '../game/workshop/sprites';
 import {
   drawArchway,
   drawBench,
@@ -42,7 +44,15 @@ import {
 
 export interface ConsoleCallbacks {
   onLeashToggle(): void;
-  onUseItem(id: CraftedId): void;
+  /** A pack item with a verb was tapped (legacy crafted id OR Workshop ItemId). */
+  onUseItem(id: PackId): void;
+  /** A raw material was tapped — the pack is a launchpad, not a label. */
+  onResourceTap(id: PackId): void;
+  /** The placing bar's ✕ — cancel placement (the item stays in the pack). */
+  onCancelPlace(): void;
+  /** Pickup card actions for the keepsake the Game is currently offering. */
+  onPickupTake(): void;
+  onPickupMove(): void;
 }
 
 const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }> = {
@@ -84,21 +94,30 @@ export class Console {
   private readonly foundToday = el<HTMLDivElement>('found-today');
   private readonly hint = el<HTMLDivElement>('hint-line');
   private readonly wantChip = el<HTMLDivElement>('want-chip');
+  private readonly landmarkInfo = el<HTMLDivElement>('landmark-info');
+  private readonly landmarkInfoArea = el<HTMLDivElement>('landmark-info-area');
+  private readonly landmarkInfoTitle = el<HTMLDivElement>('landmark-info-title');
+  private readonly landmarkInfoBody = el<HTMLDivElement>('landmark-info-body');
   private readonly toastEl = el<HTMLDivElement>('toast');
   private readonly memoriesPanel = el<HTMLDivElement>('memories-panel');
   private readonly memoriesList = el<HTMLDivElement>('memories-list');
   private readonly packPanel = el<HTMLDivElement>('pack-panel');
   private readonly packItems = el<HTMLDivElement>('pack-items');
   private readonly btnLeash = el<HTMLButtonElement>('btn-leash');
+  private readonly placingBar = el<HTMLDivElement>('placing-bar');
+  private readonly placingLabel = el<HTMLSpanElement>('placing-label');
+  private readonly pickupCard = el<HTMLDivElement>('pickup-card');
+  private readonly pickupTitle = el<HTMLDivElement>('pickup-title');
 
   private readonly memories: Memories;
   private readonly backpack: Backpack;
   private readonly callbacks: ConsoleCallbacks;
-  private readonly icons = new Map<ItemId, string>();
+  private readonly icons = new Map<PackId, string>();
   private mood: DatouMood = 'calm';
   private garlandWorn = false;
   private toastTimer: number | null = null;
   private hintDismissed = false;
+  private currentLandmarkInfo: LandmarkInspection | null = null;
 
   constructor(memories: Memories, backpack: Backpack, callbacks: ConsoleCallbacks) {
     this.memories = memories;
@@ -120,6 +139,15 @@ export class Console {
     el<HTMLButtonElement>('pack-close').addEventListener('click', () => {
       this.packPanel.hidden = true;
     });
+    el<HTMLButtonElement>('placing-cancel').addEventListener('click', () =>
+      callbacks.onCancelPlace(),
+    );
+    el<HTMLButtonElement>('pickup-take').addEventListener('click', () =>
+      callbacks.onPickupTake(),
+    );
+    el<HTMLButtonElement>('pickup-move').addEventListener('click', () =>
+      callbacks.onPickupMove(),
+    );
 
     memories.onChange(() => {
       if (!this.memoriesPanel.hidden) this.renderMemories();
@@ -130,6 +158,7 @@ export class Console {
     onLangChange(() => {
       applyStaticI18n();
       this.setMood(this.mood);
+      this.renderLandmarkInfo();
       if (!this.memoriesPanel.hidden) this.renderMemories();
       if (!this.packPanel.hidden) this.renderPack();
     });
@@ -165,6 +194,76 @@ export class Console {
     this.wantChip.hidden = false;
     this.wantChip.textContent = t(`want.${kind}`);
     this.wantChip.style.transform = `translate(${Math.round(screenX)}px, ${Math.round(screenY)}px) translate(-50%, -100%)`;
+  }
+
+  showLandmarkInfo(info: LandmarkInspection): void {
+    this.currentLandmarkInfo = info;
+    this.renderLandmarkInfo();
+  }
+
+  positionLandmarkInfo(screenX: number, screenY: number, visible: boolean): void {
+    if (!this.currentLandmarkInfo || !visible) {
+      this.landmarkInfo.hidden = true;
+      return;
+    }
+    this.landmarkInfo.hidden = false;
+    const pad = 16;
+    const halfWidth = Math.min(160, window.innerWidth / 2 - pad);
+    const x = Math.min(window.innerWidth - halfWidth - pad, Math.max(halfWidth + pad, screenX));
+    const y = Math.min(window.innerHeight - 28, Math.max(130, screenY));
+    this.landmarkInfo.style.left = `${Math.round(x)}px`;
+    this.landmarkInfo.style.top = `${Math.round(y)}px`;
+  }
+
+  hideLandmarkInfo(): void {
+    this.currentLandmarkInfo = null;
+    this.landmarkInfo.hidden = true;
+  }
+
+  /** Persistent placement state: "Placing {thing} — tap the ground · ✕". */
+  showPlacing(thing: string): void {
+    this.notifyInteracted(); // the placing bar takes the onboarding hint's spot
+    this.placingLabel.textContent = t('place.banner', { thing });
+    this.placingBar.hidden = false;
+  }
+
+  hidePlacing(): void {
+    this.placingBar.hidden = true;
+  }
+
+  /** Offer to pick up / move the placed keepsake under the player's tap. */
+  showPickup(title: string): void {
+    this.pickupTitle.textContent = title;
+    el<HTMLButtonElement>('pickup-take').textContent = t('pickup.take');
+    el<HTMLButtonElement>('pickup-move').textContent = t('pickup.move');
+    this.pickupCard.hidden = false;
+  }
+
+  positionPickup(screenX: number, screenY: number, visible: boolean): void {
+    if (this.pickupCard.hidden) return;
+    if (!visible) {
+      this.pickupCard.style.visibility = 'hidden';
+      return;
+    }
+    this.pickupCard.style.visibility = '';
+    const pad = 16;
+    const half = 90;
+    const x = Math.min(window.innerWidth - half - pad, Math.max(half + pad, screenX));
+    const y = Math.min(window.innerHeight - 28, Math.max(110, screenY));
+    this.pickupCard.style.left = `${Math.round(x)}px`;
+    this.pickupCard.style.top = `${Math.round(y)}px`;
+  }
+
+  hidePickup(): void {
+    this.pickupCard.hidden = true;
+  }
+
+  private renderLandmarkInfo(): void {
+    const info = this.currentLandmarkInfo;
+    if (!info) return;
+    this.landmarkInfoArea.textContent = tDyn(`landmark.${info.area}.arrive`);
+    this.landmarkInfoTitle.textContent = tDyn(`landmark.inspect.${info.key}.name`);
+    this.landmarkInfoBody.textContent = tDyn(`landmark.inspect.${info.key}.desc`);
   }
 
   toast(text: string): void {
@@ -214,10 +313,11 @@ export class Console {
     return tDyn(`milestone.${entry.key}`);
   }
 
-  private icon(id: ItemId): string {
+  private icon(id: PackId): string {
     let url = this.icons.get(id);
     if (!url) {
-      url = ICON_DRAW[id](7).canvas.toDataURL();
+      const draw = (ICON_DRAW as Partial<Record<string, (typeof ICON_DRAW)[ItemId]>>)[id];
+      url = draw ? draw(7).canvas.toDataURL() : itemSpriteUrl(id);
       this.icons.set(id, url);
     }
     return url;
@@ -233,10 +333,13 @@ export class Console {
       this.packItems.append(empty);
     }
     for (const id of held) {
+      const spec = parseItemId(id);
+      // Unknown id from a stale save — skip rather than crash the pack.
+      if (!spec && !(id in ICON_DRAW)) continue;
       const btn = document.createElement('button');
       btn.className = 'pack-item';
       btn.type = 'button';
-      btn.title = tDyn(`thing.${id}`);
+      btn.title = spec ? itemName(spec) : tDyn(`thing.${id}`);
       const img = document.createElement('img');
       img.src = this.icon(id);
       img.alt = btn.title;
@@ -244,19 +347,17 @@ export class Console {
       count.className = 'pack-count';
       count.textContent = `×${this.backpack.count(id)}`;
       btn.append(img, count);
-      const recipe = RECIPES.find((r) => r.id === id);
-      if (recipe) {
+      const verb = verbFor(id);
+      if (verb) {
         const use = document.createElement('span');
         use.className = 'pack-use';
         use.textContent =
-          recipe.use === 'wear'
-            ? t(this.garlandWorn ? 'use.unwear' : 'use.wear')
-            : t(`use.${recipe.use}`);
+          verb === 'wear' ? t(this.garlandWorn ? 'use.unwear' : 'use.wear') : t(`use.${verb}`);
         btn.append(use);
-        btn.addEventListener('click', () => this.callbacks.onUseItem(recipe.id));
+        btn.addEventListener('click', () => this.callbacks.onUseItem(id));
       } else {
-        // Raw resources: clicking explains what they're for.
-        btn.addEventListener('click', () => this.toast(t('craft.resourceHint')));
+        // Raw materials launch the bench (with the explainer as a toast subtitle).
+        btn.addEventListener('click', () => this.callbacks.onResourceTap(id));
       }
       this.packItems.append(btn);
     }

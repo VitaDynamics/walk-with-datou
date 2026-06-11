@@ -91,10 +91,12 @@ import { Rng } from '../physics/mujoco/rng';
 import { Cutout } from '../world/Cutout';
 import {
   LANDMARK_DEFS,
+  LANDMARK_INSPECTIONS,
   LANDMARKS_VERSION,
   LandmarkField,
   type LandmarkArea,
   type LandmarkId,
+  type LandmarkInspection,
 } from '../world/landmarks';
 import { dailySeed } from '../world/Spots';
 import type { LandmarkAnchor } from './Companion';
@@ -314,7 +316,10 @@ const COFFER_LOOK: Partial<
 
 /** Coffer plate variant for an area; light areas get the weathered community
  *  chest with an id-derived seed (each one's wobble is its own). */
-function cofferLook(id: LandmarkId): { h: number; draw: (open: boolean) => ReturnType<typeof drawCoffer> } {
+function cofferLook(id: LandmarkId): {
+  h: number;
+  draw: (open: boolean) => ReturnType<typeof drawCoffer>;
+} {
   const fixed = COFFER_LOOK[id];
   if (fixed) return fixed;
   let hash = 0;
@@ -340,7 +345,10 @@ export class LandmarkDirector {
 
   // One cooperative beat per area (chime brace / pump run / relay wake).
   private readonly beats = Object.fromEntries(
-    LANDMARK_DEFS.map((d) => [d.id, { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null }]),
+    LANDMARK_DEFS.map((d) => [
+      d.id,
+      { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
+    ]),
   ) as Record<LandmarkId, Beat>;
   private tellCooldown = 0;
   /** Passing the repaired chime re-lures with its quiet ring (§7A). */
@@ -383,9 +391,21 @@ export class LandmarkDirector {
 
   private placeCommons(): void {
     const done = this.completed('repair-commons');
-    this.mastCut = this.plate(drawPennantMast(this.vary(71, done), done), MAST.x, MAST.z, MAST.h, 1.0);
+    this.mastCut = this.plate(
+      drawPennantMast(this.vary(71, done), done),
+      MAST.x,
+      MAST.z,
+      MAST.h,
+      1.0,
+    );
     this.plate(drawLeanTo(72), LEAN_TO.x, LEAN_TO.z, LEAN_TO.h, 1.4);
-    this.chimeCut = this.plate(drawChimeStand(this.vary(73, done), done), CHIME.x, CHIME.z, CHIME.h, 0.5);
+    this.chimeCut = this.plate(
+      drawChimeStand(this.vary(73, done), done),
+      CHIME.x,
+      CHIME.z,
+      CHIME.h,
+      0.5,
+    );
     this.placeCoffer('repair-commons');
     for (const [i, f] of FASTENERS.entries())
       this.plate(drawFastener(75 + i), f.x, f.z, 0.24, 0.12);
@@ -422,7 +442,13 @@ export class LandmarkDirector {
   private placeGarden(): void {
     const done = this.completed('pump-garden');
     if (done) this.channelOn = [true, true];
-    this.pumpCut = this.plate(drawPumpWheel(this.vary(80, done), done), PUMP.x, PUMP.z, PUMP.h, 0.9);
+    this.pumpCut = this.plate(
+      drawPumpWheel(this.vary(80, done), done),
+      PUMP.x,
+      PUMP.z,
+      PUMP.h,
+      0.9,
+    );
     this.plate(drawHoseCoil(106), HOSE.x, HOSE.z, HOSE.h, 0.3);
     this.plate(drawBlueStake(107), STAKE_C.x, STAKE_C.z, STAKE_C.h, 0.1);
     for (const [i, ch] of CHANNELS.entries()) {
@@ -450,7 +476,13 @@ export class LandmarkDirector {
   private placeCamp(): void {
     const done = this.completed('relay-camp');
     if (done) this.vanePos = [VANE_TARGET[0], VANE_TARGET[1]];
-    this.relayCut = this.plate(drawRelayMast(this.vary(90, done), done), RELAY_MAST.x, RELAY_MAST.z, RELAY_MAST.h, 0.9);
+    this.relayCut = this.plate(
+      drawRelayMast(this.vary(90, done), done),
+      RELAY_MAST.x,
+      RELAY_MAST.z,
+      RELAY_MAST.h,
+      0.9,
+    );
     this.plate(drawToolShelter(91), SHELTER.x, SHELTER.z, SHELTER.h, 1.2);
     this.plate(drawCableSpool(92), SPOOL.x, SPOOL.z, SPOOL.h, 0.5);
     for (const [i, seat] of LOG_SEATS.entries())
@@ -570,12 +602,21 @@ export class LandmarkDirector {
     // The STREAM line: stepping stones → willow bend → frog shallows.
     this.decal(drawFlatStones(150), -72, 28, 3.2);
     this.plate(drawRock(151), -75.5, 25, 1.0, 0.8);
-    for (const [i, [x, z]] of ([[-69, 24.5], [-75, 31.5], [-68.5, 27]] as const).entries())
+    for (const [i, [x, z]] of (
+      [
+        [-69, 24.5],
+        [-75, 31.5],
+        [-68.5, 27],
+      ] as const
+    ).entries())
       this.plate(drawReed(152 + i), x, z, 1.2, 0);
+    this.placeMadeItem('sign', 'plank', -76, 29.5);
+    this.placeMadeItem('drinking-bowl', 'flat-stone', -69.5, 31);
     this.placeCoffer('stepping-stones');
 
     this.plate(drawWillow(155), -38, 92, 5.5, 1.8);
     this.placeMadeItem('bench', 'driftwood', -41.5, 88.5);
+    this.placeMadeItem('basket', 'reed', -35.8, 91);
     this.plate(drawRibbonScrap(156), -34.5, 95, 0.35, 0.1);
     this.plate(drawPerchedBird(157), -35, 89, 0.42, 0.1);
     this.placeCoffer('willow-bend');
@@ -584,20 +625,38 @@ export class LandmarkDirector {
     this.decal(drawMarshPool(159), -40, 164.5, 3);
     this.plate(drawFrog(160), -43, 157.5, 0.3, 0.08);
     this.plate(drawFrog(161), -39.5, 162.5, 0.26, 0.08);
-    for (const [i, [x, z]] of ([[-48.5, 157], [-42, 165.5], [-48, 163]] as const).entries())
+    for (const [i, [x, z]] of (
+      [
+        [-48.5, 157],
+        [-42, 165.5],
+        [-48, 163],
+      ] as const
+    ).entries())
       this.plate(drawReed(162 + i), x, z, 1.25, 0);
+    this.placeMadeItem('basket', 'reed', -47.5, 161);
+    this.placeMadeItem('stool', 'driftwood', -41, 158);
     this.placeCoffer('frog-shallows');
 
     // The PAVEMENTS: the lantern avenue; the lakeshore boardwalk.
-    for (const [i, [x, z]] of ([[2, 58], [6, 64.5], [2, 76], [6, 82]] as const).entries())
+    for (const [i, [x, z]] of (
+      [
+        [2, 58],
+        [6, 64.5],
+        [2, 76],
+        [6, 82],
+      ] as const
+    ).entries())
       this.plate(drawLamp(165 + i), x, z, 1.7, 0.4);
     this.placeMadeItem('sign', 'plank', 0.5, 69);
+    this.placeMadeItem('bench', 'plank', 7.5, 72.5);
+    this.placeMadeItem('planter', 'twig', 0.5, 74.5);
     this.placeCoffer('lantern-walk');
 
     this.decal(drawBoardwalk(170), 82, 138, 5);
     this.decal(drawBoardwalk(171), 87, 144, 5);
     this.plate(drawLamp(172), 79, 135, 1.7, 0.4);
     this.placeMadeItem('stool', 'driftwood', 85.5, 140);
+    this.placeMadeItem('cache-box', 'plank', 79.5, 140.5);
     this.placeCoffer('boardwalk-rest');
 
     this.plate(drawDriftArch(173), 96, 188, 2.4, 1.0);
@@ -610,6 +669,7 @@ export class LandmarkDirector {
     this.plate(drawKitePost(176), 150, 90, 3.2, 0.7);
     this.clusterPlates(drawWindGrass, 7, 150, 90, 4, 10, 0.7, 0x7a17);
     this.placeMadeItem('bench', 'plank', 146.5, 93);
+    this.placeMadeItem('mat', 'grass-wisp', 153.5, 92);
     this.placeCoffer('kite-field');
 
     // The FENCE LINE: the meadow gate.
@@ -617,6 +677,8 @@ export class LandmarkDirector {
     this.plate(drawPatchedFence(178), 169.5, -84, 0.95, 0.6);
     this.plate(drawPatchedFence(179), 174.5, -71.5, 0.95, 0.6);
     this.plate(drawFastener(180), 170, -75, 0.24, 0.12);
+    this.placeMadeItem('sign', 'plank', 168.5, -79.5);
+    this.placeMadeItem('planter', 'twig', 175.5, -80);
     this.placeCoffer('gate-arch');
 
     // The CAIRN LINE: the beacon rise (lit once tended).
@@ -630,25 +692,35 @@ export class LandmarkDirector {
     this.placeMadeItem('cairn', 'pebble', 114.5, -152.5);
     this.placeMadeItem('cairn', 'pebble', 121.5, -147);
     this.plate(drawRock(182), 122, -153, 1.1, 0.85);
+    this.placeMadeItem('bench', 'plank', 114.5, -148.5);
     this.placeCoffer('beacon-rise');
 
     // FOOTPRINT TRAILS: the star circle, the hollow oak, the swing tree.
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2 + 0.4;
-      this.plate(drawStarStone(183 + i), -10 + Math.cos(a) * 4.2, -170 + Math.sin(a) * 4.2, 0.7, 0.5);
+      this.plate(
+        drawStarStone(183 + i),
+        -10 + Math.cos(a) * 4.2,
+        -170 + Math.sin(a) * 4.2,
+        0.7,
+        0.5,
+      );
     }
     this.placeMadeItem('campfire', 'flat-stone', -10, -170);
+    this.placeMadeItem('mat', 'grass-wisp', -12.5, -166.5);
     this.plate(drawMoth(188), -7.5, -167, 0.28, 0.08);
     this.placeCoffer('star-circle');
 
     this.plate(drawHollowOak(189), -65, -45, 5.0, 1.9);
     this.plate(drawSquirrel(190), -62, -47.5, 0.45, 0.12);
     this.placeMadeItem('stool', 'log', -68.5, -42.5);
+    this.placeMadeItem('cache-box', 'plank', -62.5, -42.5);
     this.placeCoffer('hollow-oak');
 
     this.plate(drawSwingTree(191), -34, -70, 4.6, 1.7);
     this.clusterPlates(drawCloverPatch, 4, -34, -70, 3, 8, 0.35, 0x7a18);
     this.placeMadeItem('mat', 'grass-wisp', -30.5, -73);
+    this.placeMadeItem('bench', 'plank', -38.5, -67.5);
     this.placeCoffer('swing-tree');
 
     // The FLOWER DRIFT: the bee meadow.
@@ -657,6 +729,8 @@ export class LandmarkDirector {
     this.plate(drawButterflies(193), 41, -61, 0.5, 0);
     this.plate(drawButterflies(194), 35, -67.5, 0.45, 0);
     this.placeMadeItem('planter', 'twig', 34.5, -61);
+    this.placeMadeItem('drinking-bowl', 'flat-stone', 41.5, -66);
+    this.placeMadeItem('bench', 'plank', 34.5, -68.5);
     this.placeCoffer('bee-meadow');
 
     // The FOREST CORRIDOR: the fern hollow.
@@ -664,8 +738,15 @@ export class LandmarkDirector {
     this.plate(drawGiantFern(196), -163.5, -142, 1.4, 0.6);
     this.plate(drawGiantFern(197), -157, -148.5, 1.5, 0.65);
     this.clusterPlates(drawMoonFern, 5, -160, -145, 3, 8, 0.45, 0x7a1a);
-    for (const [i, [x, z]] of ([[-163, -147.5], [-156.5, -143]] as const).entries())
+    for (const [i, [x, z]] of (
+      [
+        [-163, -147.5],
+        [-156.5, -143],
+      ] as const
+    ).entries())
       this.plate(drawMushroom(198 + i), x, z, 0.45, 0);
+    this.placeMadeItem('stool', 'log', -156.5, -146);
+    this.placeMadeItem('basket', 'reed', -162.5, -141);
     this.placeCoffer('fern-hollow');
 
     // The CART RUTS: the old quarry.
@@ -673,6 +754,7 @@ export class LandmarkDirector {
     this.plate(drawStonepile(201), -181, -6.5, 0.7, 0.5);
     this.plate(drawStonepile(202), -188.5, -13, 0.6, 0.45);
     this.placeMadeItem('block', 'stone-block', -181.5, -8);
+    this.placeMadeItem('bench', 'flat-stone', -188, -6.5);
     this.placeCoffer('quarry-scar');
   }
 
@@ -823,6 +905,20 @@ export class LandmarkDirector {
   }
 
   // --- interaction routing -----------------------------------------------------
+
+  /** Selected focal object under a world tap, used by the anchored info card. */
+  inspectionAt(x: number, z: number): LandmarkInspection | null {
+    let best: LandmarkInspection | null = null;
+    let bestDistance = Infinity;
+    for (const inspection of LANDMARK_INSPECTIONS) {
+      const distance = Math.hypot(x - inspection.x, z - inspection.z);
+      if (distance <= inspection.radius && distance < bestDistance) {
+        best = inspection;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
 
   /** The landmark interactive under a world tap, if any. */
   target(x: number, z: number): LandmarkTarget | null {
@@ -1156,8 +1252,22 @@ export class LandmarkDirector {
     this.field.complete('repair-commons');
     this.persist();
     // The place changes and stays changed: chime hangs true, mast lamp lit.
-    this.chimeCut = this.replate(this.chimeCut, drawChimeStand(73, true), CHIME.x, CHIME.z, CHIME.h, 0.5);
-    this.mastCut = this.replate(this.mastCut, drawPennantMast(71, true), MAST.x, MAST.z, MAST.h, 1.0);
+    this.chimeCut = this.replate(
+      this.chimeCut,
+      drawChimeStand(73, true),
+      CHIME.x,
+      CHIME.z,
+      CHIME.h,
+      0.5,
+    );
+    this.mastCut = this.replate(
+      this.mastCut,
+      drawPennantMast(71, true),
+      MAST.x,
+      MAST.z,
+      MAST.h,
+      1.0,
+    );
     this.placeCommonsClues();
     this.deps.datouBeat();
     this.deps.cue('chime');
@@ -1202,10 +1312,24 @@ export class LandmarkDirector {
     // Water travels: wheel runs, channels carry, paper plants lift and color.
     this.pumpCut = this.replate(this.pumpCut, drawPumpWheel(80, true), PUMP.x, PUMP.z, PUMP.h, 0.9);
     for (const [i, ch] of CHANNELS.entries()) {
-      this.channelCuts[i] = this.replate(this.channelCuts[i], drawChannel(83 + i, true, true), ch.x, ch.z, ch.h, 0.5);
+      this.channelCuts[i] = this.replate(
+        this.channelCuts[i],
+        drawChannel(83 + i, true, true),
+        ch.x,
+        ch.z,
+        ch.h,
+        0.5,
+      );
     }
     for (const [i, p] of PLANTERS.entries()) {
-      this.planterCuts[i] = this.replate(this.planterCuts[i], drawFloatingPlanter(85 + i, true), p.x, p.z, 0.7, 0);
+      this.planterCuts[i] = this.replate(
+        this.planterCuts[i],
+        drawFloatingPlanter(85 + i, true),
+        p.x,
+        p.z,
+        0.7,
+        0,
+      );
     }
     this.placeGardenClues();
     this.deps.datouBeat();

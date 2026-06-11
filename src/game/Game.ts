@@ -25,10 +25,18 @@ import {
   drawSoil,
   drawStick,
   drawWindchime,
+  type PropSprite,
 } from '../art/props';
 import { DatouRig } from '../datou/DatouRig';
 import { HumanRig } from '../human/HumanRig';
-import { readSavedAvatar, type AvatarStyle } from '../human/avatar';
+import {
+  readSavedAge,
+  readSavedCharacter,
+  readSavedOutfit,
+  type AgeId,
+  type CharId,
+  type DirId,
+} from '../human/avatar';
 import { Leash } from '../human/Leash';
 import { Player } from '../human/Player';
 import type { PhysicsAdapter } from '../physics/PhysicsAdapter';
@@ -36,12 +44,14 @@ import { Console } from '../ui/Console';
 import { Minimap } from '../ui/Minimap';
 import { Cutout } from '../world/Cutout';
 import { LANDMARK_DEFS } from '../world/landmarks';
+import type { LandmarkInspection } from '../world/landmarks';
 import { SPOT_ANCHORS } from '../world/layout';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
 import { WORLD_WALK_RADIUS } from '../world/zones';
-import { Backpack, type CraftedId, type ItemId, type ResourceId } from './Backpack';
+import { Backpack, type ItemId, type PackId, type ResourceId } from './Backpack';
+import { migratePlaced, type LegacyBuilt, type PlacedEntry } from './placed';
 import { Bond } from './Bond';
 import { CameraRig } from './CameraRig';
 import { Companion, type CompanionEvents, type WantKind } from './Companion';
@@ -58,7 +68,14 @@ import { Workshop } from '../ui/Workshop';
 import { ForageMenu, type ForageOption } from '../ui/ForageMenu';
 import { WorkshopState } from './workshop/WorkshopState';
 import type { Outcome } from './workshop/bench';
-import { parseItemId, itemName, itemId, sizesFor, finishesFor, materialsAcceptedBy } from './workshop/items';
+import {
+  parseItemId,
+  itemName,
+  itemId,
+  sizesFor,
+  finishesFor,
+  materialsAcceptedBy,
+} from './workshop/items';
 import { canonical } from './workshop/pattern';
 import { patternForForm, patternRecipe } from './workshop/patterns';
 import type { FormId } from './workshop/forms';
@@ -94,17 +111,11 @@ type BuildableKind =
   | 'windchime'
   | 'archway';
 
-interface BuiltItem {
-  kind: BuildableKind;
-  x: number;
-  z: number;
-}
-
-/** A placed Workshop item (any of the generative ItemIds). */
-interface WorkshopBuilt {
-  id: string;
-  x: number;
-  z: number;
+/** A keepsake standing in the world: its save entry, its plate, its height. */
+interface PlacedItem {
+  entry: PlacedEntry;
+  cut: Cutout;
+  height: number;
 }
 
 /** Plate heights/shadows for placed buildables. */
@@ -155,7 +166,13 @@ export class Game {
   private readonly workshopState = new WorkshopState();
   private workshop!: Workshop;
   private forageMenu!: ForageMenu;
-  private placingItem: string | null = null;
+  // Reversible placement: holding ↔ placed are the same object, both ways.
+  private placingId: string | null = null;
+  private placeGhost: Cutout | null = null;
+  private readonly placedItems: PlacedItem[] = [];
+  private pickupTarget: PlacedItem | null = null;
+  private pendingPickup: PlacedEntry | null = null;
+  private lastPointer: { x: number; y: number } | null = null;
   // Resource nodes & tools (W8).
   private readonly nodeState = new NodeState();
   private readonly personality = new PersonalityModel();
@@ -170,6 +187,7 @@ export class Game {
   // Authored community areas (landmark plan) — the places the park leads to.
   private landmarks!: LandmarkDirector;
   private pendingLandmark: LandmarkTarget | null = null;
+  private inspectedLandmark: { info: LandmarkInspection; left: number } | null = null;
   /** The scripted first-hook want toward the Commons fires once, a little
    *  into the session, if the home coffer is open and one item is made (§6). */
   private firstHookIn = 25;
@@ -183,7 +201,6 @@ export class Game {
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
   private garlandWorn = false;
-  private placing: BuildableKind | 'plot' | null = null;
   private pendingGather: string | null = null;
   private pendingReaction: { verb: string; x: number; z: number } | null = null;
   private reactCooldown = 0;
@@ -208,7 +225,12 @@ export class Game {
 
     const shadowTex = canvasTexture(paintContactShadow());
     this.datouRig = new DatouRig(shadowTex);
-    this.humanRig = new HumanRig(shadowTex, readSavedAvatar());
+    this.humanRig = new HumanRig(
+      shadowTex,
+      readSavedCharacter(),
+      readSavedOutfit(),
+      readSavedAge(),
+    );
     this.scene.add(this.datouRig.group, this.humanRig.group, this.leash.mesh);
 
     this.stickCutout = new Cutout(drawStick(5), { height: 0.28 });
@@ -220,7 +242,20 @@ export class Game {
     this.spots = new SpotField(dailySeed(), SPOT_ANCHORS, SPOTS_PER_DAY);
     this.spots.restoreFound(this.loadJson<number[]>('wwd.spots.' + dailyKey(), []));
     for (const s of this.spots.spots) if (s.found) this.world.revealSpot(s);
-    for (const b of this.loadJson<BuiltItem[]>('wwd.built', [])) this.placeBuilt(b, false);
+    // One placed list (`wwd.placed`); merge the two pre-unification arrays once.
+    const oldBuilt = this.loadJson<LegacyBuilt[]>('wwd.built', []);
+    const oldWorkshop = this.loadJson<PlacedEntry[]>('wwd.workshopBuilt', []);
+    const placedSave = migratePlaced(
+      this.loadJson<PlacedEntry[]>('wwd.placed', []),
+      oldBuilt,
+      oldWorkshop,
+    );
+    for (const entry of placedSave) this.spawnPlaced(entry);
+    if (oldBuilt.length || oldWorkshop.length) {
+      this.savePlaced();
+      this.removeRaw('wwd.built');
+      this.removeRaw('wwd.workshopBuilt');
+    }
     this.syncFarm();
     this.garlandWorn = this.loadRaw('wwd.garland') === '1';
     this.datouRig.setGarland(this.garlandWorn);
@@ -330,6 +365,10 @@ export class Game {
     this.ui = new Console(this.memories, this.backpack, {
       onLeashToggle: () => this.toggleLeash(),
       onUseItem: (id) => this.useItem(id),
+      onResourceTap: () => this.resourceTapped(),
+      onCancelPlace: () => this.cancelPlacement(),
+      onPickupTake: () => this.pickUpTarget(false),
+      onPickupMove: () => this.pickUpTarget(true),
     });
     this.ui.setFoundToday(this.spots.foundCount, this.spots.spots.length);
     this.ui.setTrust(this.bond.level / TRUST_FULL);
@@ -365,8 +404,6 @@ export class Game {
       this.ui.notifyInteracted();
       this.forageMenu.toggle();
     });
-    for (const b of this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []))
-      this.placeWorkshopItem(b.id, b.x, b.z, false);
     this.placeNodes();
     this.placeCoffer();
 
@@ -415,19 +452,29 @@ export class Game {
       }
     }
 
+    // Dev/QA: ?qa=place|pickup presets the placement affordances (placing bar,
+    // ghost, pickup card) so headless screenshots can QA them. Inert in play.
+    const qa = new URLSearchParams(location.search).get('qa');
+    if (qa === 'place') {
+      const qaId = 'stool:twig:M:plain';
+      this.backpack.add(qaId);
+      this.enterPlacement(qaId);
+      this.lastPointer = { x: window.innerWidth * 0.64, y: window.innerHeight * 0.58 };
+    } else if (qa === 'pickup') {
+      this.spawnPlaced({ id: 'lantern', x: this.player.x + 1.2, z: this.player.z + 0.8 });
+      this.offerPickup(this.placedItems[this.placedItems.length - 1]);
+    }
+
     this.player.setColliders(this.world.colliders);
     this.physics.setColliders?.(this.world.colliders);
     this.physics.setPlayerPosition(this.player.x, this.player.z);
     this.applyStance();
     this.applyWeather();
 
+    canvas.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && (this.placing || this.placingItem)) {
-        this.placing = null;
-        this.placingItem = null;
-        this.ui.toast(t('place.cancelled'));
-      }
+      if (e.key === 'Escape' && this.placingId) this.cancelPlacement();
     });
     window.addEventListener('beforeunload', () =>
       this.saveRaw('wwd.bond', String(this.bond.level)),
@@ -441,9 +488,19 @@ export class Game {
     requestAnimationFrame(this.tick);
   }
 
-  /** Live avatar swap from ⚙ settings. */
-  setAvatar(style: AvatarStyle): void {
-    this.humanRig.setAvatar(style);
+  /** Live character swap (Mei/An) from ⚙ settings. */
+  setCharacter(char: CharId): void {
+    this.humanRig.setCharacter(char);
+  }
+
+  /** Live outfit swap from ⚙ settings. */
+  setOutfit(dir: DirId): void {
+    this.humanRig.setOutfit(dir);
+  }
+
+  /** Live age swap (kid/teen/adult) from ⚙ settings. */
+  setAge(age: AgeId): void {
+    this.humanRig.setAge(age);
   }
 
   // --- pointer verbs ---
@@ -460,25 +517,12 @@ export class Game {
     if (!hit) return;
     const p = this.clampToWorld(hit.x, hit.z);
 
-    // Placement mode: the next ground tap drops the made item into the world.
-    if (this.placingItem) {
-      // A planter tapped onto the garden's donation socket installs there (§7B).
-      const form = parseItemId(this.placingItem)?.form;
-      if (form && this.landmarks.tryDonate(p.x, p.z, form)) {
-        this.placingItem = null;
-        return;
-      }
-      this.placeWorkshopItem(this.placingItem, p.x, p.z, true);
-      this.placingItem = null;
-      return;
-    }
-    if (this.placing) {
-      if (this.placing === 'plot') {
-        if (this.backpack.take('plot')) this.farm.addPlot(p.x, p.z);
-      } else {
-        this.placeBuilt({ kind: this.placing, x: p.x, z: p.z }, true);
-      }
-      this.placing = null;
+    // A tap anywhere else lets the pickup offer rest.
+    this.closePickup();
+
+    // Placement mode: the next ground tap sets the held keepsake down.
+    if (this.placingId) {
+      this.commitPlacement(this.placingId, p.x, p.z);
       return;
     }
 
@@ -486,6 +530,15 @@ export class Game {
     if (this.companion.activeWant === 'curious') {
       this.events.guidedTo = p;
       return;
+    }
+
+    const inspection = this.landmarks.inspectionAt(p.x, p.z);
+    if (inspection) {
+      this.inspectedLandmark = { info: inspection, left: 7 };
+      this.ui.showLandmarkInfo(inspection);
+    } else {
+      this.inspectedLandmark = null;
+      this.ui.hideLandmarkInfo();
     }
 
     // A garden plot under the tap → plant / harvest (walk over first).
@@ -507,6 +560,19 @@ export class Game {
       } else {
         this.player.walkTo(pickable.x, pickable.z);
         this.pendingGather = pickable.id;
+      }
+      return;
+    }
+
+    // A placed keepsake under the tap → offer to pick it up (walk over first).
+    const placedHit = this.placedAt(p.x, p.z);
+    if (placedHit) {
+      const d = Math.hypot(placedHit.entry.x - this.player.x, placedHit.entry.z - this.player.z);
+      if (d <= 2.2) {
+        this.offerPickup(placedHit);
+      } else {
+        this.player.walkTo(placedHit.entry.x, placedHit.entry.z);
+        this.pendingPickup = placedHit.entry;
       }
       return;
     }
@@ -533,6 +599,10 @@ export class Game {
       }
       return;
     }
+
+    // A labelled focal object explains itself without turning the click into
+    // an accidental walk command. Existing landmark interactives returned above.
+    if (inspection) return;
 
     // A resource node → Datou trots over and works it (W8).
     const node = this.nodeNear(p.x, p.z);
@@ -611,7 +681,7 @@ export class Game {
     void z;
   }
 
-  private useItem(id: CraftedId): void {
+  private useItem(id: PackId): void {
     switch (id) {
       case 'stick': {
         if (this.fetch.active) return;
@@ -632,39 +702,176 @@ export class Game {
       }
       case 'bundle':
       case 'stonepile':
-        // Components: explain rather than do.
+        // Components: take the player where they're used, explain on the way.
+        this.workshop.show();
         this.ui.toast(t('craft.componentHint'));
         break;
-      default: {
-        // Every other craftable goes into the world on the next ground tap.
-        this.placing = id as BuildableKind | 'plot';
-        this.ui.closePack();
-        this.ui.toast(t('place.hint'));
+      default:
+        // Every placeable waits in the pack until the next ground tap.
+        this.enterPlacement(id);
         break;
-      }
     }
   }
 
-  private placeBuilt(item: BuiltItem, fresh: boolean): void {
-    if (fresh && !this.backpack.take(item.kind)) return;
-    const seed = Math.round(item.x * 31 + item.z * 7);
-    const drawBuild = {
-      cairn: drawCairn,
-      lantern: drawLamp,
-      fence: drawFence,
-      campfire: drawCampfire,
-      shelter: drawShelter,
-      bench: drawBench,
-      birdbath: drawBirdbath,
-      windchime: drawWindchime,
-      archway: drawArchway,
-    }[item.kind];
-    const cut = new Cutout(drawBuild(seed), BUILD_LOOK[item.kind]);
-    this.world.placeCutout(cut, item.x, item.z);
-    if (fresh) {
-      const built = this.loadJson<BuiltItem[]>('wwd.built', []);
-      built.push(item);
-      this.saveJson('wwd.built', built);
+  /** A raw material tapped in the pack: the pack is a launchpad — open the bench. */
+  private resourceTapped(): void {
+    this.ui.closePack();
+    this.workshop.show();
+  }
+
+  // --- reversible placement (place ↔ pick up ↔ move) ---
+
+  /** Sprite + plate metrics for any placeable id (Workshop or legacy). */
+  private placedVisual(
+    id: string,
+    seed = 0,
+  ): { sprite: PropSprite; height: number; shadowRadius: number } | null {
+    const spec = parseItemId(id);
+    if (spec) {
+      const h = itemHeight(spec);
+      return { sprite: itemSprite(id), height: h, shadowRadius: h * 0.45 };
+    }
+    if (id in BUILD_LOOK) {
+      const kind = id as BuildableKind;
+      const drawBuild = {
+        cairn: drawCairn,
+        lantern: drawLamp,
+        fence: drawFence,
+        campfire: drawCampfire,
+        shelter: drawShelter,
+        bench: drawBench,
+        birdbath: drawBirdbath,
+        windchime: drawWindchime,
+        archway: drawArchway,
+      }[kind];
+      return { sprite: drawBuild(seed), ...BUILD_LOOK[kind] };
+    }
+    return null;
+  }
+
+  /** Human name for a placeable id (composed Workshop name or legacy table). */
+  private placedLabel(id: string): string {
+    const spec = parseItemId(id);
+    return spec ? itemName(spec) : tDyn(`thing.${id}`);
+  }
+
+  /** Hold a pack item over the ground: ghost preview + the placing bar. */
+  private enterPlacement(id: string): void {
+    this.endPlacement();
+    this.placingId = id;
+    this.ui.closePack();
+    this.closePickup();
+    this.ui.showPlacing(this.placedLabel(id));
+    const vis = id === 'plot' ? null : this.placedVisual(id);
+    if (vis) {
+      this.placeGhost = new Cutout(vis.sprite, { height: vis.height, shadowRadius: 0 });
+      const mat = this.placeGhost.plane.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.35;
+      mat.depthWrite = false;
+      this.placeGhost.group.visible = false; // until the pointer picks ground
+      this.scene.add(this.placeGhost.group);
+    }
+  }
+
+  /** Esc / ✕: stop placing. Harmless — the item never left the pack. */
+  private cancelPlacement(): void {
+    if (!this.placingId) return;
+    this.endPlacement();
+    this.ui.toast(t('place.cancelled'));
+  }
+
+  private endPlacement(): void {
+    this.placingId = null;
+    this.ui.hidePlacing();
+    if (this.placeGhost) {
+      this.placeGhost.group.removeFromParent();
+      this.placeGhost.dispose();
+      this.placeGhost = null;
+    }
+  }
+
+  /** The ground tap that sets the held keepsake down. */
+  private commitPlacement(id: string, x: number, z: number): void {
+    // A planter tapped onto the garden's donation socket installs there (§7B).
+    const form = parseItemId(id)?.form;
+    if (form && this.landmarks.tryDonate(x, z, form)) {
+      this.backpack.take(id);
+      this.endPlacement();
+      return;
+    }
+    if (!this.backpack.take(id)) {
+      this.endPlacement();
+      return;
+    }
+    if (id === 'plot') {
+      // The plot digs into the ground and registers with the farm — the one
+      // placeable that doesn't come back up (soil isn't carried).
+      this.farm.addPlot(x, z);
+    } else {
+      this.spawnPlaced({ id, x, z });
+      this.savePlaced();
+    }
+    this.endPlacement();
+  }
+
+  /** Stand a saved/just-placed keepsake in the world and register it. */
+  private spawnPlaced(entry: PlacedEntry): void {
+    const seed = Math.round(entry.x * 31 + entry.z * 7);
+    const vis = this.placedVisual(entry.id, seed);
+    if (!vis) return; // unknown id from an old save — leave it untracked
+    const cut = new Cutout(vis.sprite, { height: vis.height, shadowRadius: vis.shadowRadius });
+    this.world.placeCutout(cut, entry.x, entry.z);
+    this.placedItems.push({ entry, cut, height: vis.height });
+  }
+
+  private savePlaced(): void {
+    this.saveJson(
+      'wwd.placed',
+      this.placedItems.map((p) => p.entry),
+    );
+  }
+
+  /** Nearest placed keepsake to a tapped world point. */
+  private placedAt(x: number, z: number): PlacedItem | null {
+    let best: PlacedItem | null = null;
+    let bestD = 1.1;
+    for (const p of this.placedItems) {
+      const d = Math.hypot(p.entry.x - x, p.entry.z - z);
+      if (d <= bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  /** Show the quiet pick-up / move card anchored over the keepsake. */
+  private offerPickup(target: PlacedItem): void {
+    this.pickupTarget = target;
+    this.ui.showPickup(this.placedLabel(target.entry.id));
+  }
+
+  private closePickup(): void {
+    if (!this.pickupTarget) return;
+    this.pickupTarget = null;
+    this.ui.hidePickup();
+  }
+
+  /** The missing reverse arrow: placed → pack (and, for move, straight back to hand). */
+  private pickUpTarget(move: boolean): void {
+    const target = this.pickupTarget;
+    if (!target) return;
+    this.closePickup();
+    const i = this.placedItems.indexOf(target);
+    if (i < 0) return;
+    this.placedItems.splice(i, 1);
+    this.world.removeCutout(target.cut);
+    this.backpack.add(target.entry.id);
+    this.savePlaced();
+    if (move) {
+      this.enterPlacement(target.entry.id);
+    } else {
+      this.ui.toast(t('pickup.done', { thing: this.placedLabel(target.entry.id) }));
     }
   }
 
@@ -742,7 +949,14 @@ export class Game {
     for (const p of plan) this.backpack.take(p.mat as ResourceId, p.n);
     // Size from total mass, plain finish (a clean Tree build).
     const mass = plan.reduce((s, p) => s + p.n, 0);
-    const size = sizesFor(form).length === 1 ? sizesFor(form)[0] : mass <= 3 ? sizesFor(form)[0] : mass <= 6 ? sizesFor(form)[Math.min(1, sizesFor(form).length - 1)] : sizesFor(form)[sizesFor(form).length - 1];
+    const size =
+      sizesFor(form).length === 1
+        ? sizesFor(form)[0]
+        : mass <= 3
+          ? sizesFor(form)[0]
+          : mass <= 6
+            ? sizesFor(form)[Math.min(1, sizesFor(form).length - 1)]
+            : sizesFor(form)[sizesFor(form).length - 1];
     const id = itemId({ form, material: domMat, size, finish: finishesFor(form)[0] });
     this.handleMake({ kind: 'exact', form, id, patternKey: canonical(pat) });
   }
@@ -761,9 +975,7 @@ export class Game {
     // Record the pattern too when the form has one, so the Tree node inks in.
     const pat = patternForForm(form);
     this.handleMake(
-      pat
-        ? { kind: 'exact', form, id, patternKey: canonical(pat) }
-        : { kind: 'grammar', id },
+      pat ? { kind: 'exact', form, id, patternKey: canonical(pat) } : { kind: 'grammar', id },
     );
   }
 
@@ -875,7 +1087,9 @@ export class Game {
   }
 
   private anyNodeForMaterial(mat: MaterialId): NodePlacement | null {
-    return NODE_PLACEMENTS.find((p) => NODE_DEFS[p.type].yields.some((y) => y.material === mat)) ?? null;
+    return (
+      NODE_PLACEMENTS.find((p) => NODE_DEFS[p.type].yields.some((y) => y.material === mat)) ?? null
+    );
   }
 
   /** Materials Datou could fetch right now, for the Fetch menu. */
@@ -963,24 +1177,27 @@ export class Game {
     this.datouRig.pulse();
     this.datouRig.reach();
     if (firstMake) {
-      const entry = {
+      this.memories.add({
         ts: Date.now(),
-        kind: 'want' as const,
+        kind: 'want',
         key: 'made:' + id,
         mood: this.physics.getDatouState().mood,
-      };
-      this.memories.add(entry);
-      this.ui.toast(t('workshop.made', { thing: itemName(spec) }));
+      });
     }
     // Tools equip into the dorsal gripper rather than placing in the world.
-    if (spec.form === 'axe' || spec.form === 'pickaxe' || spec.form === 'shears' || spec.form === 'scoop') {
+    if (
+      spec.form === 'axe' ||
+      spec.form === 'pickaxe' ||
+      spec.form === 'shears' ||
+      spec.form === 'scoop'
+    ) {
       this.equipTool(id);
       return true;
     }
-    // Everything else: close the window and place on the next ground tap.
-    this.placingItem = id;
-    this.workshop.hide();
-    this.ui.toast(t('place.hint'));
+    // Everything else banks into the pack — carry it, show Datou, place it
+    // when you reach the right spot. Nothing is lost to a misclick anymore.
+    this.backpack.add(id);
+    this.ui.toast(t('workshop.toPack', { thing: itemName(spec) }));
     return true;
   }
 
@@ -1215,21 +1432,6 @@ export class Game {
     this.ui.toast(t('tool.equipped'));
   }
 
-  private placeWorkshopItem(id: string, x: number, z: number, fresh: boolean): void {
-    const spec = parseItemId(id);
-    if (!spec) return;
-    const cut = new Cutout(itemSprite(id), {
-      height: itemHeight(spec),
-      shadowRadius: itemHeight(spec) * 0.45,
-    });
-    this.world.placeCutout(cut, x, z);
-    if (fresh) {
-      const built = this.loadJson<WorkshopBuilt[]>('wwd.workshopBuilt', []);
-      built.push({ id, x, z });
-      this.saveJson('wwd.workshopBuilt', built);
-    }
-  }
-
   /** Tap on a garden plot: plant the first plantable resource, or harvest. */
   private tendPlot(plot: PlotState): void {
     if (plot.crop && plot.progress >= MATURE) {
@@ -1444,6 +1646,31 @@ export class Game {
       }
     }
 
+    // Deferred pick-up: arrived next to the tapped keepsake?
+    if (this.pendingPickup) {
+      const e = this.pendingPickup;
+      const hit = this.placedItems.find((p) => p.entry === e);
+      if (!hit) {
+        this.pendingPickup = null;
+      } else if (Math.hypot(e.x - this.player.x, e.z - this.player.z) <= 2.2) {
+        this.pendingPickup = null;
+        this.offerPickup(hit);
+      } else if (!this.player.hasTarget) {
+        this.pendingPickup = null;
+      }
+    }
+
+    // The pick-up offer rests if the player wanders off.
+    if (
+      this.pickupTarget &&
+      Math.hypot(
+        this.pickupTarget.entry.x - this.player.x,
+        this.pickupTarget.entry.z - this.player.z,
+      ) > 3.2
+    ) {
+      this.closePickup();
+    }
+
     // Deferred coffer-open: walked to the chest?
     if (this.pendingCoffer) {
       if (Math.hypot(COFFER_POS.x - this.player.x, COFFER_POS.z - this.player.z) <= GATHER_REACH) {
@@ -1467,6 +1694,13 @@ export class Game {
 
     // The authored areas: arrival, the chime beat, the coffer tell.
     this.landmarks.update(dt, this.player.x, this.player.z);
+    if (this.inspectedLandmark) {
+      this.inspectedLandmark.left -= dt;
+      if (this.inspectedLandmark.left <= 0) {
+        this.inspectedLandmark = null;
+        this.ui.hideLandmarkInfo();
+      }
+    }
 
     // The scripted first hook (§6): once, a little into the session, if the
     // home coffer is open and something has been made — Datou looks east.
@@ -1529,6 +1763,18 @@ export class Game {
     // --- render layers ---
     const camYaw = this.cameraRig.azimuth;
     this.world.update(dt, camYaw);
+
+    // Placement ghost: the same hand-drawn plate at 35% ink, riding the
+    // ground pick under the pointer — you see where it lands before you commit.
+    if (this.placingId && this.placeGhost && this.lastPointer) {
+      const under = this.pick(this.lastPointer.x, this.lastPointer.y);
+      if (under && under !== 'datou') {
+        const gp = this.clampToWorld(under.x, under.z);
+        this.placeGhost.group.visible = true;
+        this.placeGhost.setPosition(gp.x, gp.z);
+        this.placeGhost.faceCamera(camYaw);
+      }
+    }
     this.datouRig.update(dt, state, this.companion.expression, camYaw);
     this.humanRig.update(dt, this.player.x, this.player.z, this.player.vx, this.player.vz, camYaw);
 
@@ -1582,6 +1828,26 @@ export class Game {
     } else {
       this.ui.showWant(null);
     }
+    if (this.inspectedLandmark) {
+      const info = this.inspectedLandmark.info;
+      const anchor = new THREE.Vector3(info.x, info.y, info.z).project(this.cameraRig.camera);
+      this.ui.positionLandmarkInfo(
+        ((anchor.x + 1) / 2) * window.innerWidth,
+        ((1 - anchor.y) / 2) * window.innerHeight,
+        anchor.z >= -1 && anchor.z <= 1,
+      );
+    }
+    if (this.pickupTarget) {
+      const e = this.pickupTarget.entry;
+      const anchor = new THREE.Vector3(e.x, this.pickupTarget.height, e.z).project(
+        this.cameraRig.camera,
+      );
+      this.ui.positionPickup(
+        ((anchor.x + 1) / 2) * window.innerWidth,
+        ((1 - anchor.y) / 2) * window.innerHeight,
+        anchor.z >= -1 && anchor.z <= 1,
+      );
+    }
 
     this.saveIn -= dt;
     if (this.saveIn <= 0) {
@@ -1596,6 +1862,11 @@ export class Game {
   private readonly onResize = (): void => {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.cameraRig.resize(window.innerWidth / window.innerHeight);
+  };
+
+  /** Track the pointer so the placement ghost can ride the ground pick. */
+  private readonly onPointerMove = (e: PointerEvent): void => {
+    this.lastPointer = { x: e.clientX, y: e.clientY };
   };
 
   // --- persistence helpers ---
@@ -1620,6 +1891,14 @@ export class Game {
     }
   }
 
+  private removeRaw(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Session-only in private mode.
+    }
+  }
+
   private loadJson<T>(key: string, fallback: T): T {
     try {
       const raw = localStorage.getItem(key);
@@ -1639,8 +1918,10 @@ export class Game {
 
   dispose(): void {
     this.running = false;
+    this.endPlacement();
     this.pointer.dispose();
     this.keys.dispose();
+    this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('resize', this.onResize);
     this.physics.dispose();
     this.renderer.dispose();

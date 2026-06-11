@@ -53,6 +53,11 @@ generated in code from the seeded Rng, `src/art/`) keyed to the baseline
 palette. See `docs/quadruped-game-design-research.md` for the gameplay frame.
 
 - **You are a human puppet** (`src/human/`): WASD / tap-to-walk, Shift run.
+  The walker is one of the two designed companions **Mei or An** (from the
+  "Main Character Concepts" design handoff) — a wobbly-ink, cozy-pastel
+  paper-doll cutout (`src/art/walkerParts.ts`, drawn with `wobbleInk.ts`;
+  cast + 5 outfit directions + 3 ages in `walkerData.ts`). Character / outfit /
+  age are chosen in ⚙ settings (or `?walker=`/`?outfit=`/`?age=`), applied live.
   Datou (chibi VITA mascot rig, `src/datou/DatouRig.ts` — real vita01evt
   joint layout: 2-segment Z-fold legs, neck head, no tail) walks with you on
   an inked **leash** (follow) or off (potters nearby). Tap to pet, hold to

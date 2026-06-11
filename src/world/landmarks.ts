@@ -68,6 +68,49 @@ export interface LandmarkDef {
   readonly clueTo?: LandmarkId;
 }
 
+/** A selected landmark object that can explain itself when tapped. */
+export interface LandmarkInspection {
+  readonly key: string;
+  readonly area: LandmarkId;
+  readonly x: number;
+  readonly z: number;
+  /** Height of the floating label anchor above the ground. */
+  readonly y: number;
+  readonly radius: number;
+}
+
+/**
+ * Focal objects across the landmark network. These are intentionally selective:
+ * enough to make each place readable without turning every decorative plate
+ * into a UI target.
+ */
+export const LANDMARK_INSPECTIONS: readonly LandmarkInspection[] = [
+  { key: 'pennant-mast', area: 'repair-commons', x: 132, z: -26, y: 7.2, radius: 2.3 },
+  { key: 'message-chime', area: 'repair-commons', x: 127.5, z: -30.5, y: 1.9, radius: 1.8 },
+  { key: 'pump-wheel', area: 'pump-garden', x: 14, z: 108, y: 3.4, radius: 2.1 },
+  { key: 'floating-planter', area: 'pump-garden', x: 15, z: 119, y: 1.0, radius: 1.8 },
+  { key: 'relay-mast', area: 'relay-camp', x: -114, z: -104, y: 6.3, radius: 2.2 },
+  { key: 'signal-vane', area: 'relay-camp', x: -111, z: -107, y: 1.6, radius: 1.6 },
+  { key: 'marked-stone', area: 'ruin-stones', x: 169.5, z: -163.5, y: 2.1, radius: 1.8 },
+  { key: 'spotter-tube', area: 'watch-knoll', x: -96.5, z: 88.5, y: 1.7, radius: 1.7 },
+  { key: 'orchard-sapling', area: 'meadow-orchard', x: 61, z: -109, y: 2.1, radius: 1.7 },
+  { key: 'stepping-stones', area: 'stepping-stones', x: -72, z: 28, y: 0.8, radius: 2.3 },
+  { key: 'willow-tree', area: 'willow-bend', x: -38, z: 92, y: 4.7, radius: 2.4 },
+  { key: 'marsh-pool', area: 'frog-shallows', x: -45, z: 160, y: 0.8, radius: 2.5 },
+  { key: 'lantern-avenue', area: 'lantern-walk', x: 4, z: 70, y: 2.0, radius: 2.3 },
+  { key: 'old-boardwalk', area: 'boardwalk-rest', x: 82, z: 138, y: 0.9, radius: 2.5 },
+  { key: 'driftwood-arch', area: 'driftwood-beach', x: 96, z: 188, y: 2.6, radius: 2.0 },
+  { key: 'kite-post', area: 'kite-field', x: 150, z: 90, y: 3.0, radius: 2.1 },
+  { key: 'meadow-gate', area: 'gate-arch', x: 172, z: -78, y: 2.8, radius: 2.1 },
+  { key: 'beacon-basket', area: 'beacon-rise', x: 118, z: -150, y: 3.8, radius: 2.1 },
+  { key: 'star-stone', area: 'star-circle', x: -6.1, z: -168.4, y: 1.0, radius: 1.6 },
+  { key: 'hollow-oak', area: 'hollow-oak', x: -65, z: -45, y: 4.2, radius: 2.4 },
+  { key: 'swing-board', area: 'swing-tree', x: -34, z: -70, y: 2.8, radius: 2.2 },
+  { key: 'hive-stand', area: 'bee-meadow', x: 38, z: -64, y: 1.7, radius: 1.8 },
+  { key: 'giant-fern', area: 'fern-hollow', x: -160, z: -145, y: 1.9, radius: 1.8 },
+  { key: 'quarry-face', area: 'quarry-scar', x: -185, z: -10, y: 3.1, radius: 2.4 },
+];
+
 /**
  * The first three areas (§7). Centers sit on the existing layout anchors:
  * the east-trail cluster, the lake jetty reed bank, and the Old Pine.
@@ -103,7 +146,12 @@ export const LANDMARK_DEFS: readonly LandmarkDef[] = [
     noticeRadius: 70,
     activityRadius: 10,
     // A narrow field case in the hollow beneath the Old Pine.
-    coffer: { x: -119, z: -108.5, blueprintForm: 'wayfinder', materials: { 'old-bolt': 3, pebble: 2 } },
+    coffer: {
+      x: -119,
+      z: -108.5,
+      blueprintForm: 'wayfinder',
+      materials: { 'old-bolt': 3, pebble: 2 },
+    },
     clueTo: 'ruin-stones',
   },
   {
@@ -115,7 +163,12 @@ export const LANDMARK_DEFS: readonly LandmarkDef[] = [
     noticeRadius: 75,
     activityRadius: 11,
     // An old waxed satchel beneath the fallen lintel stone.
-    coffer: { x: 163.5, z: -157, blueprintForm: 'lantern', materials: { reed: 3, feather: 1, twig: 2 } },
+    coffer: {
+      x: 163.5,
+      z: -157,
+      blueprintForm: 'lantern',
+      materials: { reed: 3, feather: 1, twig: 2 },
+    },
     clueTo: 'watch-knoll',
   },
   {
@@ -197,7 +250,12 @@ export const LANDMARK_DEFS: readonly LandmarkDef[] = [
     center: { x: 150, z: 90 },
     noticeRadius: 60,
     activityRadius: 9,
-    coffer: { x: 146, z: 86, blueprintForm: 'wind-vane', materials: { 'old-bolt': 2, feather: 1, twig: 2 } },
+    coffer: {
+      x: 146,
+      z: 86,
+      blueprintForm: 'wind-vane',
+      materials: { 'old-bolt': 2, feather: 1, twig: 2 },
+    },
     clueTo: 'gate-arch',
   },
   // The FENCE LINE along the east edge.

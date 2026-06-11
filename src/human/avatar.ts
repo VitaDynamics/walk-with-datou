@@ -1,29 +1,88 @@
 /**
- * The walker's avatar preference (boy / girl) — chosen in ⚙ settings,
- * persisted in localStorage, applied live to the HumanRig (no reload).
+ * The walker's identity — which designed character (Mei / An) and which outfit
+ * "direction" the player walks as. Chosen in ⚙ settings, persisted in
+ * localStorage, applied live to the HumanRig (no reload). Mirrors the cast and
+ * wardrobe from "Main Character Concepts".
  */
 
-import type { AvatarStyle } from '../art/humanParts';
+import { AGE_ORDER, DIRECTION_ORDER, type AgeId, type CharId, type DirId } from '../art/walkerData';
 
-export type { AvatarStyle };
+export type { AgeId, CharId, DirId };
 
-const KEY = 'wwd.avatar';
+const CHAR_KEY = 'wwd.walker.char';
+const OUTFIT_KEY = 'wwd.walker.outfit';
+const AGE_KEY = 'wwd.walker.age';
 
-export function readSavedAvatar(): AvatarStyle {
+// Legacy boy/girl preference maps onto the new cast so existing saves carry over.
+const LEGACY_KEY = 'wwd.avatar';
+
+function legacyChar(): CharId | null {
   try {
-    // One-off URL override (?avatar=girl), like ?physics= — handy for QA.
-    const q = new URLSearchParams(window.location.search).get('avatar');
-    if (q === 'girl' || q === 'boy') return q;
-    return localStorage.getItem(KEY) === 'girl' ? 'girl' : 'boy';
+    const v = localStorage.getItem(LEGACY_KEY);
+    if (v === 'girl') return 'mei';
+    if (v === 'boy') return 'an';
   } catch {
-    return 'boy';
+    /* ignore */
+  }
+  return null;
+}
+
+export function readSavedCharacter(): CharId {
+  try {
+    const q = new URLSearchParams(window.location.search).get('walker');
+    if (q === 'mei' || q === 'an') return q;
+    const saved = localStorage.getItem(CHAR_KEY);
+    if (saved === 'mei' || saved === 'an') return saved;
+    return legacyChar() ?? 'mei';
+  } catch {
+    return 'mei';
   }
 }
 
-export function saveAvatarPreference(style: AvatarStyle): void {
+export function readSavedOutfit(): DirId {
   try {
-    localStorage.setItem(KEY, style);
+    const q = new URLSearchParams(window.location.search).get('outfit');
+    if (q && (DIRECTION_ORDER as string[]).includes(q)) return q as DirId;
+    const saved = localStorage.getItem(OUTFIT_KEY);
+    if (saved && (DIRECTION_ORDER as string[]).includes(saved)) return saved as DirId;
+    return 'scout';
   } catch {
-    // Private mode etc. — the choice just won't survive a reload.
+    return 'scout';
+  }
+}
+
+export function readSavedAge(): AgeId {
+  try {
+    const q = new URLSearchParams(window.location.search).get('age');
+    if (q && (AGE_ORDER as string[]).includes(q)) return q as AgeId;
+    const saved = localStorage.getItem(AGE_KEY);
+    if (saved && (AGE_ORDER as string[]).includes(saved)) return saved as AgeId;
+    return 'adult';
+  } catch {
+    return 'adult';
+  }
+}
+
+export function saveAgePreference(age: AgeId): void {
+  try {
+    localStorage.setItem(AGE_KEY, age);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function saveCharacterPreference(char: CharId): void {
+  try {
+    localStorage.setItem(CHAR_KEY, char);
+  } catch {
+    /* private mode — choice just won't survive a reload */
+  }
+}
+
+export function saveOutfitPreference(dir: DirId): void {
+  try {
+    localStorage.setItem(OUTFIT_KEY, dir);
+  } catch {
+    /* private mode */
   }
 }

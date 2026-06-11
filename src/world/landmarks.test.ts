@@ -3,7 +3,7 @@ import { matchExact, patternForForm } from '../game/workshop/patterns';
 import { canonical } from '../game/workshop/pattern';
 import { MATERIALS, groupOf } from '../game/workshop/materials';
 import { WorkshopState } from '../game/workshop/WorkshopState';
-import { CLEARINGS, LANDMARK_DEFS, LandmarkField } from './landmarks';
+import { CLEARINGS, LANDMARK_DEFS, LANDMARK_INSPECTIONS, LandmarkField } from './landmarks';
 
 describe('landmark definitions', () => {
   it('grant blueprints that exist in the exact-pattern table', () => {
@@ -41,9 +41,7 @@ describe('landmark definitions', () => {
         expect(def.clueTo).not.toBe(def.id);
       }
       const d = Math.hypot(def.coffer.x - def.center.x, def.coffer.z - def.center.z);
-      expect(d, `${def.id} coffer outside activity ring`).toBeLessThanOrEqual(
-        def.activityRadius,
-      );
+      expect(d, `${def.id} coffer outside activity ring`).toBeLessThanOrEqual(def.activityRadius);
     }
   });
 
@@ -53,6 +51,20 @@ describe('landmark definitions', () => {
       const around = CLEARINGS.filter((c) => c.x === def.center.x && c.z === def.center.z);
       expect(around.some((c) => c.density === 0 && c.r === def.activityRadius)).toBe(true);
       expect(around.some((c) => c.density > 0 && c.r > def.activityRadius)).toBe(true);
+    }
+  });
+
+  it('gives every landmark at least one labelled focal object', () => {
+    for (const def of LANDMARK_DEFS) {
+      expect(
+        LANDMARK_INSPECTIONS.some((inspection) => inspection.area === def.id),
+        def.id,
+      ).toBe(true);
+    }
+    for (const inspection of LANDMARK_INSPECTIONS) {
+      expect(LANDMARK_DEFS.some((def) => def.id === inspection.area)).toBe(true);
+      expect(inspection.radius).toBeGreaterThan(0);
+      expect(inspection.y).toBeGreaterThan(0);
     }
   });
 });
@@ -156,9 +168,7 @@ describe('LandmarkField', () => {
     const justOutside = commons.center.x - commons.noticeRadius - 5;
     expect(f.nearestNoticeable(justOutside, commons.center.z)).toBeNull();
     // An Explorer (×1.2) senses it from the same spot.
-    expect(f.nearestNoticeable(justOutside, commons.center.z, 1.2)?.def.id).toBe(
-      'repair-commons',
-    );
+    expect(f.nearestNoticeable(justOutside, commons.center.z, 1.2)?.def.id).toBe('repair-commons');
   });
 
   it('never re-grants a coffer across reloads (the §9 idempotence guard)', () => {

@@ -27,6 +27,10 @@ export type CraftedId =
   | 'shelter'
   | 'archway';
 export type ItemId = ResourceId | FoundId | CraftedId;
+/** Anything the pack can hold: the ids above, plus Workshop-made generative
+ *  ItemIds (`form:material:size:finish`). `string & {}` keeps the literal
+ *  autocomplete while accepting the open id space. */
+export type PackId = ItemId | (string & {});
 
 export const RESOURCE_IDS: readonly ResourceId[] = [
   'twig',
@@ -38,7 +42,7 @@ export const RESOURCE_IDS: readonly ResourceId[] = [
 ];
 
 export class Backpack {
-  private readonly counts = new Map<ItemId, number>();
+  private readonly counts = new Map<PackId, number>();
   private readonly listeners = new Set<() => void>();
   private readonly storageKey: string;
 
@@ -47,22 +51,22 @@ export class Backpack {
     this.load();
   }
 
-  count(id: ItemId): number {
+  count(id: PackId): number {
     return this.counts.get(id) ?? 0;
   }
 
   /** All item ids currently held (count > 0), resources first. */
-  held(): ItemId[] {
+  held(): PackId[] {
     return [...this.counts.entries()].filter(([, n]) => n > 0).map(([id]) => id);
   }
 
-  add(id: ItemId, n = 1): void {
+  add(id: PackId, n = 1): void {
     this.counts.set(id, this.count(id) + n);
     this.changed();
   }
 
   /** Remove up to n; returns true if the backpack had them. */
-  take(id: ItemId, n = 1): boolean {
+  take(id: PackId, n = 1): boolean {
     if (this.count(id) < n) return false;
     this.counts.set(id, this.count(id) - n);
     this.changed();
@@ -91,7 +95,7 @@ export class Backpack {
       if (!Array.isArray(parsed)) return;
       for (const entry of parsed) {
         if (Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'number') {
-          this.counts.set(entry[0] as ItemId, entry[1]);
+          this.counts.set(entry[0], entry[1]);
         }
       }
     } catch {

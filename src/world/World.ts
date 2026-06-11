@@ -325,6 +325,14 @@ export class World {
     this.cutouts.push(cut);
   }
 
+  /** Take a placed plate back out (the player picked the keepsake up). */
+  removeCutout(cut: Cutout): void {
+    const i = this.cutouts.indexOf(cut);
+    if (i >= 0) this.cutouts.splice(i, 1);
+    cut.group.removeFromParent();
+    cut.dispose();
+  }
+
   update(dt: number, camYaw: number): void {
     for (const c of this.cutouts) c.faceCamera(camYaw);
     if (Math.abs(camYaw - this.lastYaw) > 0.002) {

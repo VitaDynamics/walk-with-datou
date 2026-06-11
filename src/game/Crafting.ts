@@ -1,16 +1,11 @@
 /**
- * Crafting — the building tree.
- *
- * Three tiers, Don't Starve-style but warm: raw finds become COMPONENTS
- * (bundles of twigs, piles of stones), components become FURNISHINGS for the
- * home (fences, lanterns, a campfire, a garden plot…), and furnishings-grade
- * parts combine into STRUCTURES (Datou's shelter, an archway). Everything you
- * make either goes back into play (the fetch stick), onto Datou (the
- * garland), or INTO THE WORLD — the home grows out of what the two of you
- * found on walks ("the relationship and the space are co-transformed").
+ * Legacy item registry. The Workshop bench (src/game/workshop/) is THE
+ * crafting system; this table survives only to describe the legacy crafted
+ * ids that can still sit in a pack — which verb each one answers to ("Place",
+ * "Wear", "Throw") and what it once cost. No crafting happens here anymore.
  */
 
-import type { Backpack, CraftedId, ItemId } from './Backpack';
+import type { CraftedId, ItemId } from './Backpack';
 
 export type RecipeUse = 'throw' | 'place' | 'wear' | 'component';
 
@@ -43,18 +38,3 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'archway', needs: { bundle: 2, stonepile: 1 }, use: 'place', tier: 3 },
 ];
 
-export function recipe(id: CraftedId): Recipe {
-  return RECIPES.find((r) => r.id === id)!;
-}
-
-export function canCraft(r: Recipe, pack: Backpack): boolean {
-  return Object.entries(r.needs).every(([id, n]) => pack.count(id as ItemId) >= n);
-}
-
-/** Consume ingredients and add the result. Returns false if short. */
-export function craft(r: Recipe, pack: Backpack): boolean {
-  if (!canCraft(r, pack)) return false;
-  for (const [id, n] of Object.entries(r.needs)) pack.take(id as ItemId, n);
-  pack.add(r.id);
-  return true;
-}

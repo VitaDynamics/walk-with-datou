@@ -21,7 +21,12 @@ createPhysics()
     if (tag) tag.textContent = `physics: ${backend}`;
 
     const game = new Game(canvas, adapter);
-    mountSettings({ activeBackend: backend, onAvatarChange: (s) => game.setAvatar(s) });
+    mountSettings({
+      activeBackend: backend,
+      onCharacterChange: (c) => game.setCharacter(c),
+      onOutfitChange: (d) => game.setOutfit(d),
+      onAgeChange: (a) => game.setAge(a),
+    });
     // Minimal debug handle (used by automated checks and the console).
     (window as unknown as { game?: Game }).game = game;
     game.start();

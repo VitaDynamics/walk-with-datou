@@ -24,7 +24,8 @@ const UI = {
     'console.pack': 'Backpack',
     'console.memories': 'Memories',
     'console.foundToday': 'Found today · {n}/{total}',
-    'hint.firstSteps': 'WASD / tap to walk · tap Datou to pet, hold to soothe · tap small plants to gather',
+    'hint.firstSteps':
+      'WASD / tap to walk · tap Datou to pet, hold to soothe · tap small plants to gather',
     'pack.title': 'Backpack',
     'pack.empty': 'Nothing gathered yet — tap twigs, pebbles and flowers as you walk.',
     'use.throw': 'Throw',
@@ -32,6 +33,10 @@ const UI = {
     'use.wear': 'Wear',
     'use.unwear': 'Take off',
     'place.hint': 'Tap the ground where you want it',
+    'place.banner': 'Placing {thing} — tap the ground',
+    'pickup.take': 'Pick up',
+    'pickup.move': 'Move',
+    'pickup.done': '{thing} is back in your pack',
     'gather.toast': 'Picked up {thing}',
     'fetch.return': 'Datou brought the stick back!',
     'react.sniff': 'Datou sniffs it over',
@@ -66,7 +71,7 @@ const UI = {
     'craft.componentHint': 'A building part — used in bigger makes below',
     'craft.resourceHint': 'A find from the walk — craft with it, or plant it in a garden plot',
     'use.component': 'Part',
-    'place.cancelled': 'Put it back in the pack',
+    'place.cancelled': 'Back in your pack',
     'farm.planted': 'Planted {thing}',
     'farm.growing': 'It’s coming along…',
     'farm.harvest': 'Harvested {thing} ×{n}',
@@ -128,13 +133,15 @@ const UI = {
     'workshop.tab.tree': 'Tree',
     'workshop.tab.notebook': 'Notebook',
     'workshop.benchHint': 'Drag a material across the bench. Right-click a cell to take one back.',
-    'workshop.noMaterials': 'Gather twigs, stones and flowers on your walk — then make things here.',
+    'workshop.noMaterials':
+      'Gather twigs, stones and flowers on your walk — then make things here.',
     'workshop.result': 'Result',
     'workshop.resultEmpty': 'Arrange materials on the bench to see what they become.',
     'workshop.make': 'Make',
     'workshop.curio': 'a little curio',
     'workshop.curios': 'Curios · {n}',
     'workshop.made': 'We figured out {thing}',
+    'workshop.toPack': '{thing} — it’s in your pack',
     'workshop.foundOf': '{n} of {total} found',
     'workshop.branchLocked': 'Nothing discovered here yet',
     'workshop.notebookEmpty': 'Nothing banked yet — walk with Datou and watch for ideas.',
@@ -164,26 +171,104 @@ const UI = {
     'node.needTool': 'Datou paws at it — you’ll need the right tool',
     'node.refused': 'Datou is tired and sits this one out',
     'node.spent': 'Worked out for now — it’ll come back',
-    'coffer.opened': 'A little chest of blueprints — the fetch stick and two tools, with stock to make them. Open the Workshop.',
+    'coffer.opened':
+      'A little chest of blueprints — the fetch stick and two tools, with stock to make them. Open the Workshop.',
     'coffer.context': 'from the little chest near home',
     'memory.coffer': 'Found a little chest of ideas',
     // --- Community landmarks (landmark plan §7–§9) -------------------------
     'landmark.repair-commons.arrive': 'The Trail Repair Commons — someone keeps this trail going',
     'landmark.pump-garden.arrive': 'The Reedwater Pump Garden — a handmade wetland garden',
     'landmark.relay-camp.arrive': 'The Old Pine Relay Camp — volunteers ran a park relay here',
-    'landmark.ruin-stones.arrive': 'The Ruin Stones — the park’s first shelter. The fragment’s mark is everywhere.',
+    'landmark.ruin-stones.arrive':
+      'The Ruin Stones — the park’s first shelter. The fragment’s mark is everywhere.',
     'landmark.watch-knoll.arrive': 'The Watchers’ Knoll — bird boards, long grass, a wide sky',
-    'landmark.meadow-orchard.arrive': 'The Meadow Orchard — planted rows, sweet with coming blossom',
+    'landmark.meadow-orchard.arrive':
+      'The Meadow Orchard — planted rows, sweet with coming blossom',
+    'landmark.inspect.pennant-mast.name': 'Patchwork pennant mast',
+    'landmark.inspect.pennant-mast.desc':
+      'A tall salvaged marker that makes the volunteer repair stop visible from the trail.',
+    'landmark.inspect.message-chime.name': 'Trail message chime',
+    'landmark.inspect.message-chime.desc':
+      'Crews left this chime for walkers. Its clear ring means the Commons is being cared for.',
+    'landmark.inspect.pump-wheel.name': 'Handmade pump wheel',
+    'landmark.inspect.pump-wheel.desc':
+      'The garden’s timber pump lifts water into the channels and floating beds.',
+    'landmark.inspect.floating-planter.name': 'Floating planter',
+    'landmark.inspect.floating-planter.desc':
+      'A light planting box that rises with the restored water loop.',
+    'landmark.inspect.relay-mast.name': 'Old park relay',
+    'landmark.inspect.relay-mast.desc':
+      'Volunteers used this mast to pass small reports between distant corners of the park.',
+    'landmark.inspect.signal-vane.name': 'Signal vane',
+    'landmark.inspect.signal-vane.desc':
+      'One of two tuning vanes. Their bearings wake the relay when both sit true.',
+    'landmark.inspect.marked-stone.name': 'Ring-marked shelter stone',
+    'landmark.inspect.marked-stone.desc':
+      'The carved mark belongs to the park’s first shelter and its old network of keepers.',
+    'landmark.inspect.spotter-tube.name': 'Watchers’ spotter tube',
+    'landmark.inspect.spotter-tube.desc':
+      'A simple field scope set here for watching swifts cross the open sky.',
+    'landmark.inspect.orchard-sapling.name': 'Young orchard tree',
+    'landmark.inspect.orchard-sapling.desc':
+      'One tree in the planted row has slipped its stake and needs setting upright.',
+    'landmark.inspect.stepping-stones.name': 'Stream stepping stones',
+    'landmark.inspect.stepping-stones.desc':
+      'Flat stones placed by hand to keep the old crossing dry and steady.',
+    'landmark.inspect.willow-tree.name': 'Sheltering willow',
+    'landmark.inspect.willow-tree.desc':
+      'Its hanging branches make a quiet green room around the stream-side seat.',
+    'landmark.inspect.marsh-pool.name': 'Frog shallows pool',
+    'landmark.inspect.marsh-pool.desc':
+      'A still, reed-ringed pool kept open for frogs, insects, and small wetland life.',
+    'landmark.inspect.lantern-avenue.name': 'Waiting lantern avenue',
+    'landmark.inspect.lantern-avenue.desc':
+      'A short paved walk whose handmade lamps guide visitors toward the lakeshore.',
+    'landmark.inspect.old-boardwalk.name': 'Old marsh boardwalk',
+    'landmark.inspect.old-boardwalk.desc':
+      'Weathered planks carry the path across soft marsh ground without disturbing it.',
+    'landmark.inspect.driftwood-arch.name': 'Driftwood arch',
+    'landmark.inspect.driftwood-arch.desc':
+      'Beach-combers lashed pale shore wood into a marker that frames the southern sky.',
+    'landmark.inspect.kite-post.name': 'Community kite post',
+    'landmark.inspect.kite-post.desc':
+      'Lines and spools gather here so the open field can be shared by many flyers.',
+    'landmark.inspect.meadow-gate.name': 'Old meadow gate',
+    'landmark.inspect.meadow-gate.desc':
+      'This handmade gate marks the eastern edge while keeping the path welcoming.',
+    'landmark.inspect.beacon-basket.name': 'Keeper’s beacon basket',
+    'landmark.inspect.beacon-basket.desc':
+      'A small iron fire basket once used to answer signals across the high ground.',
+    'landmark.inspect.star-stone.name': 'Drilled star stone',
+    'landmark.inspect.star-stone.desc':
+      'One of five seat-stones whose tiny drilled stars echo the night sky above.',
+    'landmark.inspect.hollow-oak.name': 'Exchange oak',
+    'landmark.inspect.hollow-oak.desc':
+      'The old hollow holds a community shelf: leave something useful, take what you need.',
+    'landmark.inspect.swing-board.name': 'Old rope swing',
+    'landmark.inspect.swing-board.desc':
+      'A simple board and two ropes, checked and kept sound by people passing through.',
+    'landmark.inspect.hive-stand.name': 'Meadow hive stand',
+    'landmark.inspect.hive-stand.desc':
+      'Raised hives sit level among the flowers, with clear lanes for the bees.',
+    'landmark.inspect.giant-fern.name': 'Giant hollow fern',
+    'landmark.inspect.giant-fern.desc':
+      'Broad fronds hold the damp shade and give this woodland hollow its deep green character.',
+    'landmark.inspect.quarry-face.name': 'Old quarry face',
+    'landmark.inspect.quarry-face.desc':
+      'These cut marks show where much of the park’s stone was shaped and carried away.',
     'landmark.ruins.trace': 'Datou sets his paw beside the mark; you rub it through together…',
-    'landmark.ruins.done': 'Under the chalk, the mark answers: a sketch of the old network — a watchers’ rise west of home, planted rows in the high meadow.',
+    'landmark.ruins.done':
+      'Under the chalk, the mark answers: a sketch of the old network — a watchers’ rise west of home, planted rows in the high meadow.',
     'landmark.ruins.again.0': 'The chalk mark catches the light.',
     'landmark.ruins.again.1': 'A moth circles the traced ring, patient as stone.',
     'landmark.knoll.steady': 'Datou braces the tripod while you level the tube…',
-    'landmark.knoll.done': 'The tube settles true — and the swifts come wheeling back over the rise.',
+    'landmark.knoll.done':
+      'The tube settles true — and the swifts come wheeling back over the rise.',
     'landmark.knoll.again.0': 'Swifts wheel over the knoll.',
     'landmark.knoll.again.1': 'The wind combs the silver grass.',
     'landmark.orchard.stake': 'Datou tamps the soil while you draw the sapling upright…',
-    'landmark.orchard.done': 'The sapling stands. By the time you step back, the row is full of blossom.',
+    'landmark.orchard.done':
+      'The sapling stands. By the time you step back, the row is full of blossom.',
     'landmark.orchard.again.0': 'Petals drift between the rows.',
     'landmark.orchard.again.1': 'The butterflies are busy in the clover.',
     // --- Light landmarks (map-fill wave) -----------------------------------
@@ -192,86 +277,114 @@ const UI = {
     'landmark.lightAgain.2': 'Someone has visited since you — things sit a little differently.',
     'landmark.stepping-stones.arrive': 'The Stepping Stones — the stream crossing, worn smooth',
     'landmark.stepping-stones.tend': 'Datou steadies each stone while you settle them true…',
-    'landmark.stepping-stones.done': 'The crossing sits firm. Downstream, a willow leans over the bend.',
+    'landmark.stepping-stones.done':
+      'The crossing sits firm. Downstream, a willow leans over the bend.',
     'landmark.willow-bend.arrive': 'The Willow Bend — a green room over the stream',
     'landmark.willow-bend.tend': 'You part the curtain fronds; Datou clears the seat beneath…',
-    'landmark.willow-bend.done': 'The bench under the willow is clear again. The stream goes on toward the marsh.',
+    'landmark.willow-bend.done':
+      'The bench under the willow is clear again. The stream goes on toward the marsh.',
     'landmark.frog-shallows.arrive': 'The Frog Shallows — pools, cattails, and a patient chorus',
     'landmark.frog-shallows.tend': 'Datou holds very still while you skim the pools clear…',
     'landmark.frog-shallows.done': 'The pools settle to glass. One frog approves, loudly.',
     'landmark.lantern-walk.arrive': 'The Lantern Walk — a paved little avenue, lamps waiting',
     'landmark.lantern-walk.tend': 'Datou steadies each post while you straighten the lamps…',
-    'landmark.lantern-walk.done': 'The avenue stands trim. Its paving runs on toward the shore boardwalk.',
+    'landmark.lantern-walk.done':
+      'The avenue stands trim. Its paving runs on toward the shore boardwalk.',
     'landmark.boardwalk-rest.arrive': 'The Old Boardwalk — planks over the marsh, one gap to mind',
     'landmark.boardwalk-rest.tend': 'Datou braces the runner while you seat the loose planks…',
-    'landmark.boardwalk-rest.done': 'The walk holds underfoot. South along the shore, driftwood arches stand.',
+    'landmark.boardwalk-rest.done':
+      'The walk holds underfoot. South along the shore, driftwood arches stand.',
     'landmark.driftwood-beach.arrive': 'The Driftwood Beach — bleached arches on the south shore',
     'landmark.driftwood-beach.tend': 'You re-lash the leaning arch; Datou leans where told…',
-    'landmark.driftwood-beach.done': 'The arches stand against the sky. The beach-combers would be pleased.',
+    'landmark.driftwood-beach.done':
+      'The arches stand against the sky. The beach-combers would be pleased.',
     'landmark.kite-field.arrive': 'The Kite Field — a mown strip and two kites pinned to the sky',
     'landmark.kite-field.tend': 'Datou holds the spool while you take in the slack…',
-    'landmark.kite-field.done': 'The lines sit taut and the kites ride steady. East, an old gate breaks the fence line.',
+    'landmark.kite-field.done':
+      'The lines sit taut and the kites ride steady. East, an old gate breaks the fence line.',
     'landmark.gate-arch.arrive': 'The Meadow Gate — an arch standing ajar on the east edge',
     'landmark.gate-arch.tend': 'Datou noses the gate while you ease the old hinge…',
-    'landmark.gate-arch.done': 'The gate swings true and latches soft. The fence line walks north toward a beacon.',
+    'landmark.gate-arch.done':
+      'The gate swings true and latches soft. The fence line walks north toward a beacon.',
     'landmark.beacon-rise.arrive': 'The Beacon Rise — an iron fire-basket against the sky',
     'landmark.beacon-rise.tend': 'You lay the kindling; Datou watches the basket like a hawk…',
-    'landmark.beacon-rise.done': 'A small kept flame takes. From here the cairn line runs to the corner stones.',
+    'landmark.beacon-rise.done':
+      'A small kept flame takes. From here the cairn line runs to the corner stones.',
     'landmark.star-circle.arrive': 'The Star Circle — five seat-stones facing the night sky',
     'landmark.star-circle.tend': 'You brush off each seat-stone; Datou tries every one…',
-    'landmark.star-circle.done': 'The circle is swept and ready for dark. The drilled stars match the real ones.',
+    'landmark.star-circle.done':
+      'The circle is swept and ready for dark. The drilled stars match the real ones.',
     'landmark.fern-hollow.arrive': 'The Fern Hollow — a deep green dell under the pines',
     'landmark.fern-hollow.tend': 'You lift the flattened fronds; Datou pads the soft floor flat…',
-    'landmark.fern-hollow.done': 'The hollow breathes again, green on green. Cart ruts lead away west.',
+    'landmark.fern-hollow.done':
+      'The hollow breathes again, green on green. Cart ruts lead away west.',
     'landmark.quarry-scar.arrive': 'The Old Quarry — cut faces and a half-freed block',
     'landmark.quarry-scar.tend': 'Datou braces the leaning block while you chock it safe…',
-    'landmark.quarry-scar.done': 'The block rests safe on its chocks. The park’s stone all began here.',
+    'landmark.quarry-scar.done':
+      'The block rests safe on its chocks. The park’s stone all began here.',
     'landmark.hollow-oak.arrive': 'The Hollow Oak — leave a thing, take a thing',
     'landmark.hollow-oak.tend': 'You tidy the exchange shelf; Datou inspects every item…',
-    'landmark.hollow-oak.done': 'The shelf is set fair. Footprints lead on toward a swing under a big limb.',
+    'landmark.hollow-oak.done':
+      'The shelf is set fair. Footprints lead on toward a swing under a big limb.',
     'landmark.swing-tree.arrive': 'The Swing Tree — a board swing hanging plumb-still',
     'landmark.swing-tree.tend': 'Datou tests the board; you check both ropes for wear…',
     'landmark.swing-tree.done': 'The swing holds sound. Datou rides it exactly once, with dignity.',
     'landmark.bee-meadow.arrive': 'The Bee Meadow — hives in a drift of flowers',
     'landmark.bee-meadow.tend': 'You level the hive stand; Datou keeps a respectful distance…',
-    'landmark.bee-meadow.done': 'The hives sit level and the lanes hum. The flower drift runs on toward the orchard.',
-    'landmark.commons.chimeNeedsPart': 'The chime is tangled and its clapper is gone. A twig would do.',
+    'landmark.bee-meadow.done':
+      'The hives sit level and the lanes hum. The flower drift runs on toward the orchard.',
+    'landmark.commons.chimeNeedsPart':
+      'The chime is tangled and its clapper is gone. A twig would do.',
     'landmark.commons.chimeStart': 'Datou braces the post while you untangle the chime…',
     'landmark.commons.chimeDone': 'The chime rings clear — the mast lamp warms up.',
-    'landmark.commons.again.0': 'The chime rings clear as you pass — the stop keeps its small welcome.',
+    'landmark.commons.again.0':
+      'The chime rings clear as you pass — the stop keeps its small welcome.',
     'landmark.commons.again.1': 'A breeze worries the pennants; the mast lamp holds its warmth.',
     'landmark.commons.again.2': 'Someone has pinned a fresh thank-you note to the board.',
-    'landmark.commons.chimeDonated': 'Your chime joins the rest stop — it will greet whoever passes.',
-    'landmark.capsule.found': 'Beneath the Old Pine: a volunteers’ time capsule — a tiny keepsake for the Notebook.',
-    'coffer.repair-commons.opened': 'A chime supply box — a full blueprint, and the makings for one. Chimes mark friendly rest stops.',
+    'landmark.commons.chimeDonated':
+      'Your chime joins the rest stop — it will greet whoever passes.',
+    'landmark.capsule.found':
+      'Beneath the Old Pine: a volunteers’ time capsule — a tiny keepsake for the Notebook.',
+    'coffer.repair-commons.opened':
+      'A chime supply box — a full blueprint, and the makings for one. Chimes mark friendly rest stops.',
     'coffer.repair-commons.context': 'from the supply box at the Repair Commons',
-    'coffer.pump-garden.opened': 'A planter tool chest — a full blueprint, and the makings for one. A water-stained sketch shows an empty socket in the garden.',
+    'coffer.pump-garden.opened':
+      'A planter tool chest — a full blueprint, and the makings for one. A water-stained sketch shows an empty socket in the garden.',
     'coffer.pump-garden.context': 'from the tool chest at the Pump Garden',
-    'coffer.relay-camp.opened': 'A relay field case — a wayfinder blueprint and parts. A fragment inside bears an unfamiliar mark.',
+    'coffer.relay-camp.opened':
+      'A relay field case — a wayfinder blueprint and parts. A fragment inside bears an unfamiliar mark.',
     'coffer.relay-camp.context': 'from the field case at the Relay Camp',
-    'coffer.ruin-stones.opened': 'An old waxed satchel — a lantern blueprint, and the makings for one. The shelter kept its light.',
+    'coffer.ruin-stones.opened':
+      'An old waxed satchel — a lantern blueprint, and the makings for one. The shelter kept its light.',
     'coffer.ruin-stones.context': 'from the satchel at the Ruin Stones',
-    'coffer.watch-knoll.opened': 'The watchers’ kit chest — a field-glass blueprint and parts. See what they saw.',
+    'coffer.watch-knoll.opened':
+      'The watchers’ kit chest — a field-glass blueprint and parts. See what they saw.',
     'coffer.watch-knoll.context': 'from the kit chest on the Watchers’ Knoll',
-    'coffer.meadow-orchard.opened': 'The planters’ seed chest — a bug-hotel blueprint and the makings. The pollinators need housing.',
+    'coffer.meadow-orchard.opened':
+      'The planters’ seed chest — a bug-hotel blueprint and the makings. The pollinators need housing.',
     'coffer.meadow-orchard.context': 'from the seed chest at the Meadow Orchard',
-    'coffer.stepping-stones.opened': 'A ford-keeper’s box — a path-tile blueprint and the stone to lay one.',
+    'coffer.stepping-stones.opened':
+      'A ford-keeper’s box — a path-tile blueprint and the stone to lay one.',
     'coffer.stepping-stones.context': 'from the box at the Stepping Stones',
     'coffer.willow-bend.opened': 'A keepsake tin — a garland blueprint and a handful of flowers.',
     'coffer.willow-bend.context': 'from the tin at the Willow Bend',
-    'coffer.frog-shallows.opened': 'A tarred chest — a raft blueprint and the makings. Someone meant to float the marsh.',
+    'coffer.frog-shallows.opened':
+      'A tarred chest — a raft blueprint and the makings. Someone meant to float the marsh.',
     'coffer.frog-shallows.context': 'from the chest at the Frog Shallows',
     'coffer.lantern-walk.opened': 'A lamplighter’s box — a lamp blueprint and its fittings.',
     'coffer.lantern-walk.context': 'from the box on the Lantern Walk',
-    'coffer.boardwalk-rest.opened': 'A walk-mender’s chest — a bridge-plank blueprint and the timber for one.',
+    'coffer.boardwalk-rest.opened':
+      'A walk-mender’s chest — a bridge-plank blueprint and the timber for one.',
     'coffer.boardwalk-rest.context': 'from the chest at the Old Boardwalk',
-    'coffer.driftwood-beach.opened': 'A comber’s cache — an archway blueprint and the driftwood-build makings.',
+    'coffer.driftwood-beach.opened':
+      'A comber’s cache — an archway blueprint and the driftwood-build makings.',
     'coffer.driftwood-beach.context': 'from the cache at the Driftwood Beach',
     'coffer.kite-field.opened': 'A flyer’s box — a wind-vane blueprint and parts. Know your wind.',
     'coffer.kite-field.context': 'from the box at the Kite Field',
     'coffer.gate-arch.opened': 'A gate-warden’s chest — a gate blueprint and the timber for one.',
     'coffer.gate-arch.context': 'from the chest at the Meadow Gate',
-    'coffer.beacon-rise.opened': 'A signal-keeper’s chest — a lookout-perch blueprint and its timber.',
+    'coffer.beacon-rise.opened':
+      'A signal-keeper’s chest — a lookout-perch blueprint and its timber.',
     'coffer.beacon-rise.context': 'from the chest on the Beacon Rise',
     'coffer.star-circle.opened': 'A stargazer’s tin — a mobile blueprint and feathers to hang.',
     'coffer.star-circle.context': 'from the tin at the Star Circle',
@@ -283,24 +396,30 @@ const UI = {
     'coffer.hollow-oak.context': 'from the parcel in the Hollow Oak',
     'coffer.swing-tree.opened': 'A rigger’s tin — a cord blueprint and reed to twist.',
     'coffer.swing-tree.context': 'from the tin at the Swing Tree',
-    'coffer.bee-meadow.opened': 'A keeper’s box — a vessel blueprint and smooth stones. For the honey, one day.',
+    'coffer.bee-meadow.opened':
+      'A keeper’s box — a vessel blueprint and smooth stones. For the honey, one day.',
     'coffer.bee-meadow.context': 'from the box at the Bee Meadow',
     'landmark.garden.channelTurned': 'The channel piece swings back into line.',
     'landmark.garden.channelSet': 'This piece already sits true.',
-    'landmark.garden.pumping': 'The loop is whole — Datou settles at the pump and works it in slow beats…',
+    'landmark.garden.pumping':
+      'The loop is whole — Datou settles at the pump and works it in slow beats…',
     'landmark.garden.done': 'Water travels the loop. The paper plants lift and take color.',
     'landmark.garden.again.0': 'The garden burbles along quietly.',
     'landmark.garden.again.1': 'A dragonfly rests on the pump wheel between beats.',
-    'landmark.garden.again.2': 'The floating planters have drifted into a new little constellation.',
+    'landmark.garden.again.2':
+      'The floating planters have drifted into a new little constellation.',
     'landmark.garden.socketWaits': 'An empty planter socket — it waits for a made planter.',
     'landmark.garden.socketFilled': 'The planter settles into the garden. It belongs here.',
     'landmark.camp.vaneTurn': 'The vane clicks to a new bearing.',
     'landmark.camp.vaneGood': 'Datou’s ears lift — that one rings true.',
     'landmark.camp.aligned': 'Both vanes sit true — Datou goes very still, then turns to the mast…',
-    'landmark.camp.done': 'The mast wakes with a slow amber breath. Far across the meadow, something answers from the ruin stones.',
+    'landmark.camp.done':
+      'The mast wakes with a slow amber breath. Far across the meadow, something answers from the ruin stones.',
     'landmark.camp.snippet.0': 'The relay murmurs: …shelter at the lake garden, water restored…',
-    'landmark.camp.snippet.1': 'The relay murmurs: …two lost park robots found their way home this season…',
-    'landmark.camp.snippet.2': 'The relay murmurs: …signal faint from the far corner stones — still listening…',
+    'landmark.camp.snippet.1':
+      'The relay murmurs: …two lost park robots found their way home this season…',
+    'landmark.camp.snippet.2':
+      'The relay murmurs: …signal faint from the far corner stones — still listening…',
     'memory.landmark.repair-commons': 'We fixed the trail chime together',
     'memory.landmark.pump-garden': 'We restarted the water garden together',
     'memory.landmark.relay-camp': 'We tuned the old relay — and something answered',
@@ -347,7 +466,8 @@ const UI = {
     'memory.landmark.chime-donated': 'Our chime now greets the trail',
     'landmark.toy.repair-commons.0': 'Datou nudges the patch ball across the yard, very pleased.',
     'landmark.toy.repair-commons.1': 'The patch ball rolls; Datou pounces with great ceremony.',
-    'landmark.toy.pump-garden.0': 'Datou drops the reed ring in the shallows and fishes it right back out.',
+    'landmark.toy.pump-garden.0':
+      'Datou drops the reed ring in the shallows and fishes it right back out.',
     'landmark.toy.pump-garden.1': 'A careful splash — Datou parades the dripping ring around.',
     'landmark.toy.relay-camp.0': 'Datou boops the bell. It answers. He is deeply satisfied.',
     'landmark.toy.relay-camp.1': 'One soft clang — Datou’s ears swivel to catch the echo.',
@@ -460,8 +580,18 @@ const UI = {
     'form.field-glass': 'field glass',
     'settings.language': 'Language',
     'settings.walker': 'Walker',
-    'settings.boy': 'Boy',
-    'settings.girl': 'Girl',
+    'settings.mei': 'Mei',
+    'settings.an': 'An',
+    'settings.outfit': 'Outfit',
+    'settings.outfit.scout': 'Scout',
+    'settings.outfit.pajama': 'Pajama',
+    'settings.outfit.cape': 'Cape',
+    'settings.outfit.picnic': 'Picnic',
+    'settings.outfit.rain': 'Rain',
+    'settings.age': 'Age',
+    'settings.age.kid': 'Kid',
+    'settings.age.teen': 'Teen',
+    'settings.age.adult': 'Adult',
     'settings.physics': 'Physics engine',
     'settings.running': 'Now running',
     'settings.lite': 'Lite',
@@ -486,6 +616,10 @@ const UI = {
     'use.wear': '戴上',
     'use.unwear': '取下',
     'place.hint': '点一下想放的位置',
+    'place.banner': '正在放置{thing}——点一下地面',
+    'pickup.take': '收起',
+    'pickup.move': '挪一挪',
+    'pickup.done': '{thing}已收回背包',
     'gather.toast': '捡到了{thing}',
     'fetch.return': '大头把树枝叼回来了！',
     'react.sniff': '大头凑上去闻了闻',
@@ -520,7 +654,7 @@ const UI = {
     'craft.componentHint': '建造部件——用于下面更大的制作',
     'craft.resourceHint': '散步捡来的材料——可以用来制作，或种进菜畦',
     'use.component': '部件',
-    'place.cancelled': '先收回背包里',
+    'place.cancelled': '已收回背包',
     'farm.planted': '种下了{thing}',
     'farm.growing': '正在慢慢长大…',
     'farm.harvest': '收获了{thing} ×{n}',
@@ -589,6 +723,7 @@ const UI = {
     'workshop.curio': '一件小玩意',
     'workshop.curios': '小玩意 · {n}',
     'workshop.made': '我们琢磨出了{thing}',
+    'workshop.toPack': '{thing}——已放进背包',
     'workshop.foundOf': '已发现 {n}/{total}',
     'workshop.branchLocked': '这里还什么都没发现',
     'workshop.notebookEmpty': '还没有记下什么——和大头散步时留意它的灵感。',
@@ -628,8 +763,61 @@ const UI = {
     'landmark.ruin-stones.arrive': '废墟石——公园最初的庇护所。残片上的记号在这里随处可见。',
     'landmark.watch-knoll.arrive': '守望土丘——观鸟板、长草，和一整片天空',
     'landmark.meadow-orchard.arrive': '草甸果园——成排的果苗，带着将开的花香',
+    'landmark.inspect.pennant-mast.name': '拼布旗杆',
+    'landmark.inspect.pennant-mast.desc':
+      '用旧材料搭成的高大标记，让路上的人远远就能看见这处志愿维修点。',
+    'landmark.inspect.message-chime.name': '步道留言风铃',
+    'landmark.inspect.message-chime.desc':
+      '维修队把风铃留给路人；清亮的铃声说明维修角一直有人照料。',
+    'landmark.inspect.pump-wheel.name': '手工水泵轮',
+    'landmark.inspect.pump-wheel.desc': '木制水泵把水送进沟渠和漂浮花床，是整座花园的心脏。',
+    'landmark.inspect.floating-planter.name': '漂浮花床',
+    'landmark.inspect.floating-planter.desc': '轻巧的种植箱会随着修复后的水循环重新浮起。',
+    'landmark.inspect.relay-mast.name': '旧公园中继塔',
+    'landmark.inspect.relay-mast.desc': '志愿者曾用它在公园相隔很远的角落之间传递简短消息。',
+    'landmark.inspect.signal-vane.name': '信号风向片',
+    'landmark.inspect.signal-vane.desc': '两枚调谐风向片之一；方向都对准时，中继塔才会醒来。',
+    'landmark.inspect.marked-stone.name': '环纹庇护石',
+    'landmark.inspect.marked-stone.desc':
+      '石上的记号属于公园最初的庇护所，也属于旧日守护者的联络网。',
+    'landmark.inspect.spotter-tube.name': '守望望筒',
+    'landmark.inspect.spotter-tube.desc': '一架朴素的野外望筒，用来观察雨燕掠过开阔天空。',
+    'landmark.inspect.orchard-sapling.name': '果园幼树',
+    'landmark.inspect.orchard-sapling.desc': '成排幼树中的一棵松开了支架，需要重新扶正。',
+    'landmark.inspect.stepping-stones.name': '溪流踏脚石',
+    'landmark.inspect.stepping-stones.desc': '一块块手工摆平的石头，让旧渡口保持干爽稳当。',
+    'landmark.inspect.willow-tree.name': '遮荫柳树',
+    'landmark.inspect.willow-tree.desc': '垂下的枝条围住溪边座位，形成一间安静的绿色小屋。',
+    'landmark.inspect.marsh-pool.name': '蛙浅滩水洼',
+    'landmark.inspect.marsh-pool.desc': '香蒲围着的静水洼，为青蛙、昆虫和湿地小生命留出空间。',
+    'landmark.inspect.lantern-avenue.name': '候亮的灯笼小径',
+    'landmark.inspect.lantern-avenue.desc': '一段短短的铺装路，手工灯盏会把访客引向湖岸。',
+    'landmark.inspect.old-boardwalk.name': '旧沼泽栈道',
+    'landmark.inspect.old-boardwalk.desc': '风化木板让小径穿过松软沼地，同时尽量不惊扰这里。',
+    'landmark.inspect.driftwood-arch.name': '漂木拱门',
+    'landmark.inspect.driftwood-arch.desc': '拾滩人把晒白的木头绑成标记，框住南岸的天空。',
+    'landmark.inspect.kite-post.name': '共享风筝柱',
+    'landmark.inspect.kite-post.desc': '线和线轴都收在这里，让这片开阔草场能被许多放风筝的人共享。',
+    'landmark.inspect.meadow-gate.name': '旧草甸门',
+    'landmark.inspect.meadow-gate.desc': '这扇手工门标出东侧边界，也让来路依然显得亲切。',
+    'landmark.inspect.beacon-basket.name': '守望者火篮',
+    'landmark.inspect.beacon-basket.desc': '一只小铁火篮，过去用来回应高地之间的信号。',
+    'landmark.inspect.star-stone.name': '钻星坐石',
+    'landmark.inspect.star-stone.desc': '五块坐石之一，石上的小星孔与夜空彼此呼应。',
+    'landmark.inspect.hollow-oak.name': '交换老橡树',
+    'landmark.inspect.hollow-oak.desc':
+      '树洞里有一层共享架：留下有用的东西，也可以取走需要的东西。',
+    'landmark.inspect.swing-board.name': '旧绳秋千',
+    'landmark.inspect.swing-board.desc': '一块木板、两根绳子，路过的人会检查并维护它。',
+    'landmark.inspect.hive-stand.name': '草甸蜂箱架',
+    'landmark.inspect.hive-stand.desc': '蜂箱在花丛中垫得平稳，也给蜜蜂留出了清楚的飞行通道。',
+    'landmark.inspect.giant-fern.name': '谷地巨蕨',
+    'landmark.inspect.giant-fern.desc': '宽大的叶片留住湿润阴影，也让这处林间谷地呈现深深的绿色。',
+    'landmark.inspect.quarry-face.name': '旧采石壁',
+    'landmark.inspect.quarry-face.desc': '切凿痕迹记录着公园里的许多石料曾如何在这里成形并被运走。',
     'landmark.ruins.trace': '大头把爪子搭在记号旁，你们一起把它拓了出来……',
-    'landmark.ruins.done': '粉笔之下，记号给出了回答：一张旧网络的草图——家西边的守望高地，高草甸里成排的果苗。',
+    'landmark.ruins.done':
+      '粉笔之下，记号给出了回答：一张旧网络的草图——家西边的守望高地，高草甸里成排的果苗。',
     'landmark.ruins.again.0': '粉笔拓印映着光。',
     'landmark.ruins.again.1': '一只飞蛾绕着拓好的圆环打转，像石头一样耐心。',
     'landmark.knoll.steady': '大头扶稳三脚架，你来校平望筒……',
@@ -697,13 +885,16 @@ const UI = {
     'landmark.commons.again.2': '公告板上多了一张新钉上的感谢条。',
     'landmark.commons.chimeDonated': '你的风铃挂上了歇脚处——它会迎接每个路过的人。',
     'landmark.capsule.found': '老松树下：志愿者们的时间胶囊——一件小纪念收进了手账。',
-    'coffer.repair-commons.opened': '风铃补给箱——一张完整图样，和做一件的材料。风铃标记着友好的歇脚处。',
+    'coffer.repair-commons.opened':
+      '风铃补给箱——一张完整图样，和做一件的材料。风铃标记着友好的歇脚处。',
     'coffer.repair-commons.context': '来自维修角的补给箱',
-    'coffer.pump-garden.opened': '花槽工具箱——一张完整图样和做一件的材料。一张被水浸过的草图画着花园里空着的卡座。',
+    'coffer.pump-garden.opened':
+      '花槽工具箱——一张完整图样和做一件的材料。一张被水浸过的草图画着花园里空着的卡座。',
     'coffer.pump-garden.context': '来自泵花园的工具箱',
     'coffer.relay-camp.opened': '中继野外箱——寻路器图样和零件。里面的残片刻着一个陌生的记号。',
     'coffer.relay-camp.context': '来自中继营地的野外箱',
-    'coffer.ruin-stones.opened': '一只上过蜡的旧挎包——灯笼图样，和做一件的材料。庇护所守住了它的灯。',
+    'coffer.ruin-stones.opened':
+      '一只上过蜡的旧挎包——灯笼图样，和做一件的材料。庇护所守住了它的灯。',
     'coffer.ruin-stones.context': '来自废墟石的旧挎包',
     'coffer.watch-knoll.opened': '守望者的器材箱——望远镜图样和零件。去看看他们看过的。',
     'coffer.watch-knoll.context': '来自守望土丘的器材箱',
@@ -751,7 +942,8 @@ const UI = {
     'landmark.camp.vaneTurn': '导向片咔哒一声转到新的方位。',
     'landmark.camp.vaneGood': '大头的耳朵竖了起来——这一片对准了。',
     'landmark.camp.aligned': '两片都对准了——大头静止了一瞬，转向天线杆……',
-    'landmark.camp.done': '天线杆苏醒，亮起缓慢的琥珀色呼吸。草甸远处，废墟石那边有什么回应了一声。',
+    'landmark.camp.done':
+      '天线杆苏醒，亮起缓慢的琥珀色呼吸。草甸远处，废墟石那边有什么回应了一声。',
     'landmark.camp.snippet.0': '中继低语着：……湖畔花园的庇护点，水已恢复……',
     'landmark.camp.snippet.1': '中继低语着：……这个季节有两台迷路的公园机器人找到了回家的路……',
     'landmark.camp.snippet.2': '中继低语着：……远角石阵的信号微弱——仍在监听……',
@@ -912,8 +1104,18 @@ const UI = {
     'form.field-glass': '望远镜',
     'settings.language': '语言',
     'settings.walker': '散步的人',
-    'settings.boy': '男孩',
-    'settings.girl': '女孩',
+    'settings.mei': '小美',
+    'settings.an': '小安',
+    'settings.outfit': '服装',
+    'settings.outfit.scout': '探险',
+    'settings.outfit.pajama': '睡衣',
+    'settings.outfit.cape': '斗篷',
+    'settings.outfit.picnic': '野餐',
+    'settings.outfit.rain': '雨天',
+    'settings.age': '年龄',
+    'settings.age.kid': '孩童',
+    'settings.age.teen': '少年',
+    'settings.age.adult': '成人',
     'settings.physics': '物理引擎',
     'settings.running': '当前运行',
     'settings.lite': '轻量',
@@ -953,7 +1155,8 @@ export function setLang(lang: Lang): void {
   } catch {
     // Ignore persistence failures.
   }
-  if (typeof document !== 'undefined') document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  if (typeof document !== 'undefined')
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   for (const fn of listeners) fn(lang);
 }
 

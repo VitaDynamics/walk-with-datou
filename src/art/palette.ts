@@ -66,6 +66,32 @@ export const ROBOT = {
   accent: '#d9a441',
 } as const;
 
+/**
+ * Cozy-pastel walker palette — the two designed companions Mei & An
+ * (from "Main Character Concepts"). A wobbly-ink paper-doll cast: warm,
+ * low-saturation, sitting inside the same INK as the rest of the diorama.
+ * Peach · butter · sage · cream, with two skin/hair tones to tell them apart.
+ */
+export const WALKER = {
+  peach: '#f2b79b',
+  peachD: '#e59679',
+  peachL: '#f9d6c2',
+  butter: '#f2d78f',
+  butterL: '#f9ecc6',
+  straw: '#e8c97c',
+  sage: '#aec4a0',
+  sageD: '#8fa983',
+  sageL: '#cddcc2',
+  cream: '#fbf4e6',
+  creamD: '#efe2c8',
+  white: '#fffdf7',
+  skinMei: '#f9e4cb',
+  skinAn: '#f0d2ae',
+  hairMei: '#7b5340',
+  hairAn: '#55453a',
+  blush: '#f2a28d',
+} as const;
+
 /** Warm lamp glow tint (baked softly into sprites — never a real bloom). */
 export const GLOW = 'rgba(217, 178, 199, 0)';
 export const LAMP_WARM = 'rgba(233, 196, 124, 0.35)';

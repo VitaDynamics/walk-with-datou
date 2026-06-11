@@ -3,7 +3,17 @@ import {
   saveBackendPreference,
   type PhysicsBackend,
 } from '../physics/createPhysics';
-import { readSavedAvatar, saveAvatarPreference, type AvatarStyle } from '../human/avatar';
+import {
+  readSavedAge,
+  readSavedCharacter,
+  readSavedOutfit,
+  saveAgePreference,
+  saveCharacterPreference,
+  saveOutfitPreference,
+  type AgeId,
+  type CharId,
+  type DirId,
+} from '../human/avatar';
 import { applyStaticI18n, getLang, onLangChange, setLang, t, type Lang } from '../i18n';
 
 /**
@@ -20,8 +30,12 @@ import { applyStaticI18n, getLang, onLangChange, setLang, t, type Lang } from '.
 export interface SettingsOptions {
   /** The backend actually running this session (after any fallback). */
   activeBackend: PhysicsBackend;
-  /** Applies the walker's look live (no reload needed). */
-  onAvatarChange?: (style: AvatarStyle) => void;
+  /** Applies the walker's character (Mei/An) live (no reload needed). */
+  onCharacterChange?: (char: CharId) => void;
+  /** Applies the walker's outfit live (no reload needed). */
+  onOutfitChange?: (dir: DirId) => void;
+  /** Applies the walker's age (kid/teen/adult) live (no reload needed). */
+  onAgeChange?: (age: AgeId) => void;
 }
 
 /** i18n key for each backend's short "now running" label. */
@@ -41,11 +55,26 @@ export function mountSettings(opts: SettingsOptions): void {
   const langButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('.lang-btn[data-lang]'),
   );
-  const avatarButtons = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('.avatar-btn[data-avatar]'),
+  const charButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.char-btn[data-char]'),
+  );
+  const outfitButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.outfit-btn[data-outfit]'),
+  );
+  const ageButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.age-btn[data-age]'),
   );
 
   if (!button || !panel || radios.length === 0) return;
+
+  // Drop a one-off ?param= override so a saved choice sticks across reloads.
+  const dropParam = (name: string): void => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.delete(name);
+      window.history.replaceState(null, '', url);
+    }
+  };
 
   // Reflect the active backend in the panel header (localised).
   const refreshActiveTag = (): void => {
@@ -76,27 +105,60 @@ export function mountSettings(opts: SettingsOptions): void {
     });
   }
 
-  // Walker avatar — saved and applied live.
-  let avatar = readSavedAvatar();
-  const refreshAvatarButtons = (): void => {
-    for (const b of avatarButtons) b.classList.toggle('active', b.dataset.avatar === avatar);
+  // Walker character (Mei / An) — saved and applied live.
+  let character = readSavedCharacter();
+  const refreshCharButtons = (): void => {
+    for (const b of charButtons) b.classList.toggle('active', b.dataset.char === character);
   };
-  refreshAvatarButtons();
-  for (const b of avatarButtons) {
+  refreshCharButtons();
+  for (const b of charButtons) {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
-      const style: AvatarStyle = b.dataset.avatar === 'girl' ? 'girl' : 'boy';
-      if (style === avatar) return;
-      avatar = style;
-      saveAvatarPreference(style);
-      // Drop any one-off ?avatar= override so the saved choice sticks.
-      const url = new URL(window.location.href);
-      if (url.searchParams.has('avatar')) {
-        url.searchParams.delete('avatar');
-        window.history.replaceState(null, '', url);
-      }
-      refreshAvatarButtons();
-      opts.onAvatarChange?.(style);
+      const next: CharId = b.dataset.char === 'an' ? 'an' : 'mei';
+      if (next === character) return;
+      character = next;
+      saveCharacterPreference(next);
+      dropParam('walker');
+      refreshCharButtons();
+      opts.onCharacterChange?.(next);
+    });
+  }
+
+  // Walker outfit (5 directions) — saved and applied live.
+  let outfit = readSavedOutfit();
+  const refreshOutfitButtons = (): void => {
+    for (const b of outfitButtons) b.classList.toggle('active', b.dataset.outfit === outfit);
+  };
+  refreshOutfitButtons();
+  for (const b of outfitButtons) {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const next = b.dataset.outfit as DirId | undefined;
+      if (!next || next === outfit) return;
+      outfit = next;
+      saveOutfitPreference(next);
+      dropParam('outfit');
+      refreshOutfitButtons();
+      opts.onOutfitChange?.(next);
+    });
+  }
+
+  // Walker age (kid / teen / adult) — saved and applied live.
+  let age = readSavedAge();
+  const refreshAgeButtons = (): void => {
+    for (const b of ageButtons) b.classList.toggle('active', b.dataset.age === age);
+  };
+  refreshAgeButtons();
+  for (const b of ageButtons) {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const next = b.dataset.age as AgeId | undefined;
+      if (!next || next === age) return;
+      age = next;
+      saveAgePreference(next);
+      dropParam('age');
+      refreshAgeButtons();
+      opts.onAgeChange?.(next);
     });
   }
 
