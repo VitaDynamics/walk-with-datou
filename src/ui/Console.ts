@@ -335,6 +335,7 @@ export class Console {
       if (entry.key === 'forage') return t('memory.forage');
       if (entry.key === 'coffer') return t('memory.coffer');
       if (entry.key.startsWith('landmark.')) return tDyn(`memory.${entry.key}`);
+      if (entry.key.startsWith('setpiece.')) return tDyn(`memory.${entry.key}`);
       if (entry.key.startsWith('made:')) {
         const spec = parseItemId(entry.key.slice(5));
         return t('workshop.made', { thing: spec ? itemName(spec) : '' });

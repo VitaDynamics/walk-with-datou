@@ -44,13 +44,15 @@ import {
 } from '../human/avatar';
 import { Leash } from '../human/Leash';
 import { Player } from '../human/Player';
-import type { PhysicsAdapter } from '../physics/PhysicsAdapter';
+import type { DatouState, PhysicsAdapter } from '../physics/PhysicsAdapter';
 import { Console } from '../ui/Console';
 import { Minimap } from '../ui/Minimap';
 import { Cutout } from '../world/Cutout';
 import { LANDMARK_DEFS } from '../world/landmarks';
 import type { LandmarkInspection } from '../world/landmarks';
 import { MAJOR_PROPS, SPOT_ANCHORS, type MajorProp } from '../world/layout';
+import { SETPIECES, setpieceNear, type Setpiece } from '../world/setpieces';
+import { drawBeatBit, drawSetpiece } from '../art/setpieces';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
@@ -202,6 +204,23 @@ export class Game {
   private readonly tools = new Tools();
   private readonly harvest: Harvest;
   private readonly nodeVisuals = new Map<string, { cut: Cutout; state: string }>();
+  // Setpieces — the park's great things and their staged beats (E2).
+  private readonly setpieceCuts = new Map<string, Cutout>();
+  private setpieceDays: Record<string, string> = {};
+  private armedSetpiece: Setpiece | null = null;
+  private activeBeat: { sp: Setpiece; t: number; spawned: number; echoed: boolean } | null = null;
+  private beatCooldown = 0;
+  private setpieceHintIn = 150;
+  private readonly beatFx: {
+    cut: Cutout;
+    t: number;
+    dur: number;
+    x: number;
+    z: number;
+    y0: number;
+    swayPhase: number;
+    ripple: boolean;
+  }[] = [];
   // Starter treasure coffer — teaches the blueprint concept (a banked hint +
   // the stock to try it), opened once near home.
   private cofferCutout: Cutout | null = null;
@@ -484,6 +503,7 @@ export class Game {
       this.forageMenu.toggle();
     });
     this.placeNodes();
+    this.placeSetpieces();
     this.placeCoffer();
 
     this.pointer = new Pointer(canvas, {
@@ -706,6 +726,15 @@ export class Game {
     const node = this.nodeNear(p.x, p.z);
     if (node) {
       this.tapNode(node);
+      return;
+    }
+
+    // A great thing (E2) → name it; Datou heads over and the beat plays.
+    const sp = setpieceNear(p.x, p.z);
+    if (sp) {
+      this.ui.showName(tDyn(`setpiece.${sp.id}.name`), tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`));
+      this.companion.investigate(sp.x, sp.z);
+      this.armedSetpiece = sp;
       return;
     }
 
@@ -1523,6 +1552,195 @@ export class Game {
     });
   }
 
+  // --- Setpieces: the great things and their staged beats (E2) ---
+
+  private placeSetpieces(): void {
+    this.setpieceDays = this.loadJson<Record<string, string>>('wwd.setpieces', {});
+    for (const sp of SETPIECES) {
+      if (sp.anchored) continue;
+      const seed = (Math.round(sp.x * 13 + sp.z * 29) ^ 0x51e5) >>> 0;
+      const sprite = drawSetpiece(sp.id, seed);
+      if (!sprite) continue;
+      const cut = new Cutout(sprite, {
+        height: sp.height,
+        shadowRadius: sp.decal ? 0 : sp.height * 0.24,
+        decal: sp.decal,
+      });
+      this.world.placeCutout(cut, sp.x, sp.z);
+      this.setpieceCuts.set(sp.id, cut);
+    }
+  }
+
+  /** Which observation line today picks (date-seeded, diary-replayable). */
+  private setpieceVariant(sp: Setpiece): 1 | 2 {
+    let h = dailySeed();
+    for (let i = 0; i < sp.id.length; i++) h = (h * 31 + sp.id.charCodeAt(i)) >>> 0;
+    return h % 2 === 0 ? 1 : 2;
+  }
+
+  private setpieceEchoedToday(sp: Setpiece): boolean {
+    return this.setpieceDays[sp.id] === dailyKey();
+  }
+
+  /**
+   * Datou's side of a great thing: a signature clip, a few drift plates, and
+   * — once a day — the world echo: a partially revealed pattern related to
+   * the thing itself (BUILDING_SYSTEM §5). Replays on later taps are just
+   * the quiet beat, no double rewards.
+   */
+  private startBeat(sp: Setpiece): void {
+    if (this.activeBeat || this.beatCooldown > 0 || this.harvest.active) return;
+    this.armedSetpiece = null;
+    this.beatCooldown = 20;
+    this.activeBeat = { sp, t: 0, spawned: 0, echoed: this.setpieceEchoedToday(sp) };
+    this.ui.showName(tDyn(`setpiece.${sp.id}.name`), tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`));
+    if (!this.datouRig.playClip(sp.clip)) {
+      this.datouRig.pulse();
+      this.datouRig.reach();
+    }
+    this.emotion.apply('discover');
+  }
+
+  private updateBeat(dt: number, datou: DatouState): void {
+    if (this.beatCooldown > 0) this.beatCooldown -= dt;
+
+    // Arm → trigger when Datou actually gets there (tap or his own idea).
+    const trigger = (sp: Setpiece) =>
+      Math.hypot(datou.position.x - sp.x, datou.position.z - sp.z) <= 1.4;
+    if (this.armedSetpiece && trigger(this.armedSetpiece)) this.startBeat(this.armedSetpiece);
+    if (!this.activeBeat && this.beatCooldown <= 0) {
+      const near = setpieceNear(datou.position.x, datou.position.z, 1.2);
+      if (near && !this.setpieceEchoedToday(near)) this.startBeat(near);
+    }
+
+    const beat = this.activeBeat;
+    if (beat) {
+      beat.t += dt;
+      // Gentle plate sway over the beat (±2°, eased out).
+      const cut = this.setpieceCuts.get(beat.sp.id);
+      if (cut && !beat.sp.decal) {
+        const env = Math.max(0, 1 - beat.t / 3.6);
+        cut.plane.rotation.z = Math.sin(beat.t * 2.4) * 0.035 * env;
+      }
+      // Three drift plates, spaced out.
+      const SPAWN_AT = [0.3, 0.9, 1.5];
+      while (beat.spawned < SPAWN_AT.length && beat.t >= SPAWN_AT[beat.spawned]) {
+        this.spawnBeatFx(beat.sp, beat.spawned);
+        beat.spawned++;
+      }
+      // The once-a-day rewards land mid-beat.
+      if (!beat.echoed && beat.t >= 2) {
+        beat.echoed = true;
+        this.setpieceDays[beat.sp.id] = dailyKey();
+        this.saveJson('wwd.setpieces', this.setpieceDays);
+        this.bankEcho(beat.sp);
+        this.bond.add('discovery', 3);
+        this.memories.add({
+          ts: Date.now(),
+          kind: 'want',
+          key: `setpiece.${beat.sp.id}`,
+          mood: datou.mood,
+        });
+      }
+      if (beat.t >= 4.2) {
+        if (cut) cut.plane.rotation.z = 0;
+        this.activeBeat = null;
+      }
+    }
+
+    // Drift plates: fall (or ring out), sway, fade, go.
+    for (let i = this.beatFx.length - 1; i >= 0; i--) {
+      const fx = this.beatFx[i];
+      fx.t += dt;
+      const f = Math.min(1, fx.t / fx.dur);
+      const mat = fx.cut.plane.material as THREE.MeshBasicMaterial;
+      if (fx.ripple) {
+        const s = 1 + f * 1.6;
+        fx.cut.group.scale.set(s, s, s);
+        mat.opacity = 0.8 * (1 - f);
+      } else {
+        const y = fx.y0 * (1 - f * f);
+        const x = fx.x + Math.sin(fx.swayPhase + fx.t * 1.7) * 0.22;
+        fx.cut.setPosition(x, fx.z, Math.max(0.04, y));
+        mat.opacity = f < 0.7 ? 1 : 1 - (f - 0.7) / 0.3;
+      }
+      if (f >= 1) {
+        fx.cut.group.removeFromParent();
+        fx.cut.dispose();
+        this.beatFx.splice(i, 1);
+      }
+    }
+  }
+
+  private spawnBeatFx(sp: Setpiece, n: number): void {
+    if (this.beatFx.length >= 9) return;
+    const seed = (Math.round(sp.x * 7 + sp.z * 3) + n * 101) >>> 0;
+    const ripple = sp.beat === 'ripple';
+    const cut = new Cutout(drawBeatBit(sp.beat, seed), {
+      height: ripple ? 1.5 : 0.18,
+      shadowRadius: 0,
+      decal: ripple,
+      renderOrder: ripple ? 2 : 0,
+    });
+    const mat = cut.plane.material as THREE.MeshBasicMaterial;
+    mat.opacity = ripple ? 0.8 : 1;
+    mat.depthWrite = false;
+    const a = (n / 3) * Math.PI * 2 + sp.x;
+    const x = sp.x + Math.cos(a) * (ripple ? 0.9 : 0.7);
+    const z = sp.z + Math.sin(a) * (ripple ? 0.9 : 0.7);
+    this.world.placeCutout(cut, x, z);
+    if (!ripple) cut.setPosition(x, z, sp.fxHeight);
+    this.beatFx.push({
+      cut,
+      t: 0,
+      dur: ripple ? 2.2 : 2.8,
+      x,
+      z,
+      y0: sp.fxHeight,
+      swayPhase: n * 2.1,
+      ripple,
+    });
+  }
+
+  /** The world echo: reveal two cells of the related pattern (§5). */
+  private bankEcho(sp: Setpiece): void {
+    const pat = patternForForm(sp.echoForm);
+    if (!pat) return;
+    const cells: number[] = [];
+    for (let i = 0; i < 9; i++) if (pat.cells[i]) cells.push(i);
+    const day = dailySeed();
+    const pick = [cells[day % cells.length], cells[(day + 3) % cells.length]];
+    const banked = this.workshopState.bankHint({
+      pattern: canonical(pat),
+      revealedCells: [...new Set(pick)],
+      context: tDyn(`setpiece.${sp.id}.name`),
+      day: dailyKey(),
+    });
+    if (banked) this.ui.toast(t('setpiece.echo'));
+  }
+
+  /**
+   * Datou's own ideas about the great things (E2): now and then, if one he
+   * hasn't visited today is in range, the curious want anchors to it.
+   */
+  private maybeHintSetpiece(dt: number): void {
+    this.setpieceHintIn -= dt;
+    if (this.setpieceHintIn > 0) return;
+    this.setpieceHintIn = 150;
+    if (this.companion.activeWant || this.harvest.active || this.activeBeat) return;
+    let best: Setpiece | null = null;
+    let bestD = 70;
+    for (const sp of SETPIECES) {
+      if (this.setpieceEchoedToday(sp)) continue;
+      const d = Math.hypot(sp.x - this.player.x, sp.z - this.player.z);
+      if (d >= 8 && d < bestD) {
+        bestD = d;
+        best = sp;
+      }
+    }
+    if (best) this.companion.promptCurious({ id: `setpiece:${best.id}`, x: best.x, z: best.z });
+  }
+
   /** Re-draw a node's plate if its harvest state changed (depletion/regrow). */
   private replateNode(nodeId: string): void {
     const p = NODE_PLACEMENTS.find((n) => n.id === nodeId);
@@ -1830,6 +2048,8 @@ export class Game {
     this.playerIdleS = playerMoving ? 0 : this.playerIdleS + dt;
     this.behaviors.update(dt);
     this.maybeHintNode(dt);
+    this.maybeHintSetpiece(dt);
+    this.updateBeat(dt, state);
 
     // Deferred gather: arrived next to the tapped pickable?
     if (this.pendingGather) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { __tables, t } from './i18n';
 import { MAJOR_PROPS, SPOT_ANCHORS } from './world/layout';
+import { SETPIECES } from './world/setpieces';
 import { KIND_DEFS } from './world/scatter';
 import { NODE_DEFS } from './game/workshop/nodes';
 import { BOND_UNLOCKS } from './game/Bond';
@@ -35,6 +36,16 @@ describe('i18n tables', () => {
     for (const u of BOND_UNLOCKS)
       expect(en[`milestone.${u.id}`], `milestone.${u.id}`).toBeDefined();
     for (const m of MOODS) expect(en[`mood.${m}`], `mood.${m}`).toBeDefined();
+  });
+
+  it('covers every setpiece: name, both lines, memory (E2)', () => {
+    const en = __tables.UI.en as Record<string, string>;
+    for (const sp of SETPIECES) {
+      expect(en[`setpiece.${sp.id}.name`], `setpiece.${sp.id}.name`).toBeDefined();
+      expect(en[`setpiece.${sp.id}.line.1`], `setpiece.${sp.id}.line.1`).toBeDefined();
+      expect(en[`setpiece.${sp.id}.line.2`], `setpiece.${sp.id}.line.2`).toBeDefined();
+      expect(en[`memory.setpiece.${sp.id}`], `memory.setpiece.${sp.id}`).toBeDefined();
+    }
   });
 
   it('names every touchable prop and resource node (E1)', () => {
