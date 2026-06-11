@@ -55,6 +55,19 @@
         touch-action: none;
       }
 
+      /* Time-of-day grade (E7) — a quiet 2-stop wash, never a filter look. */
+      #daylight {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+        background: #d6a05a;
+        opacity: 0;
+        transition:
+          opacity 1200ms ease,
+          background-color 1200ms ease;
+      }
+
       /* Soft paper vignette over the whole frame (very quiet). */
       #vignette {
         position: fixed;
@@ -793,6 +806,7 @@
   </head>
   <body>
     <canvas id="game-canvas"></canvas>
+    <div id="daylight"></div>
     <div id="vignette"></div>
 
     <!-- Status capsule -->

@@ -239,6 +239,12 @@ export class Game {
     null;
   // The park's small animals (E5).
   private critters!: CritterSystem;
+  // The park breathes (E7): daylight grade, breeze drift, the morning note.
+  private daylightIn = 0;
+  private breezeIn = 14;
+  private morningNoteIn = 0;
+  private rainDay = false;
+  private breezeDay = false;
   private readonly beatFx: {
     cut: Cutout;
     t: number;
@@ -248,6 +254,8 @@ export class Game {
     y0: number;
     swayPhase: number;
     ripple: boolean;
+    /** Lateral drift (m/s) — breeze leaves travel, beat leaves just settle. */
+    driftX: number;
   }[] = [];
   // Starter treasure coffer — teaches the blueprint concept (a banked hint +
   // the stock to try it), opened once near home.
@@ -566,6 +574,13 @@ export class Game {
       },
       dropGift: (x, z) => this.dropAcorn(x, z),
     });
+    // The park breathes (E7): the day's weather is fixed and seeded — cache it.
+    this.rainDay = weatherFor() === 'rain';
+    this.breezeDay = weatherFor() === 'breeze';
+    if (this.loadRaw('wwd.lastOpen') !== dailyKey()) {
+      this.saveRaw('wwd.lastOpen', dailyKey());
+      this.morningNoteIn = 6; // let the scene settle, then today's hook
+    }
     this.placeCoffer();
 
     this.pointer = new Pointer(canvas, {
@@ -1764,7 +1779,7 @@ export class Game {
         mat.opacity = 0.8 * (1 - f);
       } else {
         const y = fx.y0 * (1 - f * f);
-        const x = fx.x + Math.sin(fx.swayPhase + fx.t * 1.7) * 0.22;
+        const x = fx.x + fx.driftX * fx.t + Math.sin(fx.swayPhase + fx.t * 1.7) * 0.22;
         fx.cut.setPosition(x, fx.z, Math.max(0.04, y));
         mat.opacity = f < 0.7 ? 1 : 1 - (f - 0.7) / 0.3;
       }
@@ -1803,6 +1818,7 @@ export class Game {
       y0: sp.fxHeight,
       swayPhase: n * 2.1,
       ripple,
+      driftX: 0,
     });
   }
 
@@ -2046,6 +2062,88 @@ export class Game {
         this.pendingFruit = null;
       }
     }
+  }
+
+  // --- The park breathes (E7) ---
+
+  /**
+   * Daylight grade by the real clock (a quiet 2-stop multiply wash, eased by
+   * CSS), an occasional drifting leaf on breeze days, and the once-a-day
+   * morning note that turns the live systems into the open-the-app reason.
+   */
+  private updateBreathes(dt: number): void {
+    this.daylightIn -= dt;
+    if (this.daylightIn <= 0) {
+      this.daylightIn = 30;
+      const el = document.getElementById('daylight');
+      if (el) {
+        const now = new Date();
+        const h = now.getHours() + now.getMinutes() / 60;
+        let bg = '#d6a05a';
+        let op = 0;
+        if (h >= 17 && h < 19) {
+          bg = '#d6a05a'; // golden hour
+          op = 0.1;
+        } else if (h >= 19 && h < 21) {
+          bg = '#8d83a0'; // dusk
+          op = 0.16;
+        } else if (h >= 21 || h < 5.5) {
+          bg = '#5a6480'; // night walk
+          op = 0.22;
+        } else if (h < 7) {
+          bg = '#d6aa78'; // dawn
+          op = 0.08;
+        }
+        // Rain days sit a touch dimmer all day; the fog does the rest.
+        if (this.rainDay) op = Math.max(op, 0.06);
+        el.style.backgroundColor = bg;
+        el.style.opacity = String(op);
+      }
+    }
+
+    // Breeze days: now and then one leaf crosses the walk (authored, eased).
+    if (this.breezeDay && this.beatFx.length < 9) {
+      this.breezeIn -= dt;
+      if (this.breezeIn <= 0) {
+        this.breezeIn = 18 + Math.random() * 14;
+        const a = Math.random() * Math.PI * 2;
+        const x = this.player.x + Math.cos(a) * 6;
+        const z = this.player.z + Math.sin(a) * 6;
+        const cut = new Cutout(drawBeatBit('leaf', (Math.random() * 1e9) | 0), {
+          height: 0.18,
+          shadowRadius: 0,
+        });
+        (cut.plane.material as THREE.MeshBasicMaterial).depthWrite = false;
+        this.world.placeCutout(cut, x, z);
+        cut.setPosition(x, z, 2.2);
+        this.beatFx.push({
+          cut,
+          t: 0,
+          dur: 5.5,
+          x,
+          z,
+          y0: 2.2,
+          swayPhase: Math.random() * 6,
+          ripple: false,
+          driftX: 0.4 + Math.random() * 0.4,
+        });
+      }
+    }
+
+    if (this.morningNoteIn > 0) {
+      this.morningNoteIn -= dt;
+      if (this.morningNoteIn <= 0) this.ui.toast(tDyn(this.morningKey()));
+    }
+  }
+
+  /** Today's hook, picked from the live systems (deterministic per day). */
+  private morningKey(): string {
+    if (this.rainDay) return 'morning.rain';
+    if (this.critters.dogVisitsToday()) return 'morning.dog';
+    const season = seasonFor();
+    if (season === 'summer' || season === 'autumn') return 'morning.orchard';
+    if (season === 'spring') return 'morning.blossom';
+    return 'morning.winter';
   }
 
   /** Re-draw a node's plate if its harvest state changed (depletion/regrow). */
@@ -2363,6 +2461,7 @@ export class Game {
       { x: this.player.x, z: this.player.z },
       { x: state.position.x, z: state.position.z },
     );
+    this.updateBreathes(dt);
 
     // Deferred gather: arrived next to the tapped pickable?
     if (this.pendingGather) {
@@ -2460,10 +2559,11 @@ export class Game {
       }
     }
 
-    // The garden grows — faster when Datou is tending it nearby.
+    // The garden grows — faster when Datou tends it, double on rain days (E7).
     this.farm.update(
       dt,
       (x, z) => Math.hypot(state.position.x - x, state.position.z - z) <= TEND_RANGE,
+      this.rainDay ? 2 : 1,
     );
     this.syncFarm();
 

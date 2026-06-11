@@ -136,11 +136,16 @@ export class Farm {
    * Advance active growth. `datouNear` says whether Datou is tending each
    * plot (within TEND_RANGE) — those grow faster.
    */
-  update(dt: number, datouNear: (x: number, z: number) => boolean, now = Date.now()): void {
+  update(
+    dt: number,
+    datouNear: (x: number, z: number) => boolean,
+    boost = 1,
+    now = Date.now(),
+  ): void {
     let any = false;
     for (const p of this.plots) {
       if (!p.crop || p.progress >= MATURE) continue;
-      const rate = datouNear(p.x, p.z) ? TEND_BOOST : 1;
+      const rate = (datouNear(p.x, p.z) ? TEND_BOOST : 1) * boost;
       const before = this.stage(p);
       p.progress = Math.min(MATURE, p.progress + (dt / SECONDS_PER_STAGE) * rate);
       if (this.stage(p) !== before) any = true;
