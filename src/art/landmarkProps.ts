@@ -2213,3 +2213,624 @@ export function drawSeedRattle(seed: number): PropSprite {
   }
   return { canvas: c, aspect: 96 / 112 };
 }
+
+// --- The light landmarks (map-fill wave) ---------------------------------------
+// Fifteen smaller hearts found along the connective features. One or two
+// plates each; supporting cast comes from existing props and made items.
+
+/** Stepping stones across the stream (flat ground decal, ~3 m span). */
+export function drawFlatStones(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 192);
+  for (const [x, y, r] of [
+    [60, 96, 34],
+    [148, 80, 38],
+    [238, 102, 36],
+    [322, 86, 32],
+  ] as const) {
+    blob(g, rng, x, y, r, r * 0.62, { fill: CLAY.pale, outline: INK.line, lineWidth: 4 }, 10, 0.08);
+    // A worn dry top.
+    g.save();
+    g.globalAlpha = 0.4;
+    blob(g, rng, x - 4, y - 4, r * 0.55, r * 0.3, { fill: '#f4eeDC'.toLowerCase() }, 8, 0.15);
+    g.restore();
+  }
+  return { canvas: c, aspect: 2 };
+}
+
+/** The willow (~5.5 m): a leaning trunk and long curtain fronds — the
+ *  stream bend's quiet room. */
+export function drawWillow(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(512, 576);
+  // Leaning trunk.
+  g.strokeStyle = CLAY.mid;
+  g.lineWidth = 26;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(230, 556);
+  g.quadraticCurveTo(250, 380, 300, 270);
+  g.stroke();
+  // Canopy mass.
+  blob(g, rng, 300, 210, 170, 110, { fill: SAGE.mid, outline: INK.line, lineWidth: 5 }, 14, 0.1);
+  blob(g, rng, 250, 170, 90, 60, { fill: SAGE.light }, 10, 0.12);
+  // The hanging curtain — long frond strokes, still as paint.
+  g.lineWidth = 4;
+  g.lineCap = 'round';
+  for (let i = 0; i < 16; i++) {
+    const x = 150 + i * 19 + rng.next() * 8;
+    const top = 240 + rng.next() * 50;
+    const len = 140 + rng.next() * 130;
+    g.strokeStyle = i % 3 ? SAGE.deep : SAGE.mid;
+    g.beginPath();
+    g.moveTo(x, top);
+    g.quadraticCurveTo(x - 6 + rng.next() * 12, top + len * 0.6, x - 4 + rng.next() * 8, top + len);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 512 / 576 };
+}
+
+/** A marsh pool (flat decal, ~4 m): still water with two lily pads. */
+export function drawMarshPool(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 256);
+  blob(g, rng, 192, 128, 168, 96, { fill: WATER.edge }, 14, 0.08);
+  blob(g, rng, 192, 130, 130, 70, { fill: WATER.mid }, 12, 0.1);
+  // Lily pads + one bud.
+  for (const [x, y, r] of [
+    [140, 120, 26],
+    [248, 148, 20],
+  ] as const) {
+    g.fillStyle = SAGE.mid;
+    g.beginPath();
+    g.ellipse(x, y, r, r * 0.62, 0.2, 0.25, Math.PI * 2);
+    g.lineTo(x, y);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = SAGE.shade;
+    g.lineWidth = 2.5;
+    g.stroke();
+  }
+  g.fillStyle = CLAY.blossom;
+  g.beginPath();
+  g.arc(252, 142, 6, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: c, aspect: 1.5 };
+}
+
+/** A small frog on a stone (~0.3 m) — the shallows' chorister. */
+export function drawFrog(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(96, 96);
+  blob(g, rng, 48, 76, 22, 10, { fill: CLAY.pale, outline: INK.soft, lineWidth: 2.5 }, 8, 0.1);
+  // Body crouched.
+  blob(g, rng, 48, 58, 16, 11, { fill: SAGE.mid, outline: INK.line, lineWidth: 2.5 }, 8, 0.1);
+  // Eyes on top.
+  for (const dx of [-8, 8] as const) {
+    g.fillStyle = SAGE.light;
+    g.beginPath();
+    g.arc(48 + dx, 46, 5, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 2;
+    g.stroke();
+    g.fillStyle = INK.line;
+    g.beginPath();
+    g.arc(48 + dx, 45, 1.6, 0, Math.PI * 2);
+    g.fill();
+  }
+  // Folded leg.
+  g.strokeStyle = SAGE.shade;
+  g.lineWidth = 3.5;
+  g.beginPath();
+  g.arc(60, 60, 8, -0.6, 1.8);
+  g.stroke();
+  return { canvas: c, aspect: 1 };
+}
+
+/** A boardwalk segment (flat decal, ~5 m): weathered planks over the marsh,
+ *  one or two slipped — the pavement that leads along the shore. */
+export function drawBoardwalk(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(512, 192);
+  // Two runners.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 9;
+  for (const y of [58, 134] as const) {
+    g.beginPath();
+    g.moveTo(16, y + rng.next() * 4);
+    g.lineTo(496, y - 2 + rng.next() * 4);
+    g.stroke();
+  }
+  // Planks — a couple missing, one askew.
+  for (let i = 0; i < 11; i++) {
+    if (i === 4) continue; // the gap
+    const x = 28 + i * 44;
+    g.save();
+    g.translate(x, 96);
+    g.rotate(i === 7 ? 0.14 : (rng.next() - 0.5) * 0.04);
+    g.fillStyle = i % 3 ? CLAY.light : CLAY.pale;
+    g.fillRect(-16, -52, 32, 104);
+    g.strokeStyle = INK.line;
+    g.lineWidth = 3.5;
+    g.strokeRect(-16, -52, 32, 104);
+    g.restore();
+  }
+  return { canvas: c, aspect: 512 / 192 };
+}
+
+/** A driftwood arch (~2.4 m): two bleached limbs lashed into a doorway to
+ *  nowhere — the beach-combers' gallery. */
+export function drawDriftArch(seed: number): PropSprite {
+  void seed; // fully authored plate
+  const { c, g } = sprite(320, 320);
+  g.lineCap = 'round';
+  // Two curving bleached limbs meeting overhead.
+  g.strokeStyle = CLAY.pale;
+  g.lineWidth = 18;
+  g.beginPath();
+  g.moveTo(70, 304);
+  g.quadraticCurveTo(60, 120, 150, 70);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(250, 304);
+  g.quadraticCurveTo(262, 130, 168, 74);
+  g.stroke();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(74, 300);
+  g.quadraticCurveTo(64, 124, 152, 76);
+  g.stroke();
+  // The lashing at the crown.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 3.5;
+  for (let i = 0; i < 4; i++) {
+    g.beginPath();
+    g.moveTo(146 + i * 6, 60);
+    g.lineTo(152 + i * 6, 88);
+    g.stroke();
+  }
+  // A small wind-worn knot hole.
+  g.fillStyle = CLAY.light;
+  g.beginPath();
+  g.ellipse(86, 200, 7, 11, 0.2, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2;
+  g.stroke();
+  return { canvas: c, aspect: 1 };
+}
+
+/** The kite anchor post (~3.2 m): a stout post with two kites high on their
+ *  lines — pinned to the sky, calm as flags on a still day. */
+export function drawKitePost(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(384, 512);
+  wobblyLine(g, rng, 96, 496, 100, 320, 15, CLAY.deep, 1.4, 5);
+  // Cleat + wound line.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 3;
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.ellipse(98, 360 + i * 9, 14, 5, 0.1, 0, Math.PI * 2);
+    g.stroke();
+  }
+  // Two lines up to the kites.
+  g.beginPath();
+  g.moveTo(100, 330);
+  g.quadraticCurveTo(180, 220, 252, 110);
+  g.moveTo(100, 334);
+  g.quadraticCurveTo(150, 260, 320, 200);
+  g.stroke();
+  // The kites: one diamond (clay), one box kite (sage).
+  g.save();
+  g.translate(258, 96);
+  g.rotate(0.3);
+  g.fillStyle = CLAY.blossom;
+  g.beginPath();
+  g.moveTo(0, -34);
+  g.lineTo(24, 0);
+  g.lineTo(0, 34);
+  g.lineTo(-24, 0);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  g.beginPath();
+  g.moveTo(0, -34);
+  g.lineTo(0, 34);
+  g.moveTo(-24, 0);
+  g.lineTo(24, 0);
+  g.stroke();
+  // A short tail with two bows.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(0, 34);
+  g.quadraticCurveTo(8, 52, 4, 66);
+  g.stroke();
+  g.restore();
+  g.save();
+  g.translate(326, 192);
+  g.rotate(-0.15);
+  g.fillStyle = SAGE.mid;
+  g.fillRect(-18, -22, 36, 16);
+  g.fillRect(-18, 6, 36, 16);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  g.strokeRect(-18, -22, 36, 16);
+  g.strokeRect(-18, 6, 36, 16);
+  g.beginPath();
+  g.moveTo(-18, -22);
+  g.lineTo(-18, 22);
+  g.moveTo(18, -22);
+  g.lineTo(18, 22);
+  g.stroke();
+  g.restore();
+  return { canvas: c, aspect: 384 / 512 };
+}
+
+/** The meadow gate (~2.6 m): a timber arch over a gate standing ajar in a
+ *  stretch of old fence — an edge you pass THROUGH. */
+export function drawMeadowGate(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(448, 416);
+  // Posts + arch.
+  wobblyLine(g, rng, 96, 400, 98, 96, 16, CLAY.deep, 1.3, 5);
+  wobblyLine(g, rng, 352, 400, 350, 96, 16, CLAY.mid, 1.3, 5);
+  g.strokeStyle = CLAY.mid;
+  g.lineWidth = 14;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(88, 104);
+  g.quadraticCurveTo(224, 40, 360, 102);
+  g.stroke();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.beginPath();
+  g.moveTo(88, 96);
+  g.quadraticCurveTo(224, 32, 360, 94);
+  g.stroke();
+  // A small name board hanging from the arch.
+  g.fillStyle = CLAY.pale;
+  g.fillRect(184, 92, 80, 30);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  g.strokeRect(184, 92, 80, 30);
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(194, 102);
+  g.lineTo(254, 102);
+  g.moveTo(194, 112);
+  g.lineTo(240, 112);
+  g.stroke();
+  // The gate leaf, standing ajar (drawn swung toward the viewer's left).
+  g.save();
+  g.translate(110, 250);
+  g.rotate(0.08);
+  g.fillStyle = CLAY.light;
+  for (let i = 0; i < 4; i++) g.fillRect(i * 26, -110, 16, 230);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  for (let i = 0; i < 4; i++) g.strokeRect(i * 26, -110, 16, 230);
+  // Diagonal brace.
+  g.beginPath();
+  g.moveTo(2, 100);
+  g.lineTo(96, -90);
+  g.lineWidth = 8;
+  g.strokeStyle = CLAY.deep;
+  g.stroke();
+  g.restore();
+  return { canvas: c, aspect: 448 / 416 };
+}
+
+/** The old signal beacon (~4.2 m): an iron fire-basket on a pole. Dormant,
+ *  or warm with a small kept flame once tended (baked, never flickering). */
+export function drawBeacon(seed: number, lit: boolean): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(256, 640);
+  wobblyLine(g, rng, 128, 624, 126, 180, 14, ROBOT.dark, 1.2, 5);
+  // Brace legs.
+  g.strokeStyle = ROBOT.darkShade;
+  g.lineWidth = 6;
+  for (const dx of [-34, 34] as const) {
+    g.beginPath();
+    g.moveTo(128 + dx, 624);
+    g.lineTo(127, 500);
+    g.stroke();
+  }
+  if (lit) {
+    const halo = g.createRadialGradient(128, 130, 8, 128, 130, 100);
+    halo.addColorStop(0, LAMP_WARM);
+    halo.addColorStop(1, 'rgba(233, 196, 124, 0)');
+    g.fillStyle = halo;
+    g.fillRect(28, 30, 200, 200);
+  }
+  // The iron basket.
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(86, 120);
+  g.lineTo(98, 184);
+  g.lineTo(158, 184);
+  g.lineTo(170, 120);
+  g.stroke();
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.moveTo(92 + i * 4, 132 + i * 18);
+    g.lineTo(164 - i * 4, 132 + i * 18);
+    g.stroke();
+  }
+  if (lit) {
+    // A small kept flame — one quiet painted tongue, no flicker.
+    g.fillStyle = '#f2d9a0';
+    g.beginPath();
+    g.moveTo(128, 92);
+    g.quadraticCurveTo(146, 124, 128, 142);
+    g.quadraticCurveTo(110, 124, 128, 92);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = ROBOT.accent;
+    g.lineWidth = 3;
+    g.stroke();
+  } else {
+    // Cold charcoal heap.
+    blob(g, rng, 128, 150, 26, 10, { fill: ROBOT.darkShade, outline: INK.line, lineWidth: 3 }, 8, 0.12);
+  }
+  return { canvas: c, aspect: 256 / 640 };
+}
+
+/** A star-circle stone (~0.7 m): a low seat-stone with a constellation of
+ *  drilled dots on its face. */
+export function drawStarStone(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 160);
+  blob(g, rng, 96, 102, 64, 44, { fill: CLAY.pale, outline: INK.line, lineWidth: 4.5 }, 10, 0.08);
+  // The drilled constellation — dots joined by hairline strokes.
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i < 5; i++) pts.push([60 + rng.next() * 72, 76 + rng.next() * 44]);
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 1.5;
+  g.beginPath();
+  for (const [i, [x, y]] of pts.entries()) {
+    if (i === 0) g.moveTo(x, y);
+    else g.lineTo(x, y);
+  }
+  g.stroke();
+  g.fillStyle = INK.line;
+  for (const [x, y] of pts) {
+    g.beginPath();
+    g.arc(x, y, 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  return { canvas: c, aspect: 192 / 160 };
+}
+
+/** A giant fern (~1.6 m): the hollow's oversized fronds. */
+export function drawGiantFern(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(320, 384);
+  for (const lean of [-70, -30, 20, 64] as const) {
+    const tip = 80 + rng.next() * 50;
+    g.strokeStyle = SAGE.deep;
+    g.lineWidth = 5;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(160, 368);
+    g.quadraticCurveTo(160 + lean * 0.5, 230, 160 + lean, tip);
+    g.stroke();
+    // Leaflets.
+    g.fillStyle = lean % 2 ? SAGE.mid : SAGE.deep;
+    for (let i = 1; i <= 6; i++) {
+      const t = i / 7;
+      const x = 160 + lean * (t + t * t) * 0.5;
+      const y = 368 - (368 - tip) * t;
+      const lw = 26 * (1 - t * 0.6);
+      g.beginPath();
+      g.ellipse(x - lw * 0.6, y, lw, 7, -0.45, 0, Math.PI * 2);
+      g.ellipse(x + lw * 0.6, y, lw, 7, 0.45, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  return { canvas: c, aspect: 320 / 384 };
+}
+
+/** The quarry face (~3 m): a cut stone wall with drill lines and one
+ *  half-freed block — where the park's stone came from. */
+export function drawQuarryFace(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(512, 384);
+  // The face.
+  g.beginPath();
+  g.moveTo(36, 368);
+  g.lineTo(56, 90);
+  g.lineTo(170, 60);
+  g.lineTo(330, 76);
+  g.lineTo(470, 56);
+  g.lineTo(478, 368);
+  g.closePath();
+  g.fillStyle = CLAY.pale;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Cut terraces + drill lines.
+  g.strokeStyle = CLAY.mid;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(60, 200);
+  g.lineTo(300, 196);
+  g.lineTo(310, 290);
+  g.lineTo(470, 286);
+  g.stroke();
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2;
+  for (let i = 0; i < 6; i++) {
+    const x = 90 + i * 40;
+    g.beginPath();
+    g.moveTo(x, 120);
+    g.lineTo(x + 2, 196);
+    g.stroke();
+  }
+  // The half-freed block, leaning out at the foot.
+  g.save();
+  g.translate(380, 330);
+  g.rotate(0.1);
+  g.fillStyle = CLAY.light;
+  g.fillRect(-58, -36, 116, 72);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4;
+  g.strokeRect(-58, -36, 116, 72);
+  g.restore();
+  // Moss tufts reclaiming the top.
+  blob(g, rng, 140, 70, 30, 10, { fill: SAGE.light }, 8, 0.2);
+  blob(g, rng, 400, 62, 24, 9, { fill: SAGE.mid }, 8, 0.2);
+  return { canvas: c, aspect: 512 / 384 };
+}
+
+/** The hive stand (~1.4 m): two box hives on a bench — the bee meadow's
+ *  working heart. */
+export function drawHiveStand(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(288, 288);
+  // Stand.
+  wobblyLine(g, rng, 70, 272, 72, 196, 9, CLAY.deep, 1.2, 4);
+  wobblyLine(g, rng, 218, 272, 216, 196, 9, CLAY.deep, 1.2, 4);
+  g.fillStyle = CLAY.light;
+  g.fillRect(48, 188, 192, 14);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.strokeRect(48, 188, 192, 14);
+  // Two hives, slightly different heights, tiny entrances.
+  for (const [x, h, cap] of [
+    [88, 84, CLAY.pale],
+    [172, 64, SAGE.mid],
+  ] as const) {
+    g.fillStyle = CLAY.light;
+    g.fillRect(x - 28, 188 - h, 56, h);
+    g.strokeStyle = INK.line;
+    g.lineWidth = 3.5;
+    g.strokeRect(x - 28, 188 - h, 56, h);
+    g.strokeStyle = CLAY.deep;
+    g.lineWidth = 2;
+    for (let i = 1; i < 3; i++) {
+      g.beginPath();
+      g.moveTo(x - 26, 188 - (h * i) / 3);
+      g.lineTo(x + 26, 188 - (h * i) / 3);
+      g.stroke();
+    }
+    // Lid.
+    g.fillStyle = cap;
+    g.fillRect(x - 32, 184 - h - 12, 64, 12);
+    g.strokeStyle = INK.line;
+    g.lineWidth = 3;
+    g.strokeRect(x - 32, 184 - h - 12, 64, 12);
+    // Entrance notch.
+    g.fillStyle = INK.line;
+    g.fillRect(x - 8, 182, 16, 5);
+  }
+  // Three painted bees, suspended mid-errand.
+  g.fillStyle = ROBOT.accent;
+  for (const [bx, by] of [
+    [60, 150],
+    [232, 132],
+    [146, 110],
+  ] as const) {
+    g.beginPath();
+    g.ellipse(bx, by, 5, 3.5, 0.3, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(bx - 2, by - 3);
+    g.lineTo(bx - 2, by + 3);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 1 };
+}
+
+/** The hollow oak (~5 m): a broad old oak whose open hollow shelters the
+ *  exchange shelf — leave a thing, take a thing. */
+export function drawHollowOak(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(512, 640);
+  // Wide trunk.
+  g.beginPath();
+  g.moveTo(180, 616);
+  g.quadraticCurveTo(196, 420, 216, 330);
+  g.lineTo(296, 330);
+  g.quadraticCurveTo(318, 430, 332, 616);
+  g.closePath();
+  g.fillStyle = CLAY.mid;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 5.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // Canopy.
+  blob(g, rng, 256, 240, 210, 140, { fill: SAGE.deep, outline: INK.line, lineWidth: 5 }, 14, 0.1);
+  blob(g, rng, 190, 190, 110, 80, { fill: SAGE.mid }, 10, 0.12);
+  blob(g, rng, 330, 180, 100, 72, { fill: SAGE.mid }, 10, 0.12);
+  // The hollow with its little shelf.
+  g.beginPath();
+  g.ellipse(256, 480, 44, 64, 0, 0, Math.PI * 2);
+  g.fillStyle = INK.line;
+  g.fill();
+  g.fillStyle = CLAY.deep;
+  g.beginPath();
+  g.ellipse(256, 480, 36, 55, 0, 0, Math.PI * 2);
+  g.fill();
+  // Shelf + the exchange things (a tin, a book-shape, a pinecone).
+  g.fillStyle = CLAY.light;
+  g.fillRect(224, 488, 64, 7);
+  g.fillStyle = CLAY.pale;
+  g.fillRect(230, 466, 14, 20);
+  g.fillStyle = WATER.mid;
+  g.fillRect(250, 462, 12, 24);
+  blob(g, rng, 274, 478, 6, 8, { fill: CLAY.deep }, 7, 0.1);
+  return { canvas: c, aspect: 512 / 640 };
+}
+
+/** The swing tree (~4.6 m): a board swing on long ropes under a big limb,
+ *  hanging plumb-still. */
+export function drawSwingTree(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(448, 576);
+  // Trunk, leaning so the limb reaches over clear ground.
+  g.strokeStyle = CLAY.mid;
+  g.lineWidth = 24;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(150, 556);
+  g.quadraticCurveTo(160, 380, 200, 280);
+  g.stroke();
+  // The long limb.
+  g.lineWidth = 13;
+  g.beginPath();
+  g.moveTo(196, 286);
+  g.quadraticCurveTo(290, 240, 360, 250);
+  g.stroke();
+  // Canopy.
+  blob(g, rng, 220, 200, 150, 95, { fill: SAGE.mid, outline: INK.line, lineWidth: 5 }, 12, 0.11);
+  blob(g, rng, 160, 160, 80, 56, { fill: SAGE.light }, 9, 0.12);
+  // The swing: two plumb ropes + a worn board.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 3;
+  for (const x of [306, 346] as const) {
+    g.beginPath();
+    g.moveTo(x, 252);
+    g.lineTo(x, 446);
+    g.stroke();
+  }
+  g.fillStyle = CLAY.light;
+  g.fillRect(292, 444, 68, 14);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.strokeRect(292, 444, 68, 14);
+  return { canvas: c, aspect: 448 / 576 };
+}

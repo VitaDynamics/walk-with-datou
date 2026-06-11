@@ -20,7 +20,22 @@ export type LandmarkId =
   | 'relay-camp'
   | 'ruin-stones'
   | 'watch-knoll'
-  | 'meadow-orchard';
+  | 'meadow-orchard'
+  | 'stepping-stones'
+  | 'willow-bend'
+  | 'frog-shallows'
+  | 'lantern-walk'
+  | 'boardwalk-rest'
+  | 'driftwood-beach'
+  | 'kite-field'
+  | 'gate-arch'
+  | 'beacon-rise'
+  | 'star-circle'
+  | 'fern-hollow'
+  | 'quarry-scar'
+  | 'hollow-oak'
+  | 'swing-tree'
+  | 'bee-meadow';
 
 /**
  * How far the player has come with a place:
@@ -121,6 +136,139 @@ export const LANDMARK_DEFS: readonly LandmarkDef[] = [
     activityRadius: 10,
     // The planters' seed chest at the row end.
     coffer: { x: 55, z: -106, blueprintForm: 'bug-hotel', materials: { twig: 7, flower: 2 } },
+  },
+
+  // --- The light landmarks (map-fill wave): smaller hearts, one tend-beat
+  // each, found along the connective features — the stream, the boardwalk,
+  // the mown strip, the fence line, cairn lines, footprint trails, the
+  // flower drift, the forest corridor, and the old cart ruts.
+
+  // Along the STREAM (woods → lake west shore).
+  {
+    id: 'stepping-stones',
+    center: { x: -72, z: 28 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -68, z: 31, blueprintForm: 'path-tile', materials: { pebble: 6 } },
+    clueTo: 'willow-bend',
+  },
+  {
+    id: 'willow-bend',
+    center: { x: -38, z: 92 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -42, z: 95, blueprintForm: 'garland', materials: { flower: 6 } },
+    clueTo: 'frog-shallows',
+  },
+  {
+    id: 'frog-shallows',
+    center: { x: -45, z: 160 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -41, z: 156, blueprintForm: 'raft', materials: { reed: 2, twig: 9 } },
+  },
+  // Along the PAVEMENTS (the lantern avenue; the lakeshore boardwalk).
+  {
+    id: 'lantern-walk',
+    center: { x: 4, z: 70 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 8, z: 66, blueprintForm: 'lamp', materials: { 'old-bolt': 2, twig: 3 } },
+    clueTo: 'boardwalk-rest',
+  },
+  {
+    id: 'boardwalk-rest',
+    center: { x: 82, z: 138 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 80, z: 143, blueprintForm: 'bridge-plank', materials: { twig: 9 } },
+    clueTo: 'driftwood-beach',
+  },
+  {
+    id: 'driftwood-beach',
+    center: { x: 96, z: 188 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 92, z: 184, blueprintForm: 'archway', materials: { twig: 11 } },
+  },
+  // The MOWN STRIP through the tall south-east meadow.
+  {
+    id: 'kite-field',
+    center: { x: 150, z: 90 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 146, z: 86, blueprintForm: 'wind-vane', materials: { 'old-bolt': 2, feather: 1, twig: 2 } },
+    clueTo: 'gate-arch',
+  },
+  // The FENCE LINE along the east edge.
+  {
+    id: 'gate-arch',
+    center: { x: 172, z: -78 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 168, z: -74, blueprintForm: 'gate', materials: { twig: 12 } },
+    clueTo: 'beacon-rise',
+  },
+  // The CAIRN LINE (orchard → beacon → ruins).
+  {
+    id: 'beacon-rise',
+    center: { x: 118, z: -150 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 114, z: -146, blueprintForm: 'lookout-perch', materials: { twig: 12 } },
+    clueTo: 'star-circle',
+  },
+  // FOOTPRINT TRAILS through the open north and west meadow.
+  {
+    id: 'star-circle',
+    center: { x: -10, z: -170 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -6, z: -166, blueprintForm: 'mobile', materials: { feather: 3, flower: 1 } },
+    clueTo: 'fern-hollow',
+  },
+  {
+    id: 'hollow-oak',
+    center: { x: -65, z: -45 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -61, z: -41, blueprintForm: 'cache-box', materials: { twig: 7, 'old-bolt': 1 } },
+    clueTo: 'swing-tree',
+  },
+  {
+    id: 'swing-tree',
+    center: { x: -34, z: -70 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -30, z: -66, blueprintForm: 'cord', materials: { reed: 3 } },
+    clueTo: 'bee-meadow',
+  },
+  // The FLOWER DRIFT north of home.
+  {
+    id: 'bee-meadow',
+    center: { x: 38, z: -64 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: 42, z: -60, blueprintForm: 'vessel', materials: { pebble: 7 } },
+    clueTo: 'meadow-orchard',
+  },
+  // The FOREST CORRIDOR deep in the north-west woods.
+  {
+    id: 'fern-hollow',
+    center: { x: -160, z: -145 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -156, z: -141, blueprintForm: 'brush', materials: { reed: 1, twig: 2 } },
+    clueTo: 'quarry-scar',
+  },
+  // The CART RUTS out to the old quarry, far west.
+  {
+    id: 'quarry-scar',
+    center: { x: -185, z: -10 },
+    noticeRadius: 60,
+    activityRadius: 9,
+    coffer: { x: -181, z: -14, blueprintForm: 'well', materials: { pebble: 13 } },
+    clueTo: 'hollow-oak',
   },
 ];
 

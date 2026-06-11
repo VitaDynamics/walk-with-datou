@@ -164,33 +164,257 @@ export function paintWorld(
   }
   g.restore();
 
-  // Faint spur paths to the outlying areas — less travelled than the main
-  // home→zone paths, but the network finally reads as a network.
+  // --- Connective features (the leading lines between areas) ----------------
+  // Not everything radiates from home: areas are found along a stream, a
+  // boardwalk, a mown strip, cart ruts, footprint trails, a flower drift and
+  // a forest corridor — each line a different way of being led somewhere.
+
+  /** A wobbled polyline through world-space waypoints. */
+  const flow = (pts: Array<[number, number]>, wobble: number): void => {
+    g.beginPath();
+    g.moveTo(px(pts[0][0]), pz(pts[0][1]));
+    for (let k = 0; k < pts.length - 1; k++) {
+      const [ax, az] = pts[k];
+      const [bx, bz] = pts[k + 1];
+      const steps = 10;
+      const len = Math.hypot(bx - ax, bz - az) || 1;
+      const nx = -(bz - az) / len;
+      const nz = (bx - ax) / len;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const wob = Math.sin((k + t) * Math.PI * 1.7 + bx) * wobble + (rng.next() * 2 - 1) * 2;
+        g.lineTo(px(ax + (bx - ax) * t + nx * wob), pz(az + (bz - az) * t + nz * wob));
+      }
+    }
+    g.stroke();
+  };
+
+  // THE STREAM: rises in the woods, crosses at the stepping stones, bends
+  // under the willow, and feeds the lake — the west side's waterway.
+  const streamPts: Array<[number, number]> = [
+    [-150, -58],
+    [-112, -18],
+    [-72, 28],
+    [-50, 62],
+    [-38, 92],
+    [-24, 116],
+    [-12, 138],
+  ];
+  g.save();
+  g.lineCap = 'round';
+  g.strokeStyle = WATER.edge;
+  g.lineWidth = 3.6 * S;
+  flow(streamPts, 5);
+  g.strokeStyle = WATER.mid;
+  g.lineWidth = 2 * S;
+  flow(streamPts, 5);
+  g.restore();
+
+  // THE BOARDWALK: a planked pavement from the jetty along the east shore
+  // to the driftwood beach — pale runner band with plank ticks.
+  const walkPts: Array<[number, number]> = [
+    [26, 126],
+    [54, 130],
+    [82, 138],
+    [92, 162],
+    [96, 188],
+  ];
+  g.save();
+  g.lineCap = 'round';
+  g.globalAlpha = 0.85;
+  g.strokeStyle = '#e0d3b4';
+  g.lineWidth = 2.4 * S;
+  flow(walkPts, 2);
+  g.globalAlpha = 0.5;
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 0.5 * S;
+  for (let k = 0; k < walkPts.length - 1; k++) {
+    const [ax, az] = walkPts[k];
+    const [bx, bz] = walkPts[k + 1];
+    const len = Math.hypot(bx - ax, bz - az);
+    const nx = -(bz - az) / len;
+    const nz = (bx - ax) / len;
+    for (let d = 3; d < len; d += 4.5) {
+      const t = d / len;
+      const cx = ax + (bx - ax) * t;
+      const cz = az + (bz - az) * t;
+      g.beginPath();
+      g.moveTo(px(cx - nx * 1.1), pz(cz - nz * 1.1));
+      g.lineTo(px(cx + nx * 1.1), pz(cz + nz * 1.1));
+      g.stroke();
+    }
+  }
+  g.restore();
+
+  // THE MOWN STRIP: a wide cut lane through the tall south-east meadow,
+  // straight to the kite field.
+  g.save();
+  g.globalAlpha = 0.5;
+  g.strokeStyle = GROUND.blotchC;
+  g.lineCap = 'round';
+  g.lineWidth = 6 * S;
+  flow(
+    [
+      [132, 10],
+      [142, 50],
+      [150, 90],
+    ],
+    3,
+  );
+  g.restore();
+
+  // THE CART RUTS: two parallel worn lines out to the old quarry.
+  g.save();
+  g.globalAlpha = 0.7;
+  g.strokeStyle = GROUND.path;
+  g.lineCap = 'round';
+  g.lineWidth = 0.7 * S;
+  for (const off of [-0.9, 0.9] as const) {
+    g.beginPath();
+    const ruts: Array<[number, number]> = [
+      [-138, -52],
+      [-162, -32],
+      [-185, -10],
+    ];
+    g.moveTo(px(ruts[0][0]), pz(ruts[0][1] + off));
+    for (let k = 0; k < ruts.length - 1; k++) {
+      const [ax, az] = ruts[k];
+      const [bx, bz] = ruts[k + 1];
+      for (let i = 1; i <= 8; i++) {
+        const t = i / 8;
+        const wob = Math.sin((k + t) * 4.1) * 1.5;
+        g.lineTo(px(ax + (bx - ax) * t), pz(az + (bz - az) * t + off + wob));
+      }
+    }
+    g.stroke();
+  }
+  g.restore();
+
+  // FOOTPRINT TRAILS: little alternating dabs — home toward the swing tree
+  // and the hollow oak; the orchard out to the star circle; the willow bend
+  // across to the watchers' knoll.
+  g.save();
+  g.fillStyle = INK.soft;
+  const trails: Array<Array<[number, number]>> = [
+    [
+      [-8, -10],
+      [-34, -70],
+      [-65, -45],
+    ],
+    [
+      [48, -120],
+      [20, -146],
+      [-10, -170],
+    ],
+    [
+      [-46, 92],
+      [-72, 90],
+      [-98, 88],
+    ],
+  ];
+  for (const trail of trails) {
+    for (let k = 0; k < trail.length - 1; k++) {
+      const [ax, az] = trail[k];
+      const [bx, bz] = trail[k + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      const nx = -(bz - az) / len;
+      const nz = (bx - ax) / len;
+      let side = 1;
+      for (let d = 2; d < len; d += 3.4) {
+        const t = d / len;
+        side = -side;
+        const cx = ax + (bx - ax) * t + nx * side * 0.55 + (rng.next() - 0.5) * 0.8;
+        const cz = az + (bz - az) * t + nz * side * 0.55 + (rng.next() - 0.5) * 0.8;
+        g.globalAlpha = 0.22 + rng.next() * 0.1;
+        g.beginPath();
+        g.ellipse(px(cx), pz(cz), 0.42 * S, 0.62 * S, Math.atan2(bx - ax, -(bz - az)), 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
+  g.restore();
+
+  // THE FLOWER DRIFT: a soft blossom band from home's north path through the
+  // bee meadow to the orchard rows.
+  g.save();
+  g.globalAlpha = 0.14;
+  g.strokeStyle = '#d9b3a0';
+  g.lineCap = 'round';
+  g.lineWidth = 8 * S;
+  flow(
+    [
+      [12, -18],
+      [38, -64],
+      [52, -92],
+    ],
+    4,
+  );
+  g.globalAlpha = 0.3;
+  g.fillStyle = '#d9b3a0';
+  for (let i = 0; i < 60; i++) {
+    const t = rng.next();
+    const bx = 12 + (52 - 12) * t + (rng.next() - 0.5) * 12;
+    const bz = -18 + (-92 + 18) * t + (rng.next() - 0.5) * 12;
+    g.beginPath();
+    g.arc(px(bx), pz(bz), (0.3 + rng.next() * 0.35) * S, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.restore();
+
+  // THE FOREST CORRIDOR: a lighter winding gap through the deep woods stain,
+  // from the camp down into the fern hollow.
+  g.save();
+  g.globalAlpha = 0.3;
+  g.strokeStyle = GROUND.path;
+  g.lineCap = 'round';
+  g.lineWidth = 2.6 * S;
+  flow(
+    [
+      [-128, -118],
+      [-144, -132],
+      [-160, -145],
+    ],
+    3,
+  );
+  g.restore();
+
+  // One spur stays: the trail loop up to the ruin stones (not from home).
   g.save();
   g.strokeStyle = GROUND.path;
   g.lineCap = 'round';
   g.globalAlpha = 0.75;
   g.lineWidth = 2.2 * S;
-  const spurs: Array<[number, number, number, number]> = [
-    [138, -52, 168, -160], // trail loop → ruin stones
-    [-12, 8, -98, 88], // home meadow → watchers' knoll
-    [10, -14, 60, -110], // home meadow → orchard rows
+  flow(
+    [
+      [138, -52],
+      [155, -106],
+      [168, -160],
+    ],
+    6,
+  );
+  g.restore();
+
+  // Small aprons so each light landmark holds its ground from above.
+  g.save();
+  const aprons: Array<[number, number, number, string, number]> = [
+    [-72, 28, 7, WATER.sand, 0.5], // stepping stones
+    [-38, 92, 8, SAGE.light, 0.35], // willow bend
+    [-45, 160, 9, WATER.sand, 0.45], // frog shallows
+    [4, 70, 7, GROUND.path, 0.6], // lantern walk paving
+    [96, 188, 10, '#e8ddc2', 0.55], // driftwood strand
+    [150, 90, 8, GROUND.blotchC, 0.5], // kite field
+    [172, -78, 6, GROUND.path, 0.5], // meadow gate
+    [118, -150, 7, GROUND.blotchA, 0.5], // beacon rise
+    [-10, -170, 8, GROUND.blotchB, 0.55], // star circle
+    [-160, -145, 9, SAGE.mid, 0.3], // fern hollow (deeper green)
+    [-185, -10, 9, '#e3ddc8', 0.55], // quarry floor
+    [-65, -45, 7, GROUND.blotchA, 0.45], // hollow oak
+    [-34, -70, 7, SAGE.light, 0.3], // swing tree clover
+    [38, -64, 8, '#e8d8cb', 0.3], // bee meadow blossom ground
   ];
-  for (const [sx, sz, ex, ez] of spurs) {
-    const steps = 12;
-    g.beginPath();
-    g.moveTo(px(sx), pz(sz));
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      const wob = Math.sin(t * Math.PI * 2.2 + ex) * 7 + (rng.next() * 2 - 1) * 4;
-      const dx = sx + (ex - sx) * t;
-      const dz = sz + (ez - sz) * t;
-      const len = Math.hypot(ex - sx, ez - sz) || 1;
-      const nx = -(ez - sz) / len;
-      const nz = (ex - sx) / len;
-      g.lineTo(px(dx + nx * wob), pz(dz + nz * wob));
-    }
-    g.stroke();
+  for (const [ax, az, r, fill, alpha] of aprons) {
+    g.globalAlpha = alpha;
+    blob(g, rng, px(ax), pz(az), r * S, r * 0.8 * S, { fill }, 11, 0.12);
   }
   g.restore();
 

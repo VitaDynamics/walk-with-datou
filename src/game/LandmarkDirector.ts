@@ -12,10 +12,19 @@
  * landed true. The player is the hands; the robot is the partner.
  */
 
-import { drawCoffer } from '../art/props';
 import {
+  drawCoffer,
+  drawLamp,
+  drawMushroom,
+  drawReed,
+  drawRock,
+  drawStonepile,
+} from '../art/props';
+import {
+  drawBeacon,
   drawBlueCoffer,
   drawBlueStake,
+  drawBoardwalk,
   drawButterflies,
   drawCableSpool,
   drawChannel,
@@ -24,17 +33,26 @@ import {
   drawCrate,
   drawDonatedChime,
   drawDragonfly,
+  drawDriftArch,
   drawEchoBell,
   drawFallenLintel,
   drawFastener,
   drawFeatherWand,
   drawFieldCase,
+  drawFlatStones,
   drawFloatingPlanter,
+  drawFrog,
+  drawGiantFern,
+  drawHiveStand,
+  drawHollowOak,
   drawHoseCoil,
   drawInkcap,
+  drawKitePost,
   drawLeanTo,
   drawLogSeat,
   drawMarkedStone,
+  drawMarshPool,
+  drawMeadowGate,
   drawMoonFern,
   drawMoth,
   drawPatchBall,
@@ -52,10 +70,13 @@ import {
   drawRowMarker,
   drawSapling,
   drawSeedRattle,
+  drawQuarryFace,
   drawSignalVane,
   drawSpotterTube,
   drawSquirrel,
+  drawStarStone,
   drawStoneOrb,
+  drawSwingTree,
   drawToolShelter,
   drawTrailBloom,
   drawTriangleMark,
@@ -63,6 +84,7 @@ import {
   drawWaterBarrel,
   drawWaterIris,
   drawWheelingBirds,
+  drawWillow,
   drawWindGrass,
 } from '../art/landmarkProps';
 import { Rng } from '../physics/mujoco/rng';
@@ -124,7 +146,8 @@ export interface LandmarkTarget {
     | 'toy'
     | 'stone'
     | 'tube'
-    | 'sapling';
+    | 'sapling'
+    | 'tend';
   area: LandmarkId;
   /** Which channel/vane (0 or 1) for the paired interactives. */
   index?: 0 | 1;
@@ -240,7 +263,7 @@ const ROW_MARKERS = [
 const BUTTERFLIES = { x: 62, z: -107.8, h: 0.5 };
 
 /** Datou's toy per area — left by the volunteers, his to play with. */
-const TOYS: Record<LandmarkId, { x: number; z: number; h: number }> = {
+const TOYS: Partial<Record<LandmarkId, { x: number; z: number; h: number }>> = {
   'repair-commons': { x: 128.8, z: -26.2, h: 0.42 },
   'pump-garden': { x: 12.5, z: 114.2, h: 0.42 },
   'relay-camp': { x: -112.2, z: -108.2, h: 0.72 },
@@ -249,13 +272,38 @@ const TOYS: Record<LandmarkId, { x: number; z: number; h: number }> = {
   'meadow-orchard': { x: 63.5, z: -106.8, h: 0.35 },
 };
 
+/**
+ * The light landmarks: one tend-together station each. Tapping it runs the
+ * shared cooperative beat; completion is a memory + the place acknowledged
+ * (the beacon also lights). Hearts are placed in placeLightAreas().
+ */
+const LIGHT_STATIONS: Partial<Record<LandmarkId, { x: number; z: number }>> = {
+  'stepping-stones': { x: -72, z: 28 },
+  'willow-bend': { x: -38, z: 92 },
+  'frog-shallows': { x: -45, z: 160 },
+  'lantern-walk': { x: 4, z: 70 },
+  'boardwalk-rest': { x: 82, z: 138 },
+  'driftwood-beach': { x: 96, z: 188 },
+  'kite-field': { x: 150, z: 90 },
+  'gate-arch': { x: 172, z: -78 },
+  'beacon-rise': { x: 118, z: -150 },
+  'star-circle': { x: -10, z: -170 },
+  'fern-hollow': { x: -160, z: -145 },
+  'quarry-scar': { x: -185, z: -10 },
+  'hollow-oak': { x: -65, z: -45 },
+  'swing-tree': { x: -34, z: -70 },
+  'bee-meadow': { x: 38, z: -64 },
+};
+
 const REACH = 1.4; // Datou close enough to brace/work
 const WORK_SECONDS = 2.6; // the calm cooperative beat
 const TELL_COOLDOWN = 12; // s between coffer paw-tells
 const TELL_RANGE = 5; // m (§9: 4–6 m)
 
 /** Per-area coffer plate variant: patched chest / blue chest / metal case. */
-const COFFER_LOOK: Record<LandmarkId, { h: number; draw: (open: boolean) => ReturnType<typeof drawCoffer> }> = {
+const COFFER_LOOK: Partial<
+  Record<LandmarkId, { h: number; draw: (open: boolean) => ReturnType<typeof drawCoffer> }>
+> = {
   'repair-commons': { h: 0.7, draw: (open) => drawCoffer(74, open, true) },
   'pump-garden': { h: 0.7, draw: (open) => drawBlueCoffer(81, open) },
   'relay-camp': { h: 0.55, draw: (open) => drawFieldCase(82, open) },
@@ -263,6 +311,16 @@ const COFFER_LOOK: Record<LandmarkId, { h: number; draw: (open: boolean) => Retu
   'watch-knoll': { h: 0.6, draw: (open) => drawCoffer(119, open, true) },
   'meadow-orchard': { h: 0.6, draw: (open) => drawCoffer(127, open) },
 };
+
+/** Coffer plate variant for an area; light areas get the weathered community
+ *  chest with an id-derived seed (each one's wobble is its own). */
+function cofferLook(id: LandmarkId): { h: number; draw: (open: boolean) => ReturnType<typeof drawCoffer> } {
+  const fixed = COFFER_LOOK[id];
+  if (fixed) return fixed;
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return { h: 0.6, draw: (open) => drawCoffer(hash, open, hash % 2 === 0) };
+}
 
 type BeatPhase = 'idle' | 'datou-coming' | 'working';
 
@@ -303,6 +361,7 @@ export class LandmarkDirector {
   private vaneCuts: (Cutout | null)[] = [null, null];
   private stoneCut: Cutout | null = null;
   private tubeCut: Cutout | null = null;
+  private beaconCut: Cutout | null = null;
   private saplingCuts: (Cutout | null)[] = SAPLINGS.map(() => null);
   private readonly cofferCuts = new Map<LandmarkId, Cutout>();
   private commonsCluesPlaced = false;
@@ -317,6 +376,7 @@ export class LandmarkDirector {
     this.placeRuins();
     this.placeKnoll();
     this.placeOrchard();
+    this.placeLightAreas();
   }
 
   // --- world dressing --------------------------------------------------------
@@ -342,7 +402,7 @@ export class LandmarkDirector {
     this.placeMadeItem('table', 'plank', 124, -31.2);
     this.placeMadeItem('bench', 'plank', 129.6, -24.6);
     this.placeMadeItem('cache-box', 'plank', 121.2, -24.2);
-    const toyA = TOYS['repair-commons'];
+    const toyA = TOYS['repair-commons']!;
     this.plate(drawPatchBall(121), toyA.x, toyA.z, toyA.h, 0.25);
     if (this.field.chimeDonated) this.placeDonatedChime();
     if (done) this.placeCommonsClues();
@@ -382,7 +442,7 @@ export class LandmarkDirector {
     this.placeMadeItem('basket', 'reed', 12.4, 105.6);
     this.placeMadeItem('trellis', 'reed', 18.4, 108.6);
     this.placeMadeItem('drinking-bowl', 'flat-stone', 15.6, 104.6);
-    const toyB = TOYS['pump-garden'];
+    const toyB = TOYS['pump-garden']!;
     this.plate(drawReedRing(124), toyB.x, toyB.z, toyB.h, 0.2);
     if (done) this.placeGardenClues();
   }
@@ -416,7 +476,7 @@ export class LandmarkDirector {
     this.placeMadeItem('stool', 'log', -112.8, -103);
     this.placeMadeItem('lamp', 'driftwood', -116.8, -105);
     this.placeMadeItem('mat', 'grass-wisp', -115.5, -99.5);
-    const toyC = TOYS['relay-camp'];
+    const toyC = TOYS['relay-camp']!;
     this.plate(drawEchoBell(126), toyC.x, toyC.z, toyC.h, 0.3);
   }
 
@@ -436,7 +496,7 @@ export class LandmarkDirector {
     this.plate(drawMoth(114), MOTH.x, MOTH.z, MOTH.h, 0.08);
     this.placeMadeItem('cairn', 'pebble', 166, -163.8);
     this.placeMadeItem('memory-frame', 'driftwood', 171.8, -161.8);
-    const toy = TOYS['ruin-stones'];
+    const toy = TOYS['ruin-stones']!;
     this.plate(drawStoneOrb(115), toy.x, toy.z, toy.h, 0.22);
   }
 
@@ -455,7 +515,7 @@ export class LandmarkDirector {
     this.clusterPlates(drawWindGrass, 8, -98, 88, 3, 9, 0.7, 0x7a15);
     this.plate(drawPerchedBird(128), -101.5, 85, 0.42, 0.1);
     this.placeMadeItem('bench', 'plank', -101, 89.5);
-    const toy = TOYS['watch-knoll'];
+    const toy = TOYS['watch-knoll']!;
     this.plate(drawFeatherWand(129), toy.x, toy.z, toy.h, 0.12);
     if (done) this.placeKnollBirds();
   }
@@ -485,14 +545,140 @@ export class LandmarkDirector {
     this.plate(drawButterflies(137), BUTTERFLIES.x, BUTTERFLIES.z, BUTTERFLIES.h, 0);
     this.placeMadeItem('birdbath', 'flat-stone', 58.5, -114.5);
     this.placeMadeItem('stool', 'log', 65.5, -107.5);
-    const toy = TOYS['meadow-orchard'];
+    const toy = TOYS['meadow-orchard']!;
     this.plate(drawSeedRattle(138), toy.x, toy.z, toy.h, 0.12);
     if (done) this.plate(drawButterflies(139), 59, -113.2, 0.5, 0);
   }
 
+  /** A flat ground plate (stepping stones, pools, boardwalk planks). */
+  private decal(
+    sprite: { canvas: HTMLCanvasElement; aspect: number },
+    x: number,
+    z: number,
+    length: number,
+  ): void {
+    const cut = new Cutout(sprite, { height: length, decal: true });
+    this.deps.place(cut, x, z);
+  }
+
+  /**
+   * The fifteen light landmarks — smaller hearts along the connective
+   * features. Each: a focal piece, supporting cast (reused props + made
+   * items + life), and its community coffer. One tend-beat each (§engageTend).
+   */
+  private placeLightAreas(): void {
+    // The STREAM line: stepping stones → willow bend → frog shallows.
+    this.decal(drawFlatStones(150), -72, 28, 3.2);
+    this.plate(drawRock(151), -75.5, 25, 1.0, 0.8);
+    for (const [i, [x, z]] of ([[-69, 24.5], [-75, 31.5], [-68.5, 27]] as const).entries())
+      this.plate(drawReed(152 + i), x, z, 1.2, 0);
+    this.placeCoffer('stepping-stones');
+
+    this.plate(drawWillow(155), -38, 92, 5.5, 1.8);
+    this.placeMadeItem('bench', 'driftwood', -41.5, 88.5);
+    this.plate(drawRibbonScrap(156), -34.5, 95, 0.35, 0.1);
+    this.plate(drawPerchedBird(157), -35, 89, 0.42, 0.1);
+    this.placeCoffer('willow-bend');
+
+    this.decal(drawMarshPool(158), -45, 160, 4);
+    this.decal(drawMarshPool(159), -40, 164.5, 3);
+    this.plate(drawFrog(160), -43, 157.5, 0.3, 0.08);
+    this.plate(drawFrog(161), -39.5, 162.5, 0.26, 0.08);
+    for (const [i, [x, z]] of ([[-48.5, 157], [-42, 165.5], [-48, 163]] as const).entries())
+      this.plate(drawReed(162 + i), x, z, 1.25, 0);
+    this.placeCoffer('frog-shallows');
+
+    // The PAVEMENTS: the lantern avenue; the lakeshore boardwalk.
+    for (const [i, [x, z]] of ([[2, 58], [6, 64.5], [2, 76], [6, 82]] as const).entries())
+      this.plate(drawLamp(165 + i), x, z, 1.7, 0.4);
+    this.placeMadeItem('sign', 'plank', 0.5, 69);
+    this.placeCoffer('lantern-walk');
+
+    this.decal(drawBoardwalk(170), 82, 138, 5);
+    this.decal(drawBoardwalk(171), 87, 144, 5);
+    this.plate(drawLamp(172), 79, 135, 1.7, 0.4);
+    this.placeMadeItem('stool', 'driftwood', 85.5, 140);
+    this.placeCoffer('boardwalk-rest');
+
+    this.plate(drawDriftArch(173), 96, 188, 2.4, 1.0);
+    this.plate(drawDriftArch(174), 100.5, 184.5, 1.9, 0.8);
+    this.plate(drawStonepile(175), 92.5, 190.5, 0.6, 0.4);
+    this.placeMadeItem('bench', 'driftwood', 99, 191);
+    this.placeCoffer('driftwood-beach');
+
+    // The MOWN STRIP: the kite field.
+    this.plate(drawKitePost(176), 150, 90, 3.2, 0.7);
+    this.clusterPlates(drawWindGrass, 7, 150, 90, 4, 10, 0.7, 0x7a17);
+    this.placeMadeItem('bench', 'plank', 146.5, 93);
+    this.placeCoffer('kite-field');
+
+    // The FENCE LINE: the meadow gate.
+    this.plate(drawMeadowGate(177), 172, -78, 2.6, 1.1);
+    this.plate(drawPatchedFence(178), 169.5, -84, 0.95, 0.6);
+    this.plate(drawPatchedFence(179), 174.5, -71.5, 0.95, 0.6);
+    this.plate(drawFastener(180), 170, -75, 0.24, 0.12);
+    this.placeCoffer('gate-arch');
+
+    // The CAIRN LINE: the beacon rise (lit once tended).
+    this.beaconCut = this.plate(
+      drawBeacon(this.vary(181, this.completed('beacon-rise')), this.completed('beacon-rise')),
+      118,
+      -150,
+      4.2,
+      0.8,
+    );
+    this.placeMadeItem('cairn', 'pebble', 114.5, -152.5);
+    this.placeMadeItem('cairn', 'pebble', 121.5, -147);
+    this.plate(drawRock(182), 122, -153, 1.1, 0.85);
+    this.placeCoffer('beacon-rise');
+
+    // FOOTPRINT TRAILS: the star circle, the hollow oak, the swing tree.
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + 0.4;
+      this.plate(drawStarStone(183 + i), -10 + Math.cos(a) * 4.2, -170 + Math.sin(a) * 4.2, 0.7, 0.5);
+    }
+    this.placeMadeItem('campfire', 'flat-stone', -10, -170);
+    this.plate(drawMoth(188), -7.5, -167, 0.28, 0.08);
+    this.placeCoffer('star-circle');
+
+    this.plate(drawHollowOak(189), -65, -45, 5.0, 1.9);
+    this.plate(drawSquirrel(190), -62, -47.5, 0.45, 0.12);
+    this.placeMadeItem('stool', 'log', -68.5, -42.5);
+    this.placeCoffer('hollow-oak');
+
+    this.plate(drawSwingTree(191), -34, -70, 4.6, 1.7);
+    this.clusterPlates(drawCloverPatch, 4, -34, -70, 3, 8, 0.35, 0x7a18);
+    this.placeMadeItem('mat', 'grass-wisp', -30.5, -73);
+    this.placeCoffer('swing-tree');
+
+    // The FLOWER DRIFT: the bee meadow.
+    this.plate(drawHiveStand(192), 38, -64, 1.4, 0.7);
+    this.clusterPlates(drawTrailBloom, 8, 38, -64, 3, 10, 0.5, 0x7a19);
+    this.plate(drawButterflies(193), 41, -61, 0.5, 0);
+    this.plate(drawButterflies(194), 35, -67.5, 0.45, 0);
+    this.placeMadeItem('planter', 'twig', 34.5, -61);
+    this.placeCoffer('bee-meadow');
+
+    // The FOREST CORRIDOR: the fern hollow.
+    this.plate(drawGiantFern(195), -160, -145, 1.6, 0.7);
+    this.plate(drawGiantFern(196), -163.5, -142, 1.4, 0.6);
+    this.plate(drawGiantFern(197), -157, -148.5, 1.5, 0.65);
+    this.clusterPlates(drawMoonFern, 5, -160, -145, 3, 8, 0.45, 0x7a1a);
+    for (const [i, [x, z]] of ([[-163, -147.5], [-156.5, -143]] as const).entries())
+      this.plate(drawMushroom(198 + i), x, z, 0.45, 0);
+    this.placeCoffer('fern-hollow');
+
+    // The CART RUTS: the old quarry.
+    this.plate(drawQuarryFace(200), -185, -10, 3.0, 1.6);
+    this.plate(drawStonepile(201), -181, -6.5, 0.7, 0.5);
+    this.plate(drawStonepile(202), -188.5, -13, 0.6, 0.45);
+    this.placeMadeItem('block', 'stone-block', -181.5, -8);
+    this.placeCoffer('quarry-scar');
+  }
+
   private placeCoffer(id: LandmarkId): void {
     const area = this.field.get(id)!;
-    const look = COFFER_LOOK[id];
+    const look = cofferLook(id);
     const cut = this.plate(
       look.draw(area.cofferOpened),
       area.def.coffer.x,
@@ -677,8 +863,15 @@ export class LandmarkDirector {
     if (near(lean.x, lean.z, 1.7)) {
       return { kind: 'sapling', area: 'meadow-orchard', x: lean.x, z: lean.z };
     }
+    for (const [id, st] of Object.entries(LIGHT_STATIONS) as [
+      LandmarkId,
+      { x: number; z: number },
+    ][]) {
+      if (near(st.x, st.z, 1.8)) return { kind: 'tend', area: id, x: st.x, z: st.z };
+    }
     for (const a of this.field.areas) {
       const toy = TOYS[a.def.id];
+      if (!toy) continue;
       if (near(toy.x, toy.z, 1.5)) {
         return { kind: 'toy', area: a.def.id, x: toy.x, z: toy.z };
       }
@@ -720,7 +913,38 @@ export class LandmarkDirector {
       case 'sapling':
         this.engageSapling();
         break;
+      case 'tend':
+        this.engageTend(target.area);
+        break;
     }
+  }
+
+  /** The light landmarks' shared activity: tend the place together. Datou
+   *  comes, works his calm beat with you, and the place is acknowledged —
+   *  a memory, the map mark, and (for the beacon) a kept flame. */
+  private engageTend(id: LandmarkId): void {
+    if (this.completed(id)) {
+      this.deps.toast(this.dailyLine('landmark.lightAgain', 3));
+      return;
+    }
+    const station = LIGHT_STATIONS[id];
+    if (!station) return;
+    if (this.startBeat(id, station, () => this.completeTend(id))) {
+      this.deps.toast(tDyn(`landmark.${id}.tend`));
+    }
+  }
+
+  private completeTend(id: LandmarkId): void {
+    this.field.complete(id);
+    this.persist();
+    if (id === 'beacon-rise') {
+      // The one stateful light heart: the beacon keeps a small flame.
+      this.beaconCut = this.replate(this.beaconCut, drawBeacon(181, true), 118, -150, 4.2, 0.8);
+      this.deps.cue('chime');
+    }
+    this.deps.datouBeat();
+    this.deps.memory(`landmark.${id}`);
+    this.deps.toast(tDyn(`landmark.${id}.done`));
   }
 
   // --- D. tracing the mark -------------------------------------------------------
@@ -819,6 +1043,7 @@ export class LandmarkDirector {
    *  Repeatable, feeds the playful axis, never a chore. */
   private engageToy(id: LandmarkId): void {
     const toy = TOYS[id];
+    if (!toy) return;
     this.startBeat(id, toy, () => {
       this.deps.notePlay();
       if (id === 'relay-camp') this.deps.cue('chime'); // the bell answers
@@ -1126,7 +1351,7 @@ export class LandmarkDirector {
     for (const [mat, n] of Object.entries(area.def.coffer.materials)) {
       this.deps.grantMaterial(mat as MaterialId, n);
     }
-    const look = COFFER_LOOK[id];
+    const look = cofferLook(id);
     this.cofferCuts.set(
       id,
       this.replate(

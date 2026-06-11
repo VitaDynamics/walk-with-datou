@@ -96,16 +96,22 @@ describe('LandmarkField', () => {
   });
 
   it('notices only unseen areas inside their notice radius', () => {
-    const f = new LandmarkField();
+    // Isolate one area — the full map is dense enough that most probe points
+    // fall inside SOME notice radius (which is the point of the map-fill).
+    const f = new LandmarkField([LANDMARK_DEFS[0]]);
     const commons = f.get('repair-commons')!.def;
     // Just inside the radius, west of the commons.
     const near = f.nearestNoticeable(commons.center.x - commons.noticeRadius + 1, commons.center.z);
     expect(near?.def.id).toBe('repair-commons');
-    // Far away: nothing.
-    expect(f.nearestNoticeable(0, 0)).toBeNull();
+    // Just outside: nothing.
+    expect(
+      f.nearestNoticeable(commons.center.x - commons.noticeRadius - 1, commons.center.z),
+    ).toBeNull();
     // Noticed areas stop anchoring.
     f.notice('repair-commons');
     expect(f.nearestNoticeable(commons.center.x - 5, commons.center.z)).toBeNull();
+    // Home stays quiet on the full map — no notice radius reaches the pad.
+    expect(new LandmarkField().nearestNoticeable(0, 0)).toBeNull();
   });
 
   it('reports the area at a point and the nearest unopened coffer', () => {
@@ -145,7 +151,7 @@ describe('LandmarkField', () => {
   });
 
   it('scales the notice radius for personality shading only', () => {
-    const f = new LandmarkField();
+    const f = new LandmarkField([LANDMARK_DEFS[0]]);
     const commons = f.get('repair-commons')!.def;
     const justOutside = commons.center.x - commons.noticeRadius - 5;
     expect(f.nearestNoticeable(justOutside, commons.center.z)).toBeNull();
