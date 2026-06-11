@@ -26,6 +26,8 @@ export interface LandmarkAnchor {
   id: string;
   x: number;
   z: number;
+  /** Gaze-hold multiplier — personality presentation shading (§6). */
+  hold?: number;
 }
 
 /** What the rig needs to pose Datou for the current want. */
@@ -73,6 +75,8 @@ interface ActiveWant {
   /** The landmark the want is anchored to — held longer, led only a few
    *  steps (Datou points the way; the player does the travelling, §6). */
   landmark?: string;
+  /** Gaze-hold multiplier for landmark wants (personality shading). */
+  hold?: number;
 }
 
 export class Companion {
@@ -204,7 +208,9 @@ export class Companion {
         this.poseForWant(datou);
         if (this.timer <= 0) {
           this.phase = 'active';
-          this.timer = this.want?.landmark ? Companion.LANDMARK_WINDOW : Companion.ACTIVE_WINDOW;
+          this.timer = this.want?.landmark
+            ? Companion.LANDMARK_WINDOW * (this.want.hold ?? 1)
+            : Companion.ACTIVE_WINDOW;
         }
         break;
 
@@ -270,7 +276,12 @@ export class Companion {
     const anchor = this.promptedAnchor ?? this.landmarkAnchor();
     this.promptedAnchor = null;
     if (anchor) {
-      this.want = { kind: 'curious', poi: { x: anchor.x, z: anchor.z }, landmark: anchor.id };
+      this.want = {
+        kind: 'curious',
+        poi: { x: anchor.x, z: anchor.z },
+        landmark: anchor.id,
+        hold: anchor.hold,
+      };
       this.actions.onLandmarkNoticed?.(anchor.id);
       this.actions.setMode('leashed');
       this.actions.setTarget(datou.position.x, datou.position.z);

@@ -1131,3 +1131,193 @@ export function drawTriangleMark(seed: number): PropSprite {
   g.restore();
   return { canvas: c, aspect: 1 };
 }
+
+// --- Area dressing (Phase 3) --------------------------------------------------
+// Small supporting plates that spread each heart's character through its
+// activity ring, so a landmark reads as a lived-in AREA rather than an
+// isolated prop cluster. All low, quiet, one accent at most.
+
+/** A stack of salvaged planks with a lashing strap (~0.6 m) — Commons. */
+export function drawPlankStack(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(288, 160);
+  const fills = [CLAY.light, CLAY.pale, CLAY.mid, CLAY.light];
+  for (let i = 0; i < 4; i++) {
+    const y = 128 - i * 22;
+    const lean = (rng.next() - 0.5) * 8;
+    g.save();
+    g.translate(144 + lean, y);
+    g.rotate((rng.next() - 0.5) * 0.05);
+    g.fillStyle = fills[i];
+    g.fillRect(-110 + i * 6, -10, 220 - i * 12, 20);
+    g.strokeStyle = INK.line;
+    g.lineWidth = 4;
+    g.strokeRect(-110 + i * 6, -10, 220 - i * 12, 20);
+    g.restore();
+  }
+  // The lashing strap over the pile.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 3.5;
+  g.beginPath();
+  g.moveTo(132, 42);
+  g.quadraticCurveTo(144, 36, 158, 42);
+  g.lineTo(150, 148);
+  g.moveTo(138, 148);
+  g.lineTo(132, 44);
+  g.stroke();
+  return { canvas: c, aspect: 288 / 160 };
+}
+
+/** A small supply crate with a stenciled mark (~0.55 m) — Commons / Camp. */
+export function drawCrate(seed: number, mark: 'patch' | 'triangle' = 'patch'): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 176);
+  g.save();
+  g.translate(96, 110);
+  g.rotate((rng.next() - 0.5) * 0.06);
+  g.fillStyle = CLAY.light;
+  g.fillRect(-62, -52, 124, 104);
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.strokeRect(-62, -52, 124, 104);
+  // Slats.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 3;
+  for (const y of [-18, 16] as const) {
+    g.beginPath();
+    g.moveTo(-58, y);
+    g.lineTo(58, y + 2);
+    g.stroke();
+  }
+  if (mark === 'patch') {
+    // A small sewn patch (the Commons' signature).
+    g.fillStyle = SAGE.mid;
+    g.fillRect(-18, -40, 36, 26);
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2.5;
+    g.setLineDash([5, 4]);
+    g.strokeRect(-15, -37, 30, 20);
+    g.setLineDash([]);
+  } else {
+    // The camp's stenciled triangle.
+    g.strokeStyle = ROBOT.dark;
+    g.lineWidth = 3.5;
+    g.beginPath();
+    g.moveTo(0, -42);
+    g.lineTo(13, -20);
+    g.lineTo(-13, -20);
+    g.closePath();
+    g.stroke();
+  }
+  g.restore();
+  return { canvas: c, aspect: 192 / 176 };
+}
+
+/** A coiled irrigation hose (~0.4 m) — Garden dressing. */
+export function drawHoseCoil(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(192, 128);
+  g.strokeStyle = WATER.deep;
+  g.lineWidth = 7;
+  g.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.ellipse(96, 92 - i * 7, 58 - i * 6, 20 - i * 3, 0, 0, Math.PI * 2);
+    g.stroke();
+  }
+  // The loose end heading off.
+  g.beginPath();
+  g.moveTo(150, 86);
+  g.quadraticCurveTo(176 + rng.next() * 8, 92, 184, 110);
+  g.stroke();
+  // A pale wooden chock keeping it from rolling.
+  blob(g, rng, 52, 108, 16, 8, { fill: CLAY.pale, outline: INK.line, lineWidth: 3 }, 7, 0.12);
+  return { canvas: c, aspect: 192 / 128 };
+}
+
+/** A camp log seat (~0.5 m): a short log laid flat, sit-worn on top. */
+export function drawLogSeat(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(256, 128);
+  // The log body.
+  g.beginPath();
+  g.moveTo(40, 64);
+  g.lineTo(208, 60);
+  g.quadraticCurveTo(230, 78, 208, 100);
+  g.lineTo(40, 104);
+  g.quadraticCurveTo(20, 82, 40, 64);
+  g.closePath();
+  g.fillStyle = CLAY.mid;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 4.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  // End grain.
+  g.beginPath();
+  g.ellipse(208, 80, 14, 21, 0, 0, Math.PI * 2);
+  g.fillStyle = CLAY.pale;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.stroke();
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 2;
+  g.beginPath();
+  g.ellipse(208, 80, 7, 11, 0, 0, Math.PI * 2);
+  g.stroke();
+  // Sit-worn top: a paler band.
+  g.save();
+  g.globalAlpha = 0.55;
+  blob(g, rng, 116, 66, 56, 8, { fill: CLAY.pale }, 8, 0.12);
+  g.restore();
+  // Bark ticks.
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 2.5;
+  for (let i = 0; i < 4; i++) {
+    const x = 56 + rng.next() * 120;
+    g.beginPath();
+    g.moveTo(x, 74 + rng.next() * 20);
+    g.lineTo(x + 14, 76 + rng.next() * 20);
+    g.stroke();
+  }
+  return { canvas: c, aspect: 2 };
+}
+
+/** A small donated windchime on a hook (~1.3 m) — appears at the Commons
+ *  when the player donates a crafted chime (§9 intended first use). */
+export function drawDonatedChime(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(160, 320);
+  // Hook post.
+  wobblyLine(g, rng, 48, 304, 50, 80, 9, CLAY.deep, 1.4, 4);
+  g.strokeStyle = CLAY.deep;
+  g.lineWidth = 7;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(50, 84);
+  g.quadraticCurveTo(92, 64, 116, 88);
+  g.stroke();
+  // Strings + three hung pieces (slightly different from the trail chime —
+  // it's the player's make).
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  for (const [x, y] of [
+    [96, 150],
+    [116, 172],
+    [134, 142],
+  ] as const) {
+    g.beginPath();
+    g.moveTo(x, 96);
+    g.lineTo(x, y);
+    g.stroke();
+  }
+  blob(g, rng, 96, 162, 8, 12, { fill: CLAY.blossom, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+  blob(g, rng, 116, 184, 8, 12, { fill: SAGE.mid, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+  blob(g, rng, 134, 154, 8, 12, { fill: CLAY.pale, outline: INK.line, lineWidth: 3 }, 8, 0.1);
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.arc(116, 184, 3, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: c, aspect: 0.5 };
+}

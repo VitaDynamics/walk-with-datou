@@ -128,14 +128,31 @@ describe('LandmarkField', () => {
     f.arrive('pump-garden');
     f.firstHookDone = true;
     f.socketFilled = true;
+    f.chimeDonated = true;
+    f.capsuleFound = true;
     const g = new LandmarkField();
     g.restore(JSON.parse(JSON.stringify(f.serialize())));
     expect(g.serialize()).toEqual(f.serialize());
     expect(g.socketFilled).toBe(true);
-    // Older saves without the socket flag stay valid.
+    expect(g.chimeDonated).toBe(true);
+    expect(g.capsuleFound).toBe(true);
+    // Older saves without the newer flags stay valid.
     const h = new LandmarkField();
     h.restore({ v: 1, areas: [], firstHookDone: false });
     expect(h.socketFilled).toBe(false);
+    expect(h.chimeDonated).toBe(false);
+    expect(h.capsuleFound).toBe(false);
+  });
+
+  it('scales the notice radius for personality shading only', () => {
+    const f = new LandmarkField();
+    const commons = f.get('repair-commons')!.def;
+    const justOutside = commons.center.x - commons.noticeRadius - 5;
+    expect(f.nearestNoticeable(justOutside, commons.center.z)).toBeNull();
+    // An Explorer (×1.2) senses it from the same spot.
+    expect(f.nearestNoticeable(justOutside, commons.center.z, 1.2)?.def.id).toBe(
+      'repair-commons',
+    );
   });
 
   it('never re-grants a coffer across reloads (the §9 idempotence guard)', () => {

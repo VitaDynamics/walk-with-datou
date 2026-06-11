@@ -48,6 +48,7 @@ import { CROP_KINDS, Farm, MATURE, TEND_RANGE, type CropKind, type PlotState } f
 import { Fetch } from './Fetch';
 import { Forage } from './Forage';
 import { Keys } from './Keys';
+import { cueChime, cueResponse } from './cues';
 import { LandmarkDirector, type LandmarkTarget } from './LandmarkDirector';
 import { Memories } from './Memories';
 import { Pointer } from './Pointer';
@@ -259,6 +260,9 @@ export class Game {
       },
       toast: (text) => this.ui.toast(text),
       memory: (key) => this.handleLandmarkMemory(key),
+      personality: () => this.personality.axis(),
+      cue: (kind) => (kind === 'chime' ? cueChime() : cueResponse()),
+      bankCurio: (tone) => this.workshopState.addCurio(tone),
       load: () => this.loadJson<unknown>('wwd.landmarks', null),
       save: (d) => this.saveJson('wwd.landmarks', d),
     });

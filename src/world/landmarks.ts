@@ -122,6 +122,10 @@ export interface LandmarksSave {
   firstHookDone: boolean;
   /** The garden's donation socket holds the player's crafted planter (§7B). */
   socketFilled?: boolean;
+  /** A crafted chime was donated to the Commons (§9 intended first use). */
+  chimeDonated?: boolean;
+  /** The volunteers' time capsule under the Old Pine was found (Phase 3). */
+  capsuleFound?: boolean;
 }
 
 export const LANDMARKS_VERSION = 1;
@@ -132,6 +136,10 @@ export class LandmarkField {
   firstHookDone = false;
   /** The garden donation socket holds the player's planter. */
   socketFilled = false;
+  /** A crafted chime hangs at the Commons. */
+  chimeDonated = false;
+  /** The Old Pine time capsule was found. */
+  capsuleFound = false;
 
   constructor(defs: readonly LandmarkDef[] = LANDMARK_DEFS) {
     this.areas = defs.map((def) => ({ def, progress: 'unseen', cofferOpened: false }));
@@ -175,14 +183,15 @@ export class LandmarkField {
     return true;
   }
 
-  /** Nearest still-unseen area whose notice radius contains the point (§6). */
-  nearestNoticeable(x: number, z: number): LandmarkArea | null {
+  /** Nearest still-unseen area whose notice radius contains the point (§6).
+   *  `radiusScale` lets personality shade the sense range (presentation only). */
+  nearestNoticeable(x: number, z: number, radiusScale = 1): LandmarkArea | null {
     let best: LandmarkArea | null = null;
     let bestD = Infinity;
     for (const a of this.areas) {
       if (a.progress !== 'unseen') continue;
       const d = Math.hypot(a.def.center.x - x, a.def.center.z - z);
-      if (d <= a.def.noticeRadius && d < bestD) {
+      if (d <= a.def.noticeRadius * radiusScale && d < bestD) {
         bestD = d;
         best = a;
       }
@@ -223,6 +232,8 @@ export class LandmarkField {
       })),
       firstHookDone: this.firstHookDone,
       socketFilled: this.socketFilled,
+      chimeDonated: this.chimeDonated,
+      capsuleFound: this.capsuleFound,
     };
   }
 
@@ -242,5 +253,7 @@ export class LandmarkField {
     }
     if (s.firstHookDone === true) this.firstHookDone = true;
     if (s.socketFilled === true) this.socketFilled = true;
+    if (s.chimeDonated === true) this.chimeDonated = true;
+    if (s.capsuleFound === true) this.capsuleFound = true;
   }
 }
