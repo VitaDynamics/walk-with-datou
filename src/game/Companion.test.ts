@@ -23,10 +23,11 @@ interface Recorded {
   targets: { x: number; z: number }[];
   discovered: Spot[];
   satisfied: string[];
+  noticed: string[];
 }
 
 function makeActions(): { rec: Recorded; actions: ConstructorParameters<typeof Companion>[1] } {
-  const rec: Recorded = { modes: [], targets: [], discovered: [], satisfied: [] };
+  const rec: Recorded = { modes: [], targets: [], discovered: [], satisfied: [], noticed: [] };
   return {
     rec,
     actions: {
@@ -34,6 +35,7 @@ function makeActions(): { rec: Recorded; actions: ConstructorParameters<typeof C
       setTarget: (x, z) => rec.targets.push({ x, z }),
       onDiscover: (s) => rec.discovered.push(s),
       onWantSatisfied: (k) => rec.satisfied.push(k),
+      onLandmarkNoticed: (id) => rec.noticed.push(id),
     },
   };
 }
@@ -127,6 +129,63 @@ describe('Companion want loop (diorama)', () => {
     c.investigate(spot.x + 0.3, spot.z);
     run(c, datouAt(spot.x, spot.z), 0.3);
     expect(rec.discovered.map((s) => s.id)).toEqual([spot.id]);
+  });
+
+  it('anchors the next want to a sensed landmark and marks it noticed', () => {
+    const bond = new Bond();
+    const { rec, actions } = makeActions();
+    const anchor = { id: 'repair-commons', x: 126, z: -28 };
+    const c = new Companion(bond, actions, () => 0, null, () => anchor);
+    const datou = datouAt(60, -10);
+
+    run(c, datou, 7.2); // through rest into windup
+    expect(c.activeWant).toBe('curious');
+    expect(rec.noticed).toEqual(['repair-commons']);
+    // Gaze points toward the landmark (east-ish from Datou).
+    expect(c.expression.kind).toBe('curious');
+    if (c.expression.kind === 'curious') expect(c.expression.dirX).toBeGreaterThan(0.8);
+  });
+
+  it('a tap along the gaze answers a landmark want; Datou leads a few steps only', () => {
+    const bond = new Bond();
+    const { rec, actions } = makeActions();
+    const anchor = { id: 'repair-commons', x: 126, z: -28 };
+    const c = new Companion(bond, actions, () => 0, null, () => anchor);
+    const datou = datouAt(60, -10);
+
+    run(c, datou, 7.2 + 1.5); // into the active window
+    // A tap ~4 m from Datou, roughly toward the landmark.
+    run(c, datou, 0.2, { ...NO_EVENTS, guidedTo: { x: 64, z: -11 } });
+    expect(rec.satisfied).toContain('curious');
+    // The approach target is a short lead, not the 60+ m landmark itself.
+    const goal = rec.targets[rec.targets.length - 1];
+    expect(Math.hypot(goal.x - 60, goal.z + 10)).toBeLessThanOrEqual(5);
+    expect(Math.hypot(goal.x - 126, goal.z + 28)).toBeGreaterThan(50);
+  });
+
+  it('a sideways tap does not answer a landmark want', () => {
+    const bond = new Bond();
+    const { rec, actions } = makeActions();
+    const anchor = { id: 'repair-commons', x: 126, z: -28 };
+    const c = new Companion(bond, actions, () => 0, null, () => anchor);
+    const datou = datouAt(60, -10);
+
+    run(c, datou, 7.2 + 1.5);
+    run(c, datou, 0.2, { ...NO_EVENTS, guidedTo: { x: 60, z: -16 } }); // perpendicular
+    expect(rec.satisfied).not.toContain('curious');
+    expect(c.activeWant).toBe('curious'); // still holding the gaze
+  });
+
+  it('promptCurious scripts the next want immediately from rest', () => {
+    const bond = new Bond();
+    const { rec, actions } = makeActions();
+    const c = new Companion(bond, actions, () => 0.99); // long rest, no provider
+    const datou = datouAt(0, 3);
+
+    c.promptCurious({ id: 'repair-commons', x: 126, z: -28 });
+    run(c, datou, 0.3 + 1.5); // windup begins at once, then active
+    expect(c.activeWant).toBe('curious');
+    expect(rec.noticed).toEqual(['repair-commons']);
   });
 
   it('a comforting hold always grants bond', () => {

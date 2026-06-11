@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { matchExact, patternForForm } from '../game/workshop/patterns';
 import { canonical } from '../game/workshop/pattern';
 import { MATERIALS, groupOf } from '../game/workshop/materials';
+import { WorkshopState } from '../game/workshop/WorkshopState';
 import { CLEARINGS, LANDMARK_DEFS, LandmarkField } from './landmarks';
 
 describe('landmark definitions', () => {
@@ -129,6 +130,22 @@ describe('LandmarkField', () => {
     const g = new LandmarkField();
     g.restore(JSON.parse(JSON.stringify(f.serialize())));
     expect(g.serialize()).toEqual(f.serialize());
+  });
+
+  it('never re-grants a coffer across reloads (the §9 idempotence guard)', () => {
+    const f = new LandmarkField();
+    expect(f.openCoffer('repair-commons')).toBe(true);
+    const g = new LandmarkField();
+    g.restore(f.serialize());
+    expect(g.openCoffer('repair-commons')).toBe(false);
+    // …and the hint bank dedupes by pattern, so even a double grant of the
+    // blueprint itself is a no-op (WorkshopState.bankHint contract).
+    const ws = new WorkshopState('wwd.test.workshop');
+    const pat = patternForForm('chime')!;
+    const hint = { pattern: canonical(pat), revealedCells: [0, 1], context: 'x' };
+    expect(ws.bankHint(hint)).toBe(true);
+    expect(ws.bankHint(hint)).toBe(false);
+    expect(ws.hintList()).toHaveLength(1);
   });
 
   it('restore tolerates garbage and unknown areas', () => {

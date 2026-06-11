@@ -50,6 +50,7 @@ export class Minimap {
     player: { x: number; z: number },
     datou: { x: number; z: number },
     foundSpots: ReadonlyArray<{ x: number; z: number }>,
+    landmarks: ReadonlyArray<{ x: number; z: number; completed: boolean }> = [],
   ): void {
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
@@ -64,6 +65,27 @@ export class Minimap {
     g.beginPath();
     g.arc(this.px(0), this.px(0), 4, 0, Math.PI * 2);
     g.fill();
+
+    // Known community places — a tiny hand-drawn pennant appears once the
+    // player has stood there; it warms amber when the place is restored.
+    // (The map's reveal layer, landmark plan §8 — nothing else changes.)
+    for (const lm of landmarks) {
+      const x = this.px(lm.x);
+      const y = this.px(lm.z);
+      g.strokeStyle = INK.soft;
+      g.lineWidth = 1.8;
+      g.beginPath();
+      g.moveTo(x, y + 5);
+      g.lineTo(x, y - 6);
+      g.stroke();
+      g.fillStyle = lm.completed ? ROBOT.accent : INK.soft;
+      g.beginPath();
+      g.moveTo(x, y - 6);
+      g.lineTo(x + 7, y - 3.5);
+      g.lineTo(x, y - 1);
+      g.closePath();
+      g.fill();
+    }
 
     // Found discoveries — tiny warm dots.
     g.fillStyle = ROBOT.accent;

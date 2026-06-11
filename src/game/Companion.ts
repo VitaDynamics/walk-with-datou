@@ -19,6 +19,15 @@ import type { Spot, SpotField } from '../world/Spots';
 
 export type WantKind = 'attention' | 'play' | 'curious';
 
+/** A landmark the want loop can anchor to (the companion-led discovery
+ *  thread, landmark plan §6). Provided by the game when the player is inside
+ *  an unseen area's notice radius. */
+export interface LandmarkAnchor {
+  id: string;
+  x: number;
+  z: number;
+}
+
 /** What the rig needs to pose Datou for the current want. */
 export type Expression =
   | { kind: 'none' }
@@ -34,6 +43,8 @@ export interface CompanionActions {
   onDiscover?(spot: Spot): void;
   /** A want was answered — the game plays the warm feedback (mood, pulse). */
   onWantSatisfied?(kind: WantKind): void;
+  /** Datou's notice beat toward a landmark began (mark the area noticed). */
+  onLandmarkNoticed?(id: string): void;
 }
 
 /** What the player did this frame (from the pointer layer). */
@@ -59,6 +70,9 @@ interface ActiveWant {
   poi?: Vec2;
   /** The real spot the want is anchored to, when one is undiscovered. */
   spot?: Spot;
+  /** The landmark the want is anchored to — held longer, led only a few
+   *  steps (Datou points the way; the player does the travelling, §6). */
+  landmark?: string;
 }
 
 export class Companion {
@@ -68,6 +82,11 @@ export class Companion {
   private static readonly REST_MAX = 15;
   private static readonly WINDUP = 1.4;
   private static readonly ACTIVE_WINDOW = 7;
+  /** A landmark notice is held longer than an ordinary want — Datou refuses
+   *  to drop it for a few extra beats (§6). */
+  private static readonly LANDMARK_WINDOW = 11;
+  /** How far Datou leads toward a noticed landmark before looking back. */
+  private static readonly LANDMARK_LEAD = 4.5;
   private static readonly COOLDOWN = 2.5;
   /** Datou within this distance of the player counts as "keeping company". */
   private static readonly NEAR_DIST = 2.8;
@@ -87,6 +106,8 @@ export class Companion {
   private approachSpot: Spot | null = null;
   private approachTarget: Vec2 | null = null;
   private petCooldown = 0;
+  /** Datou's position last frame — origin for landmark gaze judgement. */
+  private lastDatouPos: Vec2 = { x: 0, z: 0 };
 
   /** The stance the game restores after a want resolves (idle = its own life,
    *  follow = staying close to the pad). Set by the console buttons. */
@@ -96,17 +117,21 @@ export class Companion {
   private readonly actions: CompanionActions;
   private readonly rand: () => number;
   private readonly spots: SpotField | null;
+  private readonly landmarkAnchor: () => LandmarkAnchor | null;
+  private promptedAnchor: LandmarkAnchor | null = null;
 
   constructor(
     bond: Bond,
     actions: CompanionActions,
     rand: () => number = Math.random,
     spots: SpotField | null = null,
+    landmarkAnchor: () => LandmarkAnchor | null = () => null,
   ) {
     this.bond = bond;
     this.actions = actions;
     this.rand = rand;
     this.spots = spots;
+    this.landmarkAnchor = landmarkAnchor;
     this.timer = this.restDuration();
   }
 
@@ -154,6 +179,7 @@ export class Companion {
    * @param events What the player did this frame.
    */
   update(datou: DatouState, player: Vec2, events: CompanionEvents, dt: number): void {
+    this.lastDatouPos = { x: datou.position.x, z: datou.position.z };
     if (this.petCooldown > 0) this.petCooldown -= dt;
 
     // Keeping company: walking together trickles bond passively.
@@ -178,7 +204,7 @@ export class Companion {
         this.poseForWant(datou);
         if (this.timer <= 0) {
           this.phase = 'active';
-          this.timer = Companion.ACTIVE_WINDOW;
+          this.timer = this.want?.landmark ? Companion.LANDMARK_WINDOW : Companion.ACTIVE_WINDOW;
         }
         break;
 
@@ -239,6 +265,19 @@ export class Companion {
   }
 
   private beginWant(datou: DatouState): void {
+    // A landmark in sense range outranks everything: the companion-led
+    // discovery thread (§6). A scripted prompt outranks the ambient provider.
+    const anchor = this.promptedAnchor ?? this.landmarkAnchor();
+    this.promptedAnchor = null;
+    if (anchor) {
+      this.want = { kind: 'curious', poi: { x: anchor.x, z: anchor.z }, landmark: anchor.id };
+      this.actions.onLandmarkNoticed?.(anchor.id);
+      this.actions.setMode('leashed');
+      this.actions.setTarget(datou.position.x, datou.position.z);
+      this.phase = 'windup';
+      this.timer = Companion.WINDUP;
+      return;
+    }
     const kind = this.pickWant();
     this.want = { kind };
     if (kind === 'curious') {
@@ -257,6 +296,15 @@ export class Companion {
     this.actions.setTarget(datou.position.x, datou.position.z);
     this.phase = 'windup';
     this.timer = Companion.WINDUP;
+  }
+
+  /**
+   * Scripted prompt (the one first-hook want toward the Commons, §6): the
+   * next want — begun immediately when resting — anchors to this landmark.
+   */
+  promptCurious(anchor: LandmarkAnchor): void {
+    this.promptedAnchor = anchor;
+    if (this.phase === 'rest') this.timer = 0;
   }
 
   private pickWant(): WantKind {
@@ -308,6 +356,20 @@ export class Companion {
       case 'curious': {
         if (!events.guidedTo) return false;
         const poi = this.want.poi!;
+        // A landmark sits far beyond tap precision — any tap roughly along
+        // Datou's gaze (±~32°, at least a step away) answers the want.
+        if (this.want.landmark) {
+          const ox = this.lastDatouPos.x;
+          const oz = this.lastDatouPos.z;
+          const tx = events.guidedTo.x - ox;
+          const tz = events.guidedTo.z - oz;
+          const px = poi.x - ox;
+          const pz = poi.z - oz;
+          const tLen = Math.hypot(tx, tz);
+          const pLen = Math.hypot(px, pz) || 1;
+          if (tLen < 1.2) return false;
+          return (tx * px + tz * pz) / (tLen * pLen) > 0.85;
+        }
         return this.distTo(events.guidedTo, poi) <= Companion.GUIDE_SPOT_DIST + 0.4;
       }
     }
@@ -320,12 +382,25 @@ export class Companion {
     this.actions.onWantSatisfied?.(kind);
     if (kind === 'curious' && this.want.poi) {
       const spot = this.want.spot ?? null;
-      const poi = this.want.poi;
+      const poi = this.want.landmark ? this.leadPoint(this.want.poi) : this.want.poi;
       this.endWant();
       this.beginApproach(poi, spot);
       return;
     }
     this.endWant();
+  }
+
+  /** A landmark answer leads Datou only a few steps toward it, then he looks
+   *  back — he points the way; the player does the travelling (§6). */
+  private leadPoint(poi: Vec2): Vec2 {
+    const dx = poi.x - this.lastDatouPos.x;
+    const dz = poi.z - this.lastDatouPos.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const lead = Math.min(Companion.LANDMARK_LEAD, len);
+    return {
+      x: this.lastDatouPos.x + (dx / len) * lead,
+      z: this.lastDatouPos.z + (dz / len) * lead,
+    };
   }
 
   private satisfyCurious(): void {

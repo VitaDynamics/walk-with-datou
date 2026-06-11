@@ -1239,7 +1239,7 @@ export function drawBolt(seed: number): PropSprite {
  * back, a soft warm hint of contents). Cream/clay body, ink outline, one amber
  * latch dot — the lamp/lantern accent language, no glow or sparkle.
  */
-export function drawCoffer(seed: number, open = false): PropSprite {
+export function drawCoffer(seed: number, open = false, patched = false): PropSprite {
   const rng = new Rng(seed);
   const { c, g } = sprite(256, 224);
   const baseY = 196;
@@ -1292,6 +1292,20 @@ export function drawCoffer(seed: number, open = false): PropSprite {
     g.strokeStyle = INK.line;
     g.lineWidth = 3;
     g.stroke();
+    if (patched) {
+      // The community variant: a stitched fabric patch on the lid (§9).
+      g.save();
+      g.translate(86, 104);
+      g.rotate(-0.1);
+      g.fillStyle = SAGE.mid;
+      g.fillRect(-20, -14, 40, 28);
+      g.strokeStyle = INK.soft;
+      g.lineWidth = 2.5;
+      g.setLineDash([5, 4]);
+      g.strokeRect(-17, -11, 34, 22);
+      g.setLineDash([]);
+      g.restore();
+    }
   } else {
     // Opened: lid tipped back, a soft warm interior + a tiny hint of contents.
     const halo = g.createRadialGradient(128, 118, 6, 128, 118, 70);

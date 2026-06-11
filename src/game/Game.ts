@@ -48,6 +48,7 @@ import { CROP_KINDS, Farm, MATURE, TEND_RANGE, type CropKind, type PlotState } f
 import { Fetch } from './Fetch';
 import { Forage } from './Forage';
 import { Keys } from './Keys';
+import { LandmarkDirector, type LandmarkTarget } from './LandmarkDirector';
 import { Memories } from './Memories';
 import { Pointer } from './Pointer';
 import { t, tDyn } from '../i18n';
@@ -164,6 +165,12 @@ export class Game {
   private cofferCutout: Cutout | null = null;
   private cofferOpen = false;
   private pendingCoffer = false;
+  // Authored community areas (landmark plan) — the places the park leads to.
+  private landmarks!: LandmarkDirector;
+  private pendingLandmark: LandmarkTarget | null = null;
+  /** The scripted first-hook want toward the Commons fires once, a little
+   *  into the session, if the home coffer is open and one item is made (§6). */
+  private firstHookIn = 25;
   // Inspiration cadence (§5.2): a slow tick, a cooldown, and a pity timer so at
   // least one fires every ~2 sessions and never more than one per 10 min.
   private inspoTickIn = 90;
@@ -217,6 +224,41 @@ export class Game {
     this.datouRig.setGarland(this.garlandWorn);
     this.leashOn = this.loadRaw('wwd.leash') !== '0';
 
+    // Dev/QA: ?lm=arrived|completed presets the Commons state so headless
+    // screenshots can QA the changed world. Inert in normal play.
+    const lmQa = new URLSearchParams(location.search).get('lm');
+    if (lmQa === 'arrived' || lmQa === 'completed') {
+      this.saveJson('wwd.landmarks', {
+        v: 1,
+        areas: [{ id: 'repair-commons', progress: lmQa, cofferOpened: lmQa === 'completed' }],
+        firstHookDone: true,
+      });
+    }
+
+    // The authored community areas (landmark plan) — places the props, runs
+    // the cooperative activities, owns wwd.landmarks. All hooks are lazy
+    // arrows so construction order stays flexible.
+    this.landmarks = new LandmarkDirector({
+      place: (cut, x, z) => this.world.placeCutout(cut, x, z),
+      countTwig: () => this.backpack.count('twig'),
+      takeTwig: () => this.backpack.take('twig'),
+      grantBlueprint: (form, context) => this.bankFullBlueprint(form, context),
+      grantMaterial: (mat, n) => this.backpack.add(mat as ItemId, n),
+      sendDatou: (x, z) => this.companion.investigate(x, z),
+      datouPos: () => {
+        const s = this.physics.getDatouState();
+        return { x: s.position.x, z: s.position.z };
+      },
+      datouBeat: () => {
+        this.datouRig.pulse();
+        this.datouRig.reach();
+      },
+      toast: (text) => this.ui.toast(text),
+      memory: (key) => this.handleLandmarkMemory(key),
+      load: () => this.loadJson<unknown>('wwd.landmarks', null),
+      save: (d) => this.saveJson('wwd.landmarks', d),
+    });
+
     this.companion = new Companion(
       this.bond,
       {
@@ -224,9 +266,11 @@ export class Game {
         setTarget: (x, z) => this.physics.setTarget(x, z),
         onDiscover: (spot) => this.handleDiscover(spot),
         onWantSatisfied: (kind) => this.handleWantSatisfied(kind),
+        onLandmarkNoticed: (id) => this.landmarks.onNoticed(id),
       },
       Math.random,
       this.spots,
+      () => this.landmarks.noticeAnchor(this.player.x, this.player.z),
     );
     this.fetch = new Fetch({
       setMode: (m) => this.physics.setMode(m),
@@ -456,6 +500,18 @@ export class Game {
       } else {
         this.player.walkTo(COFFER_POS.x, COFFER_POS.z);
         this.pendingCoffer = true;
+      }
+      return;
+    }
+
+    // A landmark interactive (chime, community coffer) → walk over, engage.
+    const lm = this.landmarks.target(p.x, p.z);
+    if (lm) {
+      if (Math.hypot(lm.x - this.player.x, lm.z - this.player.z) <= GATHER_REACH + 0.4) {
+        this.landmarks.engage(lm);
+      } else {
+        this.player.walkTo(lm.x, lm.z);
+        this.pendingLandmark = lm;
       }
       return;
     }
@@ -1015,16 +1071,7 @@ export class Game {
     // loop) and the two t1 tools (the §8.2 node bootstrap), each fully revealed
     // so the chest READS as a how-to, not a riddle.
     for (const form of ['stick', 'axe', 'pickaxe'] as const) {
-      const pat = patternForForm(form);
-      if (!pat) continue;
-      const cells: number[] = [];
-      for (let i = 0; i < 9; i++) if (pat.cells[i]) cells.push(i);
-      this.workshopState.bankHint({
-        pattern: canonical(pat),
-        revealedCells: cells, // a starter blueprint shows the whole shape
-        context: t('coffer.context'),
-        day: dailyKey(),
-      });
+      this.bankFullBlueprint(form, t('coffer.context'));
     }
     // A generous starter haul: at least 5 of each material category (wood /
     // stone / plant / found) so the player can immediately try the bench across
@@ -1055,6 +1102,34 @@ export class Game {
       mood: this.physics.getDatouState().mood,
     });
     this.ui.toast(t('coffer.opened'));
+  }
+
+  /** Bank an authored pattern with every cell revealed — a fully revealed
+   *  hint IS the full blueprint (coffer reward contract, §9). */
+  private bankFullBlueprint(form: FormId, context: string): void {
+    const pat = patternForForm(form);
+    if (!pat) return;
+    const cells: number[] = [];
+    for (let i = 0; i < 9; i++) if (pat.cells[i]) cells.push(i);
+    this.workshopState.bankHint({
+      pattern: canonical(pat),
+      revealedCells: cells,
+      context,
+      day: dailyKey(),
+    });
+  }
+
+  /** A landmark moment became a memory: card + bond + the warm pulse. */
+  private handleLandmarkMemory(key: string): void {
+    this.bond.add('discovery', 2);
+    this.personality.note('explore');
+    this.physics.applyPet();
+    this.memories.add({
+      ts: Date.now(),
+      kind: 'want',
+      key,
+      mood: this.physics.getDatouState().mood,
+    });
   }
 
   /** Re-draw a node's plate if its harvest state changed (depletion/regrow). */
@@ -1361,6 +1436,30 @@ export class Game {
       }
     }
 
+    // Deferred landmark engage: walked to the chime / community coffer?
+    if (this.pendingLandmark) {
+      const lm = this.pendingLandmark;
+      if (Math.hypot(lm.x - this.player.x, lm.z - this.player.z) <= GATHER_REACH + 0.4) {
+        this.pendingLandmark = null;
+        this.landmarks.engage(lm);
+      } else if (!this.player.hasTarget) {
+        this.pendingLandmark = null;
+      }
+    }
+
+    // The authored areas: arrival, the chime beat, the coffer tell.
+    this.landmarks.update(dt, this.player.x, this.player.z);
+
+    // The scripted first hook (§6): once, a little into the session, if the
+    // home coffer is open and something has been made — Datou looks east.
+    if (this.firstHookIn > 0) {
+      this.firstHookIn -= dt;
+      if (this.firstHookIn <= 0 && this.cofferOpen && this.workshopState.madeCount() >= 1) {
+        const anchor = this.landmarks.takeFirstHook();
+        if (anchor) this.companion.promptCurious(anchor);
+      }
+    }
+
     // Datou reached a tapped prop → a small in-character reaction.
     if (this.reactCooldown > 0) this.reactCooldown -= dt;
     if (this.pendingReaction) {
@@ -1446,6 +1545,7 @@ export class Game {
       this.player,
       { x: state.position.x, z: state.position.z },
       this.spots.spots.filter((sp) => sp.found),
+      this.landmarks.mapMarks(),
     );
 
     // --- console sync ---
