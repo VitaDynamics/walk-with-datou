@@ -1,11 +1,14 @@
 # Community Landmark Plan — A Park That Leads Somewhere
 
-**Status:** Implemented through Phase 2 (2026-06-11) — Phases 0–2 are in the
+**Status:** All phases implemented (2026-06-11) — Phases 0–3 are in the
 codebase (`src/world/landmarks.ts`, `src/game/LandmarkDirector.ts`,
-`src/art/landmarkProps.ts`); the full Commons → Garden → Camp chain runs with
-coffers, clues, the donation socket, and the ruin-stones response. **Next:**
-the Phase 1 exit gate (a first-time playtest of the Commons slice) and the
-Phase 3 polish layers.  
+`src/art/landmarkProps.ts`, `src/game/cues.ts`). The full Commons → Garden →
+Camp chain runs with coffers, clues, both donation hooks, the Old Pine time
+capsule, daily revisit variation, the chime re-lure / relay response cues,
+personality presentation shading, and a per-area dressing pass so each
+landmark reads as a lived-in area. **Next:** the human playtest gates (§11
+exit criteria) — the code side is complete; thresholds and further secrets
+remain optional layers to add after playtests.  
 **Date:** 2026-06-10  
 **First slice:** One complete authored area (Trail Repair Commons), then two more
 connected by a Datou-led discovery chain
