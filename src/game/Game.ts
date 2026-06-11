@@ -55,7 +55,7 @@ import { Workshop } from '../ui/Workshop';
 import { ForageMenu, type ForageOption } from '../ui/ForageMenu';
 import { WorkshopState } from './workshop/WorkshopState';
 import type { Outcome } from './workshop/bench';
-import { parseItemId, itemName, itemId, sizesFor, finishesFor } from './workshop/items';
+import { parseItemId, itemName, itemId, sizesFor, finishesFor, materialsAcceptedBy } from './workshop/items';
 import { canonical } from './workshop/pattern';
 import { patternForForm, patternRecipe } from './workshop/patterns';
 import type { FormId } from './workshop/forms';
@@ -294,6 +294,7 @@ export class Game {
       hasGroup: (group, n) => this.heldInGroup(group) >= n,
       onBuildForm: (form) => this.buildFormFromTree(form),
       onFetchFor: (form) => this.gatherForForm(form),
+      onGodCreate: (form) => this.godCreateForm(form),
     });
     document
       .getElementById('btn-workshop')
@@ -673,6 +674,26 @@ export class Game {
   }
 
   /**
+   * God mode: conjure one of `form` for free — no materials consumed, no
+   * pattern required. Builds a representative variant (first accepted material,
+   * base size/finish) and routes through the normal make path so it records,
+   * stamps the first-make memory, and drops into placement / equips like any
+   * other item. A maker's sandbox over the whole 1000-item space.
+   */
+  private godCreateForm(form: FormId): void {
+    const material = materialsAcceptedBy(form)[0];
+    if (!material) return; // no eligible material — nothing to draw
+    const id = itemId({ form, material, size: sizesFor(form)[0], finish: finishesFor(form)[0] });
+    // Record the pattern too when the form has one, so the Tree node inks in.
+    const pat = patternForForm(form);
+    this.handleMake(
+      pat
+        ? { kind: 'exact', form, id, patternKey: canonical(pat) }
+        : { kind: 'grammar', id },
+    );
+  }
+
+  /**
    * Goal-level command: "Datou, get what I need for this." Reads the blueprint's
    * groups, finds the first one we're short on, and sends Datou to gather it —
    * foraging a ground pickable of that group, OR working a node that yields it
@@ -1005,10 +1026,17 @@ export class Game {
         day: dailyKey(),
       });
     }
-    // The stock to actually make all three: twigs for the stick + tool handles,
-    // pebbles for the tool heads (t1 wooden/stone tools, §8.2).
-    this.backpack.add('twig', 6);
-    this.backpack.add('pebble', 4);
+    // A generous starter haul: at least 5 of each material category (wood /
+    // stone / plant / found) so the player can immediately try the bench across
+    // every recipe group, not just the three banked blueprints. Each material
+    // here is one the pack can actually hold (see isPackResource).
+    const STARTER: Array<[ItemId, number]> = [
+      ['twig', 6], // wood
+      ['pebble', 6], // stone
+      ['flower', 5], // plant
+      ['feather', 5], // found
+    ];
+    for (const [mat, n] of STARTER) this.backpack.add(mat, n);
 
     // Re-plate to the opened state + a calm warm beat.
     if (this.cofferCutout) {

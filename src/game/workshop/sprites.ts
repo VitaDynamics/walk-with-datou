@@ -19,7 +19,7 @@ import { canvasTexture } from '../../art/textures';
 import { compileSprite, type SpriteOpList } from '../../art/spriteOps';
 import type { PropSprite } from '../../art/props';
 import * as THREE from 'three';
-import { profile, type MaterialId } from './materials';
+import { profile, groupOf, type MaterialGroup, type MaterialId } from './materials';
 import { form as formDef, type FormFamily, type FormId } from './forms';
 import { parseItemId, type ItemId, type ItemSpec } from './items';
 import { FORM_TEMPLATES } from './formTemplates';
@@ -249,6 +249,99 @@ const FAMILY_TEMPLATES: Record<FormFamily, SpriteOpList> = {
 
 function familyTemplate(family: FormFamily): SpriteOpList {
   return FAMILY_TEMPLATES[family];
+}
+
+// --- Raw-material chips ------------------------------------------------------
+// A material on its own (Fetch menu, bench strip) is a *raw find*, not a built
+// item — so it gets its own tiny plate per group, recolored by the material
+// profile. Without this every material reused the `bundle` form and read as the
+// same grey lump regardless of group. One readable silhouette per group:
+//   wood  → a tied bundle of stems        plant → a leafy sprig
+//   stone → a little cairn of pebbles     found → a single kept trinket
+// All anchored to the bottom margin, baseline-clean (no neon, no outline chrome).
+
+const MATERIAL_CHIP_TEMPLATES: Record<MaterialGroup, SpriteOpList> = {
+  wood: {
+    canvas: [128, 128],
+    ops: [
+      { op: 'line', x0: 40, y0: 112, x1: 56, y1: 24, width: 7, color: 'fill', jitter: 3 },
+      { op: 'line', x0: 64, y0: 112, x1: 64, y1: 20, width: 7, color: 'fill', jitter: 3 },
+      { op: 'line', x0: 88, y0: 112, x1: 74, y1: 26, width: 7, color: 'fill', jitter: 3 },
+      // the binding tie
+      { op: 'line', x0: 36, y0: 78, x1: 92, y1: 74, width: 6, color: 'shade' },
+    ],
+  },
+  stone: {
+    canvas: [128, 128],
+    ops: [
+      {
+        op: 'blob', cx: 64, cy: 100, rx: 40, ry: 18, fill: 'shade',
+        outline: 'INK.line', lineWidth: 4, irregularity: 0.25,
+      },
+      {
+        op: 'blob', cx: 48, cy: 78, rx: 22, ry: 16, fill: 'fill',
+        outline: 'INK.line', lineWidth: 4, irregularity: 0.3,
+      },
+      {
+        op: 'blob', cx: 82, cy: 74, rx: 20, ry: 15, fill: 'fill',
+        outline: 'INK.line', lineWidth: 4, irregularity: 0.3,
+      },
+      {
+        op: 'blob', cx: 64, cy: 54, rx: 18, ry: 14, fill: 'fill',
+        outline: 'INK.line', lineWidth: 4, irregularity: 0.3,
+      },
+    ],
+  },
+  plant: {
+    canvas: [128, 128],
+    ops: [
+      { op: 'line', x0: 64, y0: 116, x1: 64, y1: 50, width: 6, color: 'shade' },
+      // a pair of leaves off the stem, plus a soft crown — reads as a sprig
+      { op: 'blob', cx: 46, cy: 78, rx: 16, ry: 9, fill: 'fill', outline: 'INK.soft', lineWidth: 3 },
+      { op: 'blob', cx: 82, cy: 70, rx: 16, ry: 9, fill: 'fill', outline: 'INK.soft', lineWidth: 3 },
+      { op: 'blob', cx: 64, cy: 48, rx: 18, ry: 16, fill: 'fill', outline: 'INK.line', lineWidth: 4 },
+    ],
+  },
+  found: {
+    canvas: [128, 128],
+    ops: [
+      { op: 'line', x0: 64, y0: 116, x1: 64, y1: 84, width: 5, color: 'shade' },
+      {
+        op: 'blob', cx: 64, cy: 64, rx: 26, ry: 26, fill: 'fill',
+        outline: 'INK.line', lineWidth: 4, irregularity: 0.2,
+      },
+      {
+        op: 'blob', cx: 64, cy: 60, rx: 8, ry: 8, fill: 'shade',
+        outline: 'INK.soft', lineWidth: 2,
+      },
+    ],
+  },
+};
+
+/**
+ * A standalone plate for a RAW material (not a built item), recolored by the
+ * material profile. Used by the Fetch menu and the bench strip so every
+ * material reads as its own find. Cached under a reserved id so it never
+ * collides with a real `ItemId`.
+ */
+export function materialSprite(mat: MaterialId): PropSprite {
+  const id = `mat:${mat}`;
+  const cached = spriteCache.get(id);
+  if (cached) return cached;
+  const sprite = compileSprite(MATERIAL_CHIP_TEMPLATES[groupOf(mat)], seedOf(id), profile(mat));
+  spriteCache.set(id, sprite);
+  return sprite;
+}
+
+/** Encoded plate URL for a raw material (cached). */
+export function materialSpriteUrl(mat: MaterialId): string {
+  const id = `mat:${mat}`;
+  let url = spriteUrlCache.get(id);
+  if (!url) {
+    url = materialSprite(mat).canvas.toDataURL();
+    spriteUrlCache.set(id, url);
+  }
+  return url;
 }
 
 /** Clear caches (tests / language-independent — sprites have no text). */

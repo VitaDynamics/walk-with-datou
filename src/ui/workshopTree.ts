@@ -105,7 +105,8 @@ export function renderTree(state: WorkshopState, recipeCb?: RecipeCardCallbacks)
       const isHinted = hinted.has(form);
       // Show a form node if you've made any variant, OR it's hinted/neighbor-
       // taught. Otherwise it stays in the branch's "still to find" count.
-      if (made.length === 0 && !isHinted && !taughtTiers.has(familyTier(form))) continue;
+      // God mode reveals the whole tree so anything can be conjured.
+      if (!recipeCb?.god && made.length === 0 && !isHinted && !taughtTiers.has(familyTier(form))) continue;
       const node = div('ws-node');
       const plate = div('ws-node-plate');
       const img = document.createElement('img');

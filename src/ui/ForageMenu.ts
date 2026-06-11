@@ -10,8 +10,8 @@
  */
 
 import { applyStaticI18n, onLangChange, t, tDyn } from '../i18n';
-import { itemSprite } from '../game/workshop/sprites';
-import type { MaterialId } from '../game/workshop/materials';
+import { materialSpriteUrl } from '../game/workshop/sprites';
+import { MATERIALS, type MaterialId } from '../game/workshop/materials';
 
 export interface ForageOption {
   /** Material id to gather. */
@@ -178,15 +178,11 @@ function div(cls: string): HTMLDivElement {
   return d;
 }
 
-const iconCache = new Map<string, string>();
 function pickIcon(id: string): string {
-  let url = iconCache.get(id);
-  if (!url) {
-    // Reuse the material's bench-chip plate so icons match the Workshop strip.
-    url = itemSprite(`bundle:${id as MaterialId}:S:plain`).canvas.toDataURL();
-    iconCache.set(id, url);
-  }
-  return url;
+  // Each material gets its own group-shaped plate (matching the bench strip),
+  // so the Fetch list reads as distinct finds rather than identical lumps.
+  if (id in MATERIALS) return materialSpriteUrl(id as MaterialId);
+  return materialSpriteUrl('twig'); // defensive: unknown id, never blank
 }
 
 function injectStyles(): void {

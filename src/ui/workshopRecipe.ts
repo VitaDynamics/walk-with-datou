@@ -41,6 +41,10 @@ export interface RecipeCardCallbacks {
   build(form: FormId): void;
   /** Ask Datou to go gather the missing materials for `form` (forage or work a node). */
   fetchFor(form: FormId): void;
+  /** God mode active — offer a free Create regardless of held stock. */
+  god?: boolean;
+  /** God mode: make one of `form` for free. */
+  create?(form: FormId): void;
 }
 
 function div(cls: string): HTMLDivElement {
@@ -80,6 +84,18 @@ export function recipeCard(form: FormId, cb: RecipeCardCallbacks): HTMLDivElemen
     const unknown = div('ws-recipe-unknown');
     unknown.textContent = t('workshop.recipeUnknown');
     card.append(unknown);
+    // Even with no known pattern, god mode can conjure the form directly.
+    if (cb.god && cb.create) {
+      const create = document.createElement('button');
+      create.type = 'button';
+      create.className = 'ws-recipe-create';
+      create.textContent = t('workshop.godCreate');
+      create.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cb.create!(form);
+      });
+      card.append(create);
+    }
     return card;
   }
 
@@ -122,6 +138,19 @@ export function recipeCard(form: FormId, cb: RecipeCardCallbacks): HTMLDivElemen
       cb.fetchFor(form);
     });
     card.append(fetch);
+  }
+
+  // God mode: a free Create, always available, on top of the normal flow.
+  if (cb.god && cb.create) {
+    const create = document.createElement('button');
+    create.type = 'button';
+    create.className = 'ws-recipe-create';
+    create.textContent = t('workshop.godCreate');
+    create.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cb.create!(form);
+    });
+    card.append(create);
   }
   return card;
 }

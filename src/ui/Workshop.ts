@@ -14,7 +14,7 @@ import { applyStaticI18n, onLangChange, t, tDyn } from '../i18n';
 import type { Backpack } from '../game/Backpack';
 import type { WorkshopState } from '../game/workshop/WorkshopState';
 import { Bench, type Outcome } from '../game/workshop/bench';
-import { itemSpriteUrl } from '../game/workshop/sprites';
+import { itemSpriteUrl, materialSpriteUrl } from '../game/workshop/sprites';
 import { parseItemId } from '../game/workshop/items';
 import { itemName } from '../game/workshop/items';
 import { MATERIAL_IDS, type MaterialId } from '../game/workshop/materials';
@@ -38,6 +38,8 @@ export interface WorkshopCallbacks {
   onBuildForm(form: import('../game/workshop/forms').FormId): void;
   /** Ask Datou to gather what a `form` still needs (forage or work a node). */
   onFetchFor(form: import('../game/workshop/forms').FormId): void;
+  /** God mode: make one of `form` for free (no materials), then place/equip. */
+  onGodCreate(form: import('../game/workshop/forms').FormId): void;
 }
 
 type Tab = 'bench' | 'tree' | 'notebook';
@@ -66,6 +68,8 @@ export class Workshop {
 
   private tab: Tab = 'bench';
   private open = false;
+  private god = loadGod();
+  private godBtn!: HTMLButtonElement;
   private drag: MaterialDrag | null = null;
   private cells: HTMLButtonElement[] = [];
   private resultCard!: HTMLDivElement;
@@ -142,13 +146,25 @@ export class Workshop {
       this.tabBtns[tb] = b;
       tabs.append(b);
     }
+    // God mode: a quiet header toggle. When on, every Tree recipe gains a free
+    // "Create" action — a maker's sandbox over the whole 1000-item space.
+    this.godBtn = document.createElement('button');
+    this.godBtn.type = 'button';
+    this.godBtn.className = 'ws-god';
+    this.godBtn.dataset.i18n = 'workshop.god';
+    this.godBtn.textContent = t('workshop.god');
+    this.godBtn.title = t('workshop.godHint');
+    this.godBtn.setAttribute('aria-pressed', String(this.god));
+    this.godBtn.classList.toggle('on', this.god);
+    this.godBtn.addEventListener('click', () => this.toggleGod());
+
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'ws-close';
     close.setAttribute('aria-label', 'Close');
     close.textContent = '×';
     close.addEventListener('click', () => this.hide());
-    head.append(title, tabs, close);
+    head.append(title, tabs, this.godBtn, close);
 
     this.bodyEl = div('ws-body');
     page.append(head, this.bodyEl);
@@ -163,6 +179,16 @@ export class Workshop {
 
   private switchTab(tab: Tab): void {
     this.tab = tab;
+    this.render();
+  }
+
+  private toggleGod(): void {
+    this.god = !this.god;
+    saveGod(this.god);
+    this.godBtn.classList.toggle('on', this.god);
+    this.godBtn.setAttribute('aria-pressed', String(this.god));
+    // Jump to the Tree so the new Create buttons are visible immediately.
+    if (this.god) this.tab = 'tree';
     this.render();
   }
 
@@ -185,6 +211,11 @@ export class Workshop {
           fetchFor: (form) => {
             this.cb.onFetchFor(form);
             this.hide(); // step back and let Datou work
+          },
+          god: this.god,
+          create: (form) => {
+            this.cb.onGodCreate(form);
+            this.render(); // refresh tree state after a free build
           },
         }),
       );
@@ -477,16 +508,26 @@ function dismissPopovers(): void {
   for (const p of document.querySelectorAll('.ws-pop')) p.remove();
 }
 
-const matIconCache = new Map<MaterialId, string>();
-function matIcon(mat: MaterialId): string {
-  let url = matIconCache.get(mat);
-  if (!url) {
-    // A material chip: a small plate of the material rendered via its profile,
-    // reusing the component family template for a neutral "lump" read.
-    url = itemSpriteUrl(`bundle:${mat}:S:plain`);
-    matIconCache.set(mat, url);
+const GOD_KEY = 'wwd.godmode';
+function loadGod(): boolean {
+  try {
+    return localStorage.getItem(GOD_KEY) === '1';
+  } catch {
+    return false;
   }
-  return url;
+}
+function saveGod(on: boolean): void {
+  try {
+    localStorage.setItem(GOD_KEY, on ? '1' : '0');
+  } catch {
+    // Session-only in private mode.
+  }
+}
+
+function matIcon(mat: MaterialId): string {
+  // A material chip: a small group-shaped plate of the raw material, recolored
+  // by its profile — distinct per group (bundle / cairn / sprig / trinket).
+  return materialSpriteUrl(mat);
 }
 
 function injectStyles(): void {
@@ -512,6 +553,11 @@ const WORKSHOP_CSS = `
   padding:6px 14px;border-radius:999px;cursor:pointer;transition:color var(--fast),background var(--fast);}
 .ws-tab:hover{color:var(--text-secondary);}
 .ws-tab.active{color:var(--text-primary);background:var(--accent-soft);}
+.ws-god{border:1px solid transparent;background:transparent;font-family:inherit;font-size:11.5px;letter-spacing:0.02em;
+  color:var(--text-tertiary);padding:5px 12px;border-radius:999px;cursor:pointer;
+  transition:color var(--fast),background var(--fast),border-color var(--fast);}
+.ws-god:hover{color:var(--text-secondary);}
+.ws-god.on{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft);}
 .ws-close{border:none;background:transparent;font-size:22px;line-height:1;color:var(--text-tertiary);cursor:pointer;padding:2px 8px;}
 .ws-close:hover{color:var(--text-primary);}
 .ws-body{flex:1;overflow-y:auto;padding:24px 26px 28px;scrollbar-width:thin;scrollbar-color:rgba(124,140,122,0.35) transparent;}
@@ -613,6 +659,10 @@ const WORKSHOP_CSS = `
 .ws-recipe-build:disabled{background:var(--surface-muted,#ece7df);color:var(--text-tertiary);cursor:default;}
 .ws-recipe-fetch{border:none;background:transparent;color:var(--accent);font-family:inherit;font-size:12px;font-weight:500;padding:4px 0 0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 .ws-recipe-fetch:hover{color:#6c7c6a;}
+.ws-recipe-create{border:1px solid var(--accent-soft);background:var(--accent-soft);color:var(--accent);font-family:inherit;
+  font-size:12px;font-weight:500;padding:7px 0;border-radius:999px;cursor:pointer;margin-top:6px;
+  transition:background var(--fast),color var(--fast);}
+.ws-recipe-create:hover{background:var(--accent);color:#fff;}
 
 @media (max-width:680px){
   .ws-grid{grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,76px);}
