@@ -45,6 +45,8 @@ export interface CompanionActions {
   onDiscover?(spot: Spot): void;
   /** A want was answered — the game plays the warm feedback (mood, pulse). */
   onWantSatisfied?(kind: WantKind): void;
+  /** A want expired unanswered. No punishment — but BOBO notices (emotion). */
+  onWantExpired?(kind: WantKind): void;
   /** Datou's notice beat toward a landmark began (mark the area noticed). */
   onLandmarkNoticed?(id: string): void;
 }
@@ -437,6 +439,7 @@ export class Companion {
 
   /** Ignored want: no punishment — settle back into the home stance. */
   private expire(): void {
+    if (this.want) this.actions.onWantExpired?.(this.want.kind);
     this.actions.setMode(this.homeMode);
     this.endWant();
   }

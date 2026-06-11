@@ -26,9 +26,29 @@ import {
 } from '../art/datouParts';
 import { drawGarland } from '../art/props';
 import { canvasTexture } from '../art/textures';
+import { ROBOT } from '../art/palette';
 import type { PropSprite } from '../art/props';
 import type { DatouState } from '../physics/PhysicsAdapter';
 import type { Expression } from '../game/Companion';
+import type { EmotionState, EmotionGrammar } from './emotion';
+import type { SignatureClip } from './character';
+
+/**
+ * The per-frame character feed (BOBO refactor, CHARACTER_IMPLEMENTATION §3).
+ * Optional — when absent the rig behaves exactly as before, so callers and
+ * tests that don't know about the character layer keep working.
+ */
+export interface CharacterChannel {
+  emotion: EmotionState;
+  grammar: EmotionGrammar;
+  /** Expressiveness scalar 0.35..1 (familiarity — R1). */
+  amplitude: number;
+  /** What he watches when nothing else demands his gaze (usually you). */
+  gazeX: number;
+  gazeZ: number;
+  /** 0..1 — head-turn speed encodes familiarity (bible §motion). */
+  gazeUrgency: number;
+}
 
 /** Real-robot proportions (× a small readability factor). */
 const SCALE = 1.15;
@@ -88,6 +108,30 @@ interface Leg {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
+// Real vita01evt head-pitch travel mapped onto the plate rig's in-plane head
+// rotation (positive = droop/down). Respecting the hardware limits is part of
+// feeling like the real robot (bible: 低头13° 仰头32°).
+const HEAD_ROT_UP = -0.56; // 32° up
+const HEAD_ROT_DOWN = 0.227; // 13° down
+
+/** Signature clip lengths — every burst is short (loudness budget, R2). */
+const CLIP_DURATION: Record<SignatureClip, number> = {
+  spin: 0.9,
+  backTurn: 1.2,
+  shiver: 1.0,
+  stretch: 1.4,
+  stomp: 0.5,
+  shyTurn: 0.8,
+};
+
+/** Head pose keys lag the body by design (staggered channels, bible §标志性特征). */
+const HEAD_KEYS = ['headRot', 'headLift', 'headBob'] as const;
+type HeadKey = (typeof HEAD_KEYS)[number];
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
 /** Dorsal work arm (2-segment manipulator folded along the spine). */
 const ARM_UPPER_LEN = 0.21;
 const ARM_FOREARM_LEN = 0.23;
@@ -141,12 +185,24 @@ export class DatouRig {
   private readonly eyeMat: THREE.MeshBasicMaterial;
 
   private pose: Pose = { ...REST_POSE };
+  /** First stage of the head's chained easing (the +~80 ms lag). */
+  private headMid: Record<HeadKey, number> = { headRot: 0, headLift: 0, headBob: 0 };
   private gaitPhase = 0;
   private legAmp = 0;
   private facing = 1;
   private time = 0;
   private blinkIn = 3;
-  private blinkLeft = 0;
+  /** Blink grammar: eyes close slower than they open (vitality). */
+  private blinkPhase: 'idle' | 'closing' | 'hold' | 'opening' = 'idle';
+  private blinkPhaseLeft = 0;
+  private blinkQueue = 0;
+  private blinkGap = 0;
+  /** A gaze turn waits for its double-blink tell, then flips. */
+  private pendingFacing = 0;
+  private pendingFacingIn = 0;
+  private clip: SignatureClip | null = null;
+  private clipT = 0;
+  private earMat: THREE.MeshBasicMaterial;
   private petPulse = 0;
   private garland: THREE.Mesh | null = null;
   private readonly anchorWork = new THREE.Vector3();
@@ -209,6 +265,22 @@ export class DatouRig {
     this.headGroup.position.set(HEAD_BASE_X, HEAD_BASE_Y, 0.06);
     this.flip.add(this.headGroup);
 
+    // Ear breathing-light (耳语) — canon hardware, rendered as a quiet status
+    // LED in the single permitted accent: a tiny flat dot, no glow, no bloom.
+    const ear = new THREE.Mesh(
+      new THREE.CircleGeometry(0.018, 12),
+      new THREE.MeshBasicMaterial({
+        color: ROBOT.accent,
+        transparent: true,
+        opacity: 0.2,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ear.position.set(-0.07 * SCALE, 0.36 * SCALE, 0.014);
+    this.earMat = ear.material as THREE.MeshBasicMaterial;
+    this.headGroup.add(ear);
+
     // Dorsal work arm: shoulder on the back of the shell, folded at rest.
     const upperPlane = partPlane(drawArmUpper(8), ARM_UPPER_LEN + 0.06, 'top');
     const forearmPlane = partPlane(drawArmForearm(9), ARM_FOREARM_LEN + 0.07, 'top');
@@ -254,6 +326,24 @@ export class DatouRig {
   /** Quick warm feedback for a pet/comfort touch (a soft lean, not a bounce). */
   pulse(): void {
     this.petPulse = 1;
+  }
+
+  /**
+   * Play one signature clip (spin 原地转圈, backTurn, shiver, stretch,
+   * stomp 跺脚, shyTurn). One at a time, never looping — the rig refuses
+   * overlap; stage permission (clipAllowed) and cooldowns are the CALLER's
+   * job (loudness budget, R2). Returns whether the clip started.
+   */
+  playClip(clip: SignatureClip): boolean {
+    if (this.clip) return false;
+    this.clip = clip;
+    this.clipT = 0;
+    return true;
+  }
+
+  /** The clip currently playing, if any (callers rate-limit on this). */
+  get activeClip(): SignatureClip | null {
+    return this.clip;
   }
 
   /** Wear / remove the flower garland (crafted keepsake). */
@@ -324,21 +414,79 @@ export class DatouRig {
     return this.anchorWork;
   }
 
-  update(dt: number, state: DatouState, expression: Expression, camYaw: number): void {
+  update(
+    dt: number,
+    state: DatouState,
+    expression: Expression,
+    camYaw: number,
+    ch?: CharacterChannel,
+  ): void {
     this.time += dt;
 
     this.group.position.set(state.position.x, 0, state.position.z);
     this.flip.rotation.y = camYaw;
     this.hitMesh.rotation.y = camYaw;
 
+    const emotion = ch?.emotion ?? null;
+    const intensity = emotion?.intensity ?? 0;
+    const amp = ch?.amplitude ?? 1;
+    const grammar = ch?.grammar ?? null;
+
+    // Clip clock — clips are short, single, and self-clearing.
+    if (this.clip) {
+      this.clipT += dt;
+      if (this.clipT >= CLIP_DURATION[this.clip]) this.clip = null;
+    }
+
     // Facing from screen-space velocity (keep last when ambiguous).
     const rightX = Math.cos(camYaw);
     const rightZ = -Math.sin(camYaw);
     const vScreen = state.velocity.x * rightX + state.velocity.z * rightZ;
-    if (Math.abs(vScreen) > 0.08) this.facing = vScreen > 0 ? 1 : -1;
+    if (Math.abs(vScreen) > 0.08) {
+      this.facing = vScreen > 0 ? 1 : -1;
+      this.pendingFacing = 0;
+    }
 
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
     const moving = speed > 0.06;
+
+    // --- Gaze: at rest he watches you (bible: always feel watched) ---
+    if (ch) {
+      const gx = ch.gazeX - state.position.x;
+      const gz = ch.gazeZ - state.position.z;
+      const gazeDist = Math.hypot(gx, gz);
+      const gazeScreen = gx * rightX + gz * rightZ;
+      if (
+        (this.clip === 'backTurn' || this.clip === 'shyTurn') &&
+        Math.abs(gazeScreen) > 0.05
+      ) {
+        // Turning away IS the message.
+        this.facing = gazeScreen > 0 ? -1 : 1;
+        this.pendingFacing = 0;
+      } else if (
+        !moving &&
+        expression.kind === 'none' &&
+        !this.clip &&
+        gazeDist < 4.5 &&
+        Math.abs(gazeScreen) > 0.25
+      ) {
+        const want = gazeScreen > 0 ? 1 : -1;
+        if (want !== this.facing && this.pendingFacing !== want) {
+          // The curiosity tell: a left-right double-blink, THEN the turn.
+          // Urgency sets the delay — strangers track lazily, friends snap.
+          this.pendingFacing = want;
+          this.pendingFacingIn = 0.22 - 0.16 * ch.gazeUrgency;
+          this.queueBlink(2);
+        }
+      }
+    }
+    if (this.pendingFacing !== 0) {
+      this.pendingFacingIn -= dt;
+      if (this.pendingFacingIn <= 0) {
+        this.facing = this.pendingFacing;
+        this.pendingFacing = 0;
+      }
+    }
 
     if (this.reachLeft > 0) this.reachLeft = Math.max(0, this.reachLeft - dt);
     if (this.pickupLeft > 0) this.pickupLeft = Math.max(0, this.pickupLeft - dt);
@@ -395,6 +543,46 @@ export class DatouRig {
       target.headLift -= 0.03;
     }
 
+    // --- Emotion overlays (the bible's grammar: 兴奋类 body-dominant,
+    // 伤心类 expression-dominant) — all scaled by familiarity amplitude ---
+    if (emotion && intensity > 0.25) {
+      const e = intensity * amp;
+      switch (emotion.kind) {
+        case 'joy':
+        case 'excited':
+          target.headBob = Math.max(target.headBob, 0.025 + 0.02 * e);
+          target.bodyRot -= 0.02 * e; // a touch forward, ready to go
+          break;
+        case 'proud':
+          target.headLift += 0.02 * e; // chest up, head high (inventor beat)
+          target.headRot -= 0.06 * e;
+          break;
+        case 'wronged':
+          target.headRot += 0.18 * e; // the droop carries it; body stays small
+          target.headLift -= 0.02 * e;
+          target.bodyY -= 0.02 * e;
+          break;
+        case 'afraid':
+          target.bodyY -= 0.03 * e; // low, close to the ground
+          target.headRot += 0.1 * e;
+          break;
+        case 'shy':
+          target.headRot += 0.12 * e; // ducked head, nothing else
+          break;
+        case 'startled':
+          target.headLift += 0.03 * e; // up and alert
+          break;
+      }
+    }
+
+    // Clip-held postures (the turn-away family adds a wounded droop).
+    if (this.clip === 'backTurn') {
+      target.headRot += 0.12;
+    } else if (this.clip === 'shyTurn') {
+      target.headRot += 0.1;
+      target.headLift -= 0.02;
+    }
+
     if (this.reachBlend > 0.001) {
       // Ground work is a whole-body motion, as on the real quadruped: lower
       // the shoulders and front hips, keep the rear pair planted, then let the
@@ -412,33 +600,93 @@ export class DatouRig {
       target.rearCalfBias = THREE.MathUtils.lerp(target.rearCalfBias, 0.88, r);
     }
 
-    // Smooth toward targets (calm easing, never snappy).
-    const k = 1 - Math.exp(-dt * 7);
+    // Stretch clip: a slow bow in and out (伸懒腰), blended over the target.
+    if (this.clip === 'stretch') {
+      const env = Math.sin(Math.PI * Math.min(1, this.clipT / CLIP_DURATION.stretch)) * amp;
+      target.bodyRot = THREE.MathUtils.lerp(target.bodyRot, -0.2, env);
+      target.bodyY = THREE.MathUtils.lerp(target.bodyY, BODY_Y - 0.03, env);
+      target.frontHipY = THREE.MathUtils.lerp(target.frontHipY, HIP_Y - 0.06, env);
+      target.frontThighBias = THREE.MathUtils.lerp(target.frontThighBias, -0.95, env);
+      target.frontCalfBias = THREE.MathUtils.lerp(target.frontCalfBias, 1.8, env);
+      target.headRot = THREE.MathUtils.lerp(target.headRot, 0.06, env);
+      target.headLift = THREE.MathUtils.lerp(target.headLift, -0.05, env);
+    }
+
+    // Real head-pitch travel — every composed pose respects the hardware.
+    target.headRot = THREE.MathUtils.clamp(target.headRot, HEAD_ROT_UP, HEAD_ROT_DOWN);
+
+    // Smooth toward targets — staggered channels (bible: body, head and
+    // expression deliberately out of sync). Body leads; the head follows
+    // through a chained easing (≈ +80 ms). Excited inverts: the head keys
+    // ease fast and direct while the body lags a beat. Sad slows everything.
+    const slow = grammar === 'sad' ? 0.7 : 1;
+    const kBody = 1 - Math.exp(-dt * 7 * slow * (grammar === 'excited' ? 0.75 : 1));
+    const headSet = new Set<keyof Pose>(HEAD_KEYS);
     for (const key of Object.keys(this.pose) as (keyof Pose)[]) {
-      this.pose[key] += (target[key] - this.pose[key]) * k;
+      if (headSet.has(key)) continue;
+      this.pose[key] += (target[key] - this.pose[key]) * kBody;
+    }
+    if (grammar === 'excited') {
+      const kHead = 1 - Math.exp(-dt * 10);
+      for (const key of HEAD_KEYS) {
+        this.pose[key] += (target[key] - this.pose[key]) * kHead;
+        this.headMid[key] = this.pose[key];
+      }
+    } else {
+      const kMid = 1 - Math.exp(-dt * 7 * slow);
+      const kHead = 1 - Math.exp(-dt * 12 * slow);
+      for (const key of HEAD_KEYS) {
+        this.headMid[key] += (target[key] - this.headMid[key]) * kMid;
+        this.pose[key] += (this.headMid[key] - this.pose[key]) * kHead;
+      }
     }
 
     // --- Gait: thigh swings, calf counter-swings with a lag (Z-fold walk) ---
-    this.gaitPhase += dt * (4 + speed * 4.2);
-    const ampTarget = moving ? 0.38 : 0;
+    // Excited quickens the rhythm (兴奋类 fast/large); sad shrinks the steps.
+    const freqMult = grammar === 'excited' ? 1 + 0.18 * intensity * amp : 1;
+    this.gaitPhase += dt * (4 + speed * 4.2) * freqMult;
+    // 小踏步 — his signature: tiny in-place steps when he's pleased and idle.
+    const tinySteps = !moving && !this.clip && grammar === 'excited' && intensity > 0.35;
+    const gaitScale = grammar === 'sad' ? 0.8 : 1;
+    const ampTarget = moving ? 0.38 * gaitScale : tinySteps ? 0.07 * amp : 0;
     this.legAmp += (ampTarget - this.legAmp) * (1 - Math.exp(-dt * 10));
+    // Stomp clip (跺脚, his unconscious tic): the near-front foot taps twice.
+    const stompLift =
+      this.clip === 'stomp'
+        ? Math.abs(Math.sin((this.clipT / CLIP_DURATION.stomp) * Math.PI * 2)) * 0.3 * amp
+        : 0;
     for (const leg of this.legs) {
       const thighBias = leg.front ? this.pose.frontThighBias : this.pose.rearThighBias;
       const calfBias = leg.front ? this.pose.frontCalfBias : this.pose.rearCalfBias;
       const swing = Math.sin(this.gaitPhase + leg.phase) * this.legAmp;
       // The calf lags the thigh and folds on the back-swing — reads as a knee.
       const kneeSwing = Math.sin(this.gaitPhase + leg.phase + 1.1) * this.legAmp * 0.7;
+      const stomp = leg === this.legs[0] ? stompLift : 0;
       leg.thigh.position.y = leg.front ? this.pose.frontHipY : this.pose.rearHipY;
-      leg.thigh.rotation.z = thighBias + swing;
-      leg.calf.rotation.z = calfBias + kneeSwing;
+      leg.thigh.rotation.z = thighBias + swing - stomp;
+      leg.calf.rotation.z = calfBias + kneeSwing + stomp * 1.3;
     }
 
     // --- Body: walk bob or breathing ---
-    const bob = moving ? Math.abs(Math.sin(this.gaitPhase)) * 0.028 : 0;
+    const bobScale = grammar === 'excited' ? 1.2 : 1;
+    const bob = moving ? Math.abs(Math.sin(this.gaitPhase)) * 0.028 * bobScale : 0;
     const breath = moving ? 0 : Math.sin((this.time * Math.PI * 2) / 2.4) * 0.007;
+    // Shiver (afraid / cold): a fast, tiny tremor — read, not spectacle.
+    const shiver =
+      this.clip === 'shiver' ? Math.sin(this.time * Math.PI * 2 * 13) * 0.022 * amp : 0;
     this.body.position.y = this.pose.bodyY + bob + breath;
-    this.body.rotation.z = this.pose.bodyRot;
+    this.body.rotation.z = this.pose.bodyRot + shiver;
     this.flip.scale.x = this.facing;
+
+    // Spin (原地转圈, the praised twirl): one full paper-doll turn with a
+    // soft lift — the plate passes edge-on, a cutout's pirouette.
+    if (this.clip === 'spin') {
+      const p = Math.min(1, this.clipT / CLIP_DURATION.spin);
+      this.flip.rotation.y = camYaw + easeInOut(p) * Math.PI * 2 * this.facing;
+      this.flip.position.y = Math.sin(Math.PI * p) * 0.045 * amp;
+    } else {
+      this.flip.position.y = 0;
+    }
 
     // Head rides the body posture; happy adds a soft nod.
     const happyBob = this.pose.headBob * Math.sin(this.time * 5.2);
@@ -460,7 +708,7 @@ export class DatouRig {
     this.armForearm.rotation.z += (foreTarget - this.armForearm.rotation.z) * ka;
     this.armUpper.position.y = ARM_BASE_Y + (this.pose.bodyY - BODY_Y) - this.reachBlend * 0.035;
 
-    // --- Eyes: mood plate + blink ---
+    // --- Eyes: emotion plate (mood as fallback) + the blink grammar ---
     let eye: EyeState =
       state.mood === 'happy'
         ? 'happy'
@@ -469,22 +717,75 @@ export class DatouRig {
           : state.mood === 'tired'
             ? 'sleepy'
             : 'neutral';
+    if (emotion && intensity >= 0.3) {
+      // Stand-in plates until dedicated ones land (IMPLEMENTATION §4):
+      // lidded 'sleepy' reads downcast; wide 'curious' reads alert.
+      if (emotion.kind === 'joy' || emotion.kind === 'excited' || emotion.kind === 'proud') {
+        eye = 'happy';
+      } else if (emotion.kind === 'startled' || emotion.kind === 'afraid') {
+        eye = 'curious';
+      } else if (emotion.kind === 'wronged' || emotion.kind === 'shy') {
+        eye = 'sleepy';
+      }
+    }
     if (expression.kind === 'curious') eye = 'curious';
     if (this.petPulse > 0) eye = 'happy';
+
+    // Blink grammar (bible 表情动作设定): slightly quick blinks for liveliness,
+    // and the eyes OPEN faster than they close — vitality in one asymmetry.
     this.blinkIn -= dt;
-    if (this.blinkIn <= 0) {
-      this.blinkLeft = 0.12;
-      this.blinkIn = 2.6 + Math.random() * 3;
+    if (this.blinkIn <= 0 && this.blinkPhase === 'idle' && this.blinkQueue === 0) {
+      this.queueBlink(1);
+      this.blinkIn = 2.2 + Math.random() * 2.6; // cosmetic randomness only
     }
-    if (this.blinkLeft > 0) {
-      this.blinkLeft -= dt;
-      if (eye === 'neutral' || eye === 'curious') eye = 'blink';
+    if (this.blinkQueue > 0 && this.blinkPhase === 'idle') {
+      if (this.blinkGap > 0) {
+        this.blinkGap -= dt;
+      } else {
+        this.blinkQueue--;
+        this.blinkPhase = 'closing';
+        this.blinkPhaseLeft = 0.075;
+      }
     }
+    let lidScale = 1;
+    if (this.blinkPhase !== 'idle') {
+      this.blinkPhaseLeft -= dt;
+      const p = Math.max(0, this.blinkPhaseLeft);
+      if (this.blinkPhase === 'closing') {
+        lidScale = 0.12 + (p / 0.075) * 0.88;
+        if (this.blinkPhaseLeft <= 0) {
+          this.blinkPhase = 'hold';
+          this.blinkPhaseLeft = 0.04;
+        }
+      } else if (this.blinkPhase === 'hold') {
+        lidScale = 0.12;
+        if (this.blinkPhaseLeft <= 0) {
+          this.blinkPhase = 'opening';
+          this.blinkPhaseLeft = 0.045; // open ≈1.6× faster than close
+        }
+      } else {
+        lidScale = 1 - (p / 0.045) * 0.88;
+        if (this.blinkPhaseLeft <= 0) {
+          this.blinkPhase = 'idle';
+          if (this.blinkQueue > 0) this.blinkGap = 0.08; // double-blink spacing
+        }
+      }
+      if (this.blinkPhase === 'hold' && (eye === 'neutral' || eye === 'curious')) eye = 'blink';
+    }
+    this.eyes.scale.y = lidScale;
+
     const tex = this.eyeTextures.get(eye);
     if (tex && this.eyeMat.map !== tex) {
       this.eyeMat.map = tex;
       this.eyeMat.needsUpdate = true;
     }
+
+    // --- Ear breathing light (耳语): calm sine at rest, quickens with
+    // feeling. A status LED, never a glow.
+    const earRate = 0.45 + intensity * 0.65;
+    this.earMat.opacity =
+      (0.13 + 0.2 * (0.5 + 0.5 * Math.sin(this.time * Math.PI * 2 * earRate))) *
+      (0.55 + 0.45 * amp);
 
     // Pet pulse: one soft lean-in and release.
     if (this.petPulse > 0) {
@@ -496,5 +797,11 @@ export class DatouRig {
 
     const shMat = this.shadow.material as THREE.MeshBasicMaterial;
     shMat.opacity = 0.9 - bob * 4;
+  }
+
+  /** Queue n quick blinks (n = 2 is the pre-turn curiosity tell). */
+  private queueBlink(n: number): void {
+    this.blinkQueue = Math.max(this.blinkQueue, n);
+    this.blinkGap = 0;
   }
 }

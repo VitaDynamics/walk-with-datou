@@ -28,6 +28,8 @@ import {
   type PropSprite,
 } from '../art/props';
 import { DatouRig } from '../datou/DatouRig';
+import { EmotionEngine } from '../datou/emotion';
+import { amplitude, clipAllowed, familiarityStage, gazeUrgency } from '../datou/character';
 import { HumanRig } from '../human/HumanRig';
 import {
   readSavedAge,
@@ -198,6 +200,12 @@ export class Game {
   private inspoTickId = 0;
   private forageMenuRefreshIn = 0;
 
+  // BOBO's feeling about what just happened (CHARACTER_IMPLEMENTATION §2/§5).
+  private readonly emotion = new EmotionEngine();
+  private lastEmotionKind = 'neutral';
+  private spinCooldown = 0;
+  private shiverIn = 0;
+
   private readonly events: CompanionEvents = { petted: false, comforted: false, guidedTo: null };
   private leashOn = true;
   private garlandWorn = false;
@@ -311,7 +319,11 @@ export class Game {
         setTarget: (x, z) => this.physics.setTarget(x, z),
         onDiscover: (spot) => this.handleDiscover(spot),
         onWantSatisfied: (kind) => this.handleWantSatisfied(kind),
-        onLandmarkNoticed: (id) => this.landmarks.onNoticed(id),
+        onWantExpired: () => this.emotion.apply('ignoredWant'),
+        onLandmarkNoticed: (id) => {
+          this.emotion.apply('landmark');
+          this.landmarks.onNoticed(id);
+        },
       },
       Math.random,
       this.spots,
@@ -484,6 +496,8 @@ export class Game {
   start(): void {
     if (this.running) return;
     this.running = true;
+    // His friend is back — the day starts excited (希望能每天都和好朋友在一起).
+    this.emotion.apply('greetPlayer');
     this.lastTime = performance.now();
     requestAnimationFrame(this.tick);
   }
@@ -512,6 +526,19 @@ export class Game {
       this.events.petted = true;
       this.physics.applyPet();
       this.datouRig.pulse();
+      // A pet while he's already glowing reads as praise — the canon answer
+      // is the spin (原地转圈), earned at friend stage, never back-to-back.
+      const alreadyJoyful =
+        this.emotion.state.kind === 'joy' && this.emotion.state.intensity > 0.6;
+      this.emotion.apply('pet');
+      if (
+        alreadyJoyful &&
+        this.spinCooldown <= 0 &&
+        clipAllowed('spin', familiarityStage(this.bond.level)) &&
+        this.datouRig.playClip('spin')
+      ) {
+        this.spinCooldown = 20;
+      }
       return;
     }
     if (!hit) return;
@@ -614,6 +641,11 @@ export class Game {
     // An interactable prop → Datou trots over and reacts.
     const prop = this.world.nearestInstance(p.x, p.z, 1.2, false);
     if (prop && kindDef(prop.kind).verb !== 'none' && !kindDef(prop.kind).pickable) {
+      // A sudden tap right next to him startles before it intrigues.
+      const ds = this.physics.getDatouState();
+      if (Math.hypot(prop.x - ds.position.x, prop.z - ds.position.z) < 1.5) {
+        this.emotion.apply('startle');
+      }
       this.companion.investigate(prop.x, prop.z);
       this.pendingReaction = { verb: kindDef(prop.kind).verb, x: prop.x, z: prop.z };
       return;
@@ -638,6 +670,7 @@ export class Game {
     if (duration >= 0.8) {
       this.events.comforted = true;
       this.personality.note('care');
+      this.emotion.apply('comfort');
     }
     if (duration >= COMFORT_MEMORY_SECONDS) {
       this.memories.add({
@@ -1198,6 +1231,9 @@ export class Game {
     // when you reach the right spot. Nothing is lost to a misclick anymore.
     this.backpack.add(id);
     this.ui.toast(t('workshop.toPack', { thing: itemName(spec) }));
+    // The inventor beat: something NEW exists — pride, and his excited tic.
+    this.emotion.apply('craft');
+    this.datouRig.playClip('stomp');
     return true;
   }
 
@@ -1250,6 +1286,7 @@ export class Game {
       this.inspoCooldown = 600; // ≥ 10 min between inspirations (§5.2)
       this.datouRig.pulse();
       this.datouRig.reach();
+      this.emotion.apply('discover'); // 灵感灯泡 — a fresh idea is a find
       this.ui.toast(t('workshop.inspired'));
     }
   }
@@ -1542,6 +1579,7 @@ export class Game {
     this.personality.note('play');
     this.physics.applyPet();
     this.datouRig.pulse();
+    this.emotion.apply('fetch');
     this.memories.add({
       ts: Date.now(),
       kind: 'want',
@@ -1572,6 +1610,7 @@ export class Game {
     if (!this.spots.markFound(spot.id) && spot.found !== true) return;
     this.world.revealSpot(spot);
     this.personality.note('explore');
+    this.emotion.apply('discover');
     this.physics.applyPet();
     this.datouRig.pulse();
     this.datouRig.reach();
@@ -1590,6 +1629,7 @@ export class Game {
   private handleWantSatisfied(kind: WantKind): void {
     this.physics.applyPet();
     this.datouRig.pulse();
+    this.emotion.apply('praise');
     this.memories.add({
       ts: Date.now(),
       kind: 'want',
@@ -1745,6 +1785,7 @@ export class Game {
     for (const unlock of this.bond.takeUnlocks()) {
       const entry = { ts: Date.now(), kind: 'milestone' as const, key: unlock, mood: state.mood };
       this.memories.add(entry);
+      this.emotion.apply('praise');
       this.ui.toast(this.ui.memoryText(entry));
     }
 
@@ -1775,7 +1816,38 @@ export class Game {
         this.placeGhost.faceCamera(camYaw);
       }
     }
-    this.datouRig.update(dt, state, this.companion.expression, camYaw);
+    // --- BOBO's feeling this frame → the rig's character channel ---
+    this.emotion.update(dt);
+    if (this.spinCooldown > 0) this.spinCooldown -= dt;
+    const stage = familiarityStage(this.bond.level);
+    const feeling = this.emotion.state;
+    if (feeling.kind !== this.lastEmotionKind) {
+      // Entering a feeling has a canon read: wronged/miffed → he turns his
+      // back; over-praised → the bashful half-turn. Earned with familiarity.
+      if (
+        (feeling.kind === 'wronged' || feeling.kind === 'miffed') &&
+        clipAllowed('backTurn', stage)
+      ) {
+        this.datouRig.playClip('backTurn');
+      } else if (feeling.kind === 'shy' && clipAllowed('shyTurn', stage)) {
+        this.datouRig.playClip('shyTurn');
+      }
+      this.lastEmotionKind = feeling.kind;
+    }
+    if (feeling.kind === 'afraid') {
+      this.shiverIn -= dt;
+      if (this.shiverIn <= 0 && this.datouRig.playClip('shiver')) {
+        this.shiverIn = 5 + Math.random() * 4; // cosmetic spacing only
+      }
+    }
+    this.datouRig.update(dt, state, this.companion.expression, camYaw, {
+      emotion: feeling,
+      grammar: this.emotion.grammar,
+      amplitude: amplitude(stage),
+      gazeX: this.player.x,
+      gazeZ: this.player.z,
+      gazeUrgency: gazeUrgency(stage),
+    });
     this.humanRig.update(dt, this.player.x, this.player.z, this.player.vx, this.player.vz, camYaw);
 
     // Hide the rope when they're improbably far apart (spawn/teleport) —
