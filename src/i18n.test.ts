@@ -63,6 +63,21 @@ describe('i18n tables', () => {
     }
   });
 
+  it('covers every critter: name, tap line, resident memory (E5)', () => {
+    const en = __tables.UI.en as Record<string, string>;
+    for (const kind of ['bird', 'butterfly', 'duck', 'squirrel', 'dog'] as const) {
+      expect(en[`critter.${kind}`], `critter.${kind}`).toBeDefined();
+      expect(en[`critter.${kind}.line`], `critter.${kind}.line`).toBeDefined();
+      expect(en[`memory.want.critter.${kind}`], `memory.want.critter.${kind}`).toBeDefined();
+    }
+    expect(en['critter.cat']).toBeDefined();
+    expect(en['critter.cat.line.1']).toBeDefined();
+    expect(en['critter.cat.line.2']).toBeDefined();
+    expect(en['memory.want.critter.cat']).toBeDefined();
+    expect(en['critter.gift']).toBeDefined();
+    expect(en['thing.acorn']).toBeDefined();
+  });
+
   it('names every touchable prop and resource node (E1)', () => {
     const en = __tables.UI.en as Record<string, string>;
     const kinds = new Set<string>();

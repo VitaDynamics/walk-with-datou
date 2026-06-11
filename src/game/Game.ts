@@ -65,6 +65,8 @@ import {
   type VegRow,
 } from '../world/orchard';
 import { drawFood, drawFruitTree, drawVegRow, type FruitKind } from '../art/orchard';
+import { CritterSystem } from './Critters';
+import { drawAcorn } from '../art/critters';
 import { kindDef, type ScatterKind } from '../world/scatter';
 import { SPOTS_PER_DAY, SpotField, dailyKey, dailySeed, type Spot } from '../world/Spots';
 import { World } from '../world/World';
@@ -230,8 +232,12 @@ export class Game {
   /** Fruit mid-fall (eased drop), then resting on the ground until picked.
    *  Fallen fruit is session-local — overnight, the squirrels get it. */
   private readonly fallingFruit: { kind: FruitKind; x: number; z: number; cut: Cutout; t: number }[] = [];
-  private readonly fallenFruit: { kind: FruitKind; x: number; z: number; cut: Cutout }[] = [];
-  private pendingFruit: { kind: FruitKind; x: number; z: number; cut: Cutout } | null = null;
+  private readonly fallenFruit: { kind: FruitKind | 'acorn'; x: number; z: number; cut: Cutout }[] =
+    [];
+  private pendingFruit: { kind: FruitKind | 'acorn'; x: number; z: number; cut: Cutout } | null =
+    null;
+  // The park's small animals (E5).
+  private critters!: CritterSystem;
   private readonly beatFx: {
     cut: Cutout;
     t: number;
@@ -526,6 +532,38 @@ export class Game {
     this.placeNodes();
     this.placeSetpieces();
     this.placeOrchard();
+    this.critters = new CritterSystem({
+      add: (cut, x, z) => this.world.placeCutout(cut, x, z),
+      remove: (cut) => {
+        cut.group.removeFromParent();
+        cut.dispose();
+      },
+      perchNear: (x, z) => this.world.nearestInstance(x, z, 6, false),
+      flowerNear: (x, z) => this.world.nearestPickableOfKind('flower', x, z, 12),
+      chip: (titleKey, lineKey) => this.ui.showName(tDyn(titleKey), tDyn(lineKey)),
+      toast: (key) => this.ui.toast(tDyn(key)),
+      rememberOnce: (key) => {
+        this.memories.add({
+          ts: Date.now(),
+          kind: 'want',
+          key,
+          mood: this.physics.getDatouState().mood,
+        });
+        this.bond.add('discovery', 2);
+        this.emotion.apply('discover');
+      },
+      datouReact: () => {
+        this.datouRig.pulse();
+        this.datouRig.reach();
+      },
+      datouClip: (clip) => {
+        if (!this.datouRig.playClip(clip)) {
+          this.datouRig.pulse();
+          this.datouRig.reach();
+        }
+      },
+      dropGift: (x, z) => this.dropAcorn(x, z),
+    });
     this.placeCoffer();
 
     this.pointer = new Pointer(canvas, {
@@ -759,6 +797,9 @@ export class Game {
       this.armedSetpiece = sp;
       return;
     }
+
+    // A small animal under the tap (E5) → its name and a quiet line.
+    if (this.critters.tapAt(p.x, p.z)) return;
 
     // Fallen fruit (E4) → walk over and pocket it.
     const fruit = this.fallenFruitNear(p.x, p.z);
@@ -1885,10 +1926,18 @@ export class Game {
     }
   }
 
+  /** The squirrel's gift (E5): an acorn rests at the oak roots until picked. */
+  private dropAcorn(x: number, z: number): void {
+    const cut = new Cutout(drawAcorn(11), { height: 0.22, shadowRadius: 0.12 });
+    this.world.placeCutout(cut, x, z);
+    this.fallenFruit.push({ kind: 'acorn', x, z, cut });
+    this.ui.toast(t('critter.gift'));
+  }
+
   private fallenFruitNear(
     x: number,
     z: number,
-  ): { kind: FruitKind; x: number; z: number; cut: Cutout } | null {
+  ): { kind: FruitKind | 'acorn'; x: number; z: number; cut: Cutout } | null {
     let best: (typeof this.fallenFruit)[number] | null = null;
     let bestD = 0.9;
     for (const f of this.fallenFruit) {
@@ -1901,7 +1950,7 @@ export class Game {
     return best;
   }
 
-  private pickFruit(fruit: { kind: FruitKind; x: number; z: number; cut: Cutout }): void {
+  private pickFruit(fruit: { kind: FruitKind | 'acorn'; x: number; z: number; cut: Cutout }): void {
     const i = this.fallenFruit.indexOf(fruit);
     if (i < 0) return;
     this.fallenFruit.splice(i, 1);
@@ -2268,6 +2317,11 @@ export class Game {
     this.maybeHintSetpiece(dt);
     this.updateBeat(dt, state);
     this.updateOrchard(dt, state);
+    this.critters.update(
+      dt,
+      { x: this.player.x, z: this.player.z },
+      { x: state.position.x, z: state.position.z },
+    );
 
     // Deferred gather: arrived next to the tapped pickable?
     if (this.pendingGather) {

@@ -42,6 +42,7 @@ import {
   drawWindchime,
 } from '../art/props';
 import { drawFood } from '../art/orchard';
+import { drawAcorn } from '../art/critters';
 
 export interface ConsoleCallbacks {
   onLeashToggle(): void;
@@ -70,6 +71,8 @@ const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }>
   pumpkin: (seed) => drawFood('pumpkin', seed),
   turnip: (seed) => drawFood('turnip', seed),
   carrot: (seed) => drawFood('carrot', seed),
+  // The squirrel's gift (E5).
+  acorn: drawAcorn,
   // Coffer-granted finds (landmark plan §9).
   feather: (seed) => drawDiscovery('feather', seed),
   reed: drawReed,

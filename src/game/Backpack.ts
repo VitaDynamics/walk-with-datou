@@ -20,7 +20,7 @@ export type ResourceId =
   | 'carrot';
 /** Coffer-granted finds — not gatherable from the ground, but they sit in the
  *  pack and feed the Workshop bench like any material (landmark plan §9). */
-export type FoundId = 'feather' | 'reed' | 'old-bolt';
+export type FoundId = 'feather' | 'reed' | 'old-bolt' | 'acorn';
 export type CraftedId =
   // tier 1 — components & keepsakes
   | 'bundle'
