@@ -21,25 +21,35 @@ import {
   drawChimeStand,
   drawCrate,
   drawDonatedChime,
+  drawDragonfly,
+  drawEchoBell,
   drawFastener,
   drawFieldCase,
   drawFloatingPlanter,
   drawHoseCoil,
+  drawInkcap,
   drawLeanTo,
   drawLogSeat,
+  drawPatchBall,
   drawPatchedFence,
   drawPennantMast,
+  drawPerchedBird,
   drawPlankStack,
   drawPlanterSocket,
   drawPumpNotice,
   drawPumpWheel,
+  drawReedRing,
   drawRelayMast,
   drawRelayTag,
   drawRibbonScrap,
   drawSignalVane,
+  drawSquirrel,
   drawToolShelter,
+  drawTrailBloom,
   drawTriangleMark,
+  drawWaterIris,
 } from '../art/landmarkProps';
+import { Rng } from '../physics/mujoco/rng';
 import { Cutout } from '../world/Cutout';
 import {
   LANDMARKS_VERSION,
@@ -52,6 +62,8 @@ import type { LandmarkAnchor } from './Companion';
 import type { MaterialId } from './workshop/materials';
 import type { FormId } from './workshop/forms';
 import type { Personality } from './workshop/inspiration';
+import { finishesFor, isValid, itemId, sizesFor } from './workshop/items';
+import { itemHeight, itemSprite } from './workshop/sprites';
 import { t, tDyn } from '../i18n';
 
 export interface LandmarkDirectorDeps {
@@ -77,13 +89,15 @@ export interface LandmarkDirectorDeps {
   cue(kind: 'chime' | 'response'): void;
   /** Bank a curio into the Notebook (the time-capsule keepsake). */
   bankCurio(tone: number): void;
+  /** A round of toy play happened — feeds the playful personality axis. */
+  notePlay(): void;
   load(): unknown;
   save(data: unknown): void;
 }
 
 /** What a world tap near a landmark interactive resolves to. */
 export interface LandmarkTarget {
-  kind: 'chime' | 'coffer' | 'channel' | 'vane' | 'socket' | 'hollow';
+  kind: 'chime' | 'coffer' | 'channel' | 'vane' | 'socket' | 'hollow' | 'toy';
   area: LandmarkId;
   /** Which channel/vane (0 or 1) for the paired interactives. */
   index?: 0 | 1;
@@ -172,6 +186,13 @@ const TRI_MARK_IN = { x: -114.5, z: -101.8, h: 0.3 };
 // findable only after the relay wakes (Phase 3 secret).
 const HOLLOW = { x: -120, z: -110 };
 
+/** Datou's toy per area — left by the volunteers, his to play with. */
+const TOYS: Record<LandmarkId, { x: number; z: number; h: number }> = {
+  'repair-commons': { x: 128.8, z: -26.2, h: 0.42 },
+  'pump-garden': { x: 12.5, z: 114.2, h: 0.42 },
+  'relay-camp': { x: -112.2, z: -108.2, h: 0.72 },
+};
+
 const REACH = 1.4; // Datou close enough to brace/work
 const WORK_SECONDS = 2.6; // the calm cooperative beat
 const TELL_COOLDOWN = 12; // s between coffer paw-tells
@@ -190,6 +211,10 @@ interface Beat {
   phase: BeatPhase;
   left: number;
   beatIn: number;
+  /** Where Datou works this beat (set on engage — activity or toy). */
+  station: { x: number; z: number } | null;
+  /** What happens when the beat lands. */
+  onDone: (() => void) | null;
 }
 
 export class LandmarkDirector {
@@ -198,9 +223,9 @@ export class LandmarkDirector {
 
   // One cooperative beat per area (chime brace / pump run / relay wake).
   private readonly beats: Record<LandmarkId, Beat> = {
-    'repair-commons': { phase: 'idle', left: 0, beatIn: 0 },
-    'pump-garden': { phase: 'idle', left: 0, beatIn: 0 },
-    'relay-camp': { phase: 'idle', left: 0, beatIn: 0 },
+    'repair-commons': { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
+    'pump-garden': { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
+    'relay-camp': { phase: 'idle', left: 0, beatIn: 0, station: null, onDone: null },
   };
   private tellCooldown = 0;
   /** Passing the repaired chime re-lures with its quiet ring (§7A). */
@@ -247,6 +272,15 @@ export class LandmarkDirector {
     this.plate(drawCrate(102, 'patch'), CRATE_A.x, CRATE_A.z, CRATE_A.h, 0.35);
     this.plate(drawPatchedFence(103), FENCE_B.x, FENCE_B.z, FENCE_B.h, 0.6);
     this.plate(drawFastener(104), FASTENER_C.x, FASTENER_C.z, 0.24, 0.12);
+    // The life layer: the volunteers' planting, a regular visitor, made
+    // furnishings from the same item space the player crafts from, and a toy.
+    this.clusterPlates(drawTrailBloom, 7, 126, -28, 5, 13, 0.5, 0x7a11);
+    this.plate(drawPerchedBird(120), 133.8, -28.2, 0.42, 0.1);
+    this.placeMadeItem('table', 'plank', 124, -31.2);
+    this.placeMadeItem('bench', 'plank', 129.6, -24.6);
+    this.placeMadeItem('cache-box', 'plank', 121.2, -24.2);
+    const toyA = TOYS['repair-commons'];
+    this.plate(drawPatchBall(121), toyA.x, toyA.z, toyA.h, 0.25);
     if (this.field.chimeDonated) this.placeDonatedChime();
     if (done) this.placeCommonsClues();
   }
@@ -277,6 +311,16 @@ export class LandmarkDirector {
     this.plate(drawRibbonScrap(87), 38, 78, 0.35, 0.1); // last ribbon meets the stakes
     for (const [i, s] of STAKES.entries()) this.plate(drawBlueStake(88 + i), s.x, s.z, 0.5, 0.1);
     this.placeCoffer('pump-garden');
+    // The life layer: water iris in the shallows, dragonflies, woven and
+    // stone furnishings, and the splash ring at the water's edge.
+    this.clusterPlates(drawWaterIris, 6, 15, 113, 3, 9, 0.65, 0x7a12);
+    this.plate(drawDragonfly(122), 16.5, 114.8, 0.5, 0);
+    this.plate(drawDragonfly(123), 10.5, 115.8, 0.45, 0);
+    this.placeMadeItem('basket', 'reed', 12.4, 105.6);
+    this.placeMadeItem('trellis', 'reed', 18.4, 108.6);
+    this.placeMadeItem('drinking-bowl', 'flat-stone', 15.6, 104.6);
+    const toyB = TOYS['pump-garden'];
+    this.plate(drawReedRing(124), toyB.x, toyB.z, toyB.h, 0.2);
     if (done) this.placeGardenClues();
   }
 
@@ -302,6 +346,15 @@ export class LandmarkDirector {
     for (const [i, m] of TRI_MARKS.entries())
       this.plate(drawTriangleMark(95 + i), m.x, m.z, 0.3, 0.1);
     this.placeCoffer('relay-camp');
+    // The life layer: ink-caps spreading from the pines, the camp's tenant,
+    // made furnishings, and the echo bell Datou can boop.
+    this.clusterPlates(drawInkcap, 7, -114, -104, 5, 11, 0.4, 0x7a13);
+    this.plate(drawSquirrel(125), -117.8, -107.8, 0.45, 0.12);
+    this.placeMadeItem('stool', 'log', -112.8, -103);
+    this.placeMadeItem('lamp', 'driftwood', -116.8, -105);
+    this.placeMadeItem('mat', 'grass-wisp', -115.5, -99.5);
+    const toyC = TOYS['relay-camp'];
+    this.plate(drawEchoBell(126), toyC.x, toyC.z, toyC.h, 0.3);
   }
 
   private placeCoffer(id: LandmarkId): void {
@@ -338,6 +391,48 @@ export class LandmarkDirector {
       SOCKET.h,
       0.35,
     );
+  }
+
+  /** A seeded ring of small plates around a center — the special plants
+   *  spreading each area's character into its surroundings. */
+  private clusterPlates(
+    draw: (seed: number) => { canvas: HTMLCanvasElement; aspect: number },
+    n: number,
+    cx: number,
+    cz: number,
+    rMin: number,
+    rMax: number,
+    h: number,
+    seed: number,
+  ): void {
+    const rng = new Rng(seed);
+    for (let i = 0; i < n; i++) {
+      const a = rng.next() * Math.PI * 2;
+      const d = rMin + rng.next() * (rMax - rMin);
+      this.plate(
+        draw((seed ^ (i * 2654435761)) >>> 0),
+        cx + Math.cos(a) * d,
+        cz + Math.sin(a) * d,
+        h * (0.85 + rng.next() * 0.3),
+        0.12,
+      );
+    }
+  }
+
+  /** Place a community-made Workshop item as world dressing — the same
+   *  generative item space the player crafts from (volunteers made things
+   *  here too). Skips quietly if the combination isn't in the item space. */
+  private placeMadeItem(form: FormId, material: MaterialId, x: number, z: number): void {
+    const sizes = sizesFor(form);
+    const spec = {
+      form,
+      material,
+      size: sizes[Math.min(1, sizes.length - 1)],
+      finish: finishesFor(form)[0],
+    };
+    if (!isValid(spec)) return;
+    const h = itemHeight(spec);
+    this.plate(itemSprite(itemId(spec)), x, z, h, h * 0.4);
   }
 
   private completed(id: LandmarkId): boolean {
@@ -439,6 +534,12 @@ export class LandmarkDirector {
     if (this.completed('relay-camp') && !this.field.capsuleFound && near(HOLLOW.x, HOLLOW.z, 1.7)) {
       return { kind: 'hollow', area: 'relay-camp', x: HOLLOW.x, z: HOLLOW.z };
     }
+    for (const a of this.field.areas) {
+      const toy = TOYS[a.def.id];
+      if (near(toy.x, toy.z, 1.5)) {
+        return { kind: 'toy', area: a.def.id, x: toy.x, z: toy.z };
+      }
+    }
     return null;
   }
 
@@ -464,7 +565,21 @@ export class LandmarkDirector {
       case 'hollow':
         this.findCapsule();
         break;
+      case 'toy':
+        this.engageToy(target.area);
+        break;
     }
+  }
+
+  /** Datou's toy: he trots over, plays a round, and is pleased with himself.
+   *  Repeatable, feeds the playful axis, never a chore. */
+  private engageToy(id: LandmarkId): void {
+    const toy = TOYS[id];
+    this.startBeat(id, toy, () => {
+      this.deps.notePlay();
+      if (id === 'relay-camp') this.deps.cue('chime'); // the bell answers
+      this.deps.toast(this.dailyLine(`landmark.toy.${id}`, 2));
+    });
   }
 
   /** The volunteers' time capsule under the Old Pine — found once, with
@@ -532,24 +647,39 @@ export class LandmarkDirector {
     return tDyn(`${prefix}.${dailySeed() % n}`);
   }
 
+  /** Start a cooperative beat: Datou travels to the station, works it in
+   *  steady pulses, then `onDone` lands. Shared by activities and toys. */
+  private startBeat(
+    id: LandmarkId,
+    station: { x: number; z: number },
+    onDone: () => void,
+  ): boolean {
+    const beat = this.beats[id];
+    if (beat.phase !== 'idle') return false;
+    this.deps.sendDatou(station.x, station.z);
+    beat.phase = 'datou-coming';
+    beat.left = 16; // generous travel allowance before giving up quietly
+    beat.station = station;
+    beat.onDone = onDone;
+    return true;
+  }
+
   private engageChime(): void {
     if (this.completed('repair-commons')) {
       this.deps.cue('chime');
       this.deps.toast(this.dailyLine('landmark.commons.again', 3));
       return;
     }
-    const beat = this.beats['repair-commons'];
-    if (beat.phase !== 'idle') return;
+    if (this.beats['repair-commons'].phase !== 'idle') return;
     if (this.deps.countTwig() < 1) {
       // The information gap stays open and names its key: one common twig.
       this.deps.toast(t('landmark.commons.chimeNeedsPart'));
       return;
     }
     // Datou comes to brace the post; the repair runs when he's in position.
-    this.deps.sendDatou(CHIME.x, CHIME.z);
-    beat.phase = 'datou-coming';
-    beat.left = 14; // generous travel allowance before giving up quietly
-    this.deps.toast(t('landmark.commons.chimeStart'));
+    if (this.startBeat('repair-commons', CHIME, () => this.completeChime())) {
+      this.deps.toast(t('landmark.commons.chimeStart'));
+    }
   }
 
   private completeChime(): void {
@@ -589,11 +719,9 @@ export class LandmarkDirector {
     );
     if (this.channelOn[0] && this.channelOn[1]) {
       // The loop is whole — Datou takes his station at the pump.
-      const beat = this.beats['pump-garden'];
-      this.deps.sendDatou(PUMP.x, PUMP.z);
-      beat.phase = 'datou-coming';
-      beat.left = 16;
-      this.deps.toast(t('landmark.garden.pumping'));
+      if (this.startBeat('pump-garden', PUMP, () => this.completeGarden())) {
+        this.deps.toast(t('landmark.garden.pumping'));
+      }
     } else {
       this.deps.toast(t('landmark.garden.channelTurned'));
     }
@@ -636,11 +764,9 @@ export class LandmarkDirector {
     );
     if (this.vanePos[0] === VANE_TARGET[0] && this.vanePos[1] === VANE_TARGET[1]) {
       // Both true — Datou goes very still, then gives the mast his attention.
-      const beat = this.beats['relay-camp'];
-      this.deps.sendDatou(RELAY_MAST.x, RELAY_MAST.z);
-      beat.phase = 'datou-coming';
-      beat.left = 16;
-      this.deps.toast(t('landmark.camp.aligned'));
+      if (this.startBeat('relay-camp', RELAY_MAST, () => this.completeCamp())) {
+        this.deps.toast(t('landmark.camp.aligned'));
+      }
     } else if (this.vanePos[i] === VANE_TARGET[i]) {
       // Datou is the meter: the ear-lift beat says this one landed true (§7C).
       this.deps.datouBeat();
@@ -679,10 +805,8 @@ export class LandmarkDirector {
       this.deps.toast(tDyn(`landmark.${here.def.id}.arrive`));
     }
 
-    // The cooperative beats (chime brace / pump run / relay wake).
-    this.advanceBeat('repair-commons', CHIME, () => this.completeChime(), dt);
-    this.advanceBeat('pump-garden', PUMP, () => this.completeGarden(), dt);
-    this.advanceBeat('relay-camp', RELAY_MAST, () => this.completeCamp(), dt);
+    // The cooperative beats (chime brace / pump run / relay wake / toy play).
+    for (const a of this.field.areas) this.advanceBeat(a.def.id, dt);
 
     // The repaired chime is the Commons' audible re-lure: passing it rings
     // softly, on a long cooldown (§7A "chime sounds when the player passes").
@@ -709,13 +833,14 @@ export class LandmarkDirector {
     }
   }
 
-  private advanceBeat(
-    id: LandmarkId,
-    station: { x: number; z: number },
-    complete: () => void,
-    dt: number,
-  ): void {
+  private advanceBeat(id: LandmarkId, dt: number): void {
     const beat = this.beats[id];
+    const station = beat.station;
+    const complete = beat.onDone;
+    if (!station || !complete) {
+      beat.phase = 'idle';
+      return;
+    }
     if (beat.phase === 'datou-coming') {
       beat.left -= dt;
       const d = this.deps.datouPos();
@@ -741,6 +866,8 @@ export class LandmarkDirector {
       }
       if (beat.left <= 0) {
         beat.phase = 'idle';
+        beat.station = null;
+        beat.onDone = null;
         complete();
       }
     }

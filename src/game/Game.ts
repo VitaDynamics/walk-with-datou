@@ -263,6 +263,7 @@ export class Game {
       personality: () => this.personality.axis(),
       cue: (kind) => (kind === 'chime' ? cueChime() : cueResponse()),
       bankCurio: (tone) => this.workshopState.addCurio(tone),
+      notePlay: () => this.personality.note('play'),
       load: () => this.loadJson<unknown>('wwd.landmarks', null),
       save: (d) => this.saveJson('wwd.landmarks', d),
     });
@@ -394,6 +395,8 @@ export class Game {
       mapButton?.classList.toggle('active', on);
     };
     mapButton?.addEventListener('click', toggleOverview);
+    // Dev/QA: ?overview=1 starts in the whole-map view (headless map checks).
+    if (new URLSearchParams(location.search).has('overview')) toggleOverview();
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyM' && !e.repeat) toggleOverview();
     });

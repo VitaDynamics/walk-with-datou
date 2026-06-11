@@ -1321,3 +1321,366 @@ export function drawDonatedChime(seed: number): PropSprite {
   g.fill();
   return { canvas: c, aspect: 0.5 };
 }
+
+// --- The life layer (Phase 3+) ------------------------------------------------
+// Special plants, quiet creatures, and one toy for Datou per area — the
+// landmark's influence spreading into its surroundings. All static plates;
+// presence comes from placement, never motion.
+
+/** The Commons' trail-bloom (~0.5 m): cream petals around an amber heart —
+ *  the volunteers' planting, growing only near the repair stop. */
+export function drawTrailBloom(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 160);
+  for (const [sx, h] of [
+    [50, 64],
+    [78, 52],
+  ] as const) {
+    wobblyLine(g, rng, sx, 148, sx + (rng.next() * 8 - 4), 148 - h, 3.5, SAGE.shade, 1, 4);
+    const cx = sx + (rng.next() * 8 - 4);
+    const cy = 148 - h - 6;
+    g.fillStyle = CLAY.pale;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + rng.next() * 0.3;
+      g.beginPath();
+      g.ellipse(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9, 7, 4.5, a, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK.soft;
+      g.lineWidth = 1.5;
+      g.stroke();
+    }
+    g.fillStyle = ROBOT.accent;
+    g.beginPath();
+    g.arc(cx, cy, 4.5, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 1.5;
+    g.stroke();
+  }
+  return { canvas: c, aspect: 128 / 160 };
+}
+
+/** The garden's water iris (~0.65 m): one blue bloom over curving leaves —
+ *  it only grows where the loop keeps the ground wet. */
+export function drawWaterIris(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 192);
+  // Curving leaves.
+  g.strokeStyle = SAGE.deep;
+  g.lineWidth = 5;
+  g.lineCap = 'round';
+  for (const lean of [-26, -8, 14, 30] as const) {
+    g.beginPath();
+    g.moveTo(64, 180);
+    g.quadraticCurveTo(64 + lean * 0.4, 120, 64 + lean, 78 + rng.next() * 18);
+    g.stroke();
+  }
+  // The stem + bloom.
+  wobblyLine(g, rng, 64, 180, 66, 58, 4, SAGE.shade, 1, 4);
+  g.fillStyle = WATER.deep;
+  for (const [dx, dy, rot] of [
+    [-9, 2, -0.7],
+    [9, 2, 0.7],
+    [0, -8, 0],
+  ] as const) {
+    g.save();
+    g.translate(66 + dx, 50 + dy);
+    g.rotate(rot);
+    g.beginPath();
+    g.ellipse(0, 0, 6, 12, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 1.5;
+    g.stroke();
+    g.restore();
+  }
+  g.fillStyle = WATER.edge;
+  g.beginPath();
+  g.arc(66, 50, 3.5, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: c, aspect: 128 / 192 };
+}
+
+/** The camp's ink-cap mushrooms (~0.4 m): charcoal caps on pale stems —
+ *  the woods' answer to the relay's quiet character. */
+export function drawInkcap(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 128);
+  for (const [x, h, r] of [
+    [44, 40, 17],
+    [72, 54, 21],
+    [96, 32, 13],
+  ] as const) {
+    const lean = (rng.next() - 0.5) * 8;
+    // Stem.
+    g.fillStyle = CLAY.pale;
+    g.beginPath();
+    g.moveTo(x - 4, 118);
+    g.lineTo(x - 3 + lean, 118 - h);
+    g.lineTo(x + 3 + lean, 118 - h);
+    g.lineTo(x + 4, 118);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = INK.soft;
+    g.lineWidth = 2;
+    g.stroke();
+    // Tall charcoal cap.
+    g.fillStyle = ROBOT.dark;
+    g.beginPath();
+    g.ellipse(x + lean, 118 - h - 4, r, r * 1.15, 0, Math.PI, Math.PI * 2);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = INK.line;
+    g.lineWidth = 2.5;
+    g.stroke();
+    // Pale gill ticks at the rim.
+    g.strokeStyle = CLAY.pale;
+    g.lineWidth = 1.5;
+    for (let i = -2; i <= 2; i++) {
+      g.beginPath();
+      g.moveTo(x + lean + i * (r * 0.35), 118 - h - 3);
+      g.lineTo(x + lean + i * (r * 0.4), 118 - h + 2);
+      g.stroke();
+    }
+  }
+  return { canvas: c, aspect: 1 };
+}
+
+/** A small perched bird (~0.4 m incl. its post) — the Commons' regular. */
+export function drawPerchedBird(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 160);
+  // Its fence-post perch.
+  wobblyLine(g, rng, 64, 150, 65, 84, 9, CLAY.deep, 1.3, 4);
+  // Body + head — sage with a clay breast.
+  blob(g, rng, 64, 66, 19, 13, { fill: SAGE.mid, outline: INK.line, lineWidth: 3 }, 9, 0.08);
+  blob(g, rng, 56, 60, 8, 7, { fill: CLAY.blossom }, 7, 0.1);
+  g.fillStyle = SAGE.deep;
+  g.beginPath();
+  g.arc(78, 56, 8, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 2.5;
+  g.stroke();
+  // Beak, eye, tail.
+  g.fillStyle = ROBOT.accent;
+  g.beginPath();
+  g.moveTo(85, 55);
+  g.lineTo(93, 57);
+  g.lineTo(85, 59);
+  g.closePath();
+  g.fill();
+  g.fillStyle = INK.line;
+  g.beginPath();
+  g.arc(80, 54, 1.6, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(48, 64);
+  g.lineTo(36, 56);
+  g.stroke();
+  return { canvas: c, aspect: 128 / 160 };
+}
+
+/** A dragonfly resting on a reed tip (~0.5 m) — the garden's visitor. */
+export function drawDragonfly(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 176);
+  // The reed it rests on.
+  wobblyLine(g, rng, 56, 168, 62, 64, 3.5, SAGE.mid, 1, 4);
+  // Body — a thin water-blue line with a small head.
+  g.save();
+  g.translate(64, 52);
+  g.rotate(0.35);
+  g.strokeStyle = WATER.deep;
+  g.lineWidth = 3.5;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.lineTo(30, 0);
+  g.stroke();
+  g.fillStyle = WATER.deep;
+  g.beginPath();
+  g.arc(-2, 0, 4, 0, Math.PI * 2);
+  g.fill();
+  // Two wing pairs — pale, half-transparent ellipses.
+  g.globalAlpha = 0.55;
+  g.fillStyle = CLAY.pale;
+  for (const [dx, rot] of [
+    [6, -0.9],
+    [6, 0.9],
+    [13, -0.75],
+    [13, 0.75],
+  ] as const) {
+    g.save();
+    g.translate(dx, 0);
+    g.rotate(rot);
+    g.beginPath();
+    g.ellipse(0, -10, 4.5, 12, 0, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  g.globalAlpha = 1;
+  g.restore();
+  return { canvas: c, aspect: 128 / 176 };
+}
+
+/** A sitting squirrel (~0.45 m) — the camp's small tenant. */
+export function drawSquirrel(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 144);
+  // The big curled tail behind.
+  g.strokeStyle = CLAY.mid;
+  g.lineWidth = 13;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(44, 124);
+  g.quadraticCurveTo(20, 96, 34, 64);
+  g.quadraticCurveTo(42, 46, 56, 54);
+  g.stroke();
+  // Body sitting up.
+  blob(g, rng, 70, 102, 19, 24, { fill: CLAY.light, outline: INK.line, lineWidth: 3 }, 9, 0.08);
+  // Head + ear.
+  blob(g, rng, 76, 68, 12, 11, { fill: CLAY.light, outline: INK.line, lineWidth: 3 }, 8, 0.08);
+  g.fillStyle = CLAY.mid;
+  g.beginPath();
+  g.ellipse(70, 56, 4, 6, -0.2, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 1.5;
+  g.stroke();
+  // Eye + nose + paws holding a pinecone.
+  g.fillStyle = INK.line;
+  g.beginPath();
+  g.arc(80, 66, 1.8, 0, Math.PI * 2);
+  g.fill();
+  blob(g, rng, 84, 92, 7, 9, { fill: CLAY.deep, outline: INK.soft, lineWidth: 2 }, 7, 0.1);
+  return { canvas: c, aspect: 128 / 144 };
+}
+
+/** Datou's toy at the Commons (~0.45 m): a patchwork ball the volunteers
+ *  stitched from fence-cloth scraps — one amber patch, of course. */
+export function drawPatchBall(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 128);
+  blob(g, rng, 64, 84, 30, 28, { fill: CLAY.pale, outline: INK.line, lineWidth: 4 }, 10, 0.04);
+  // Stitched seams.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2;
+  g.setLineDash([4, 3]);
+  g.beginPath();
+  g.moveTo(38, 70);
+  g.quadraticCurveTo(64, 84, 90, 70);
+  g.moveTo(40, 100);
+  g.quadraticCurveTo(64, 86, 88, 100);
+  g.stroke();
+  g.setLineDash([]);
+  // Two cloth patches — sage and the amber one.
+  g.save();
+  g.translate(52, 76);
+  g.rotate(-0.3);
+  g.fillStyle = SAGE.mid;
+  g.fillRect(-8, -7, 16, 14);
+  g.restore();
+  g.save();
+  g.translate(76, 92);
+  g.rotate(0.25);
+  g.fillStyle = ROBOT.accent;
+  g.fillRect(-7, -6, 14, 12);
+  g.restore();
+  return { canvas: c, aspect: 1 };
+}
+
+/** Datou's toy at the garden (~0.45 m): a woven reed splash-ring resting at
+ *  the water's edge. */
+export function drawReedRing(seed: number): PropSprite {
+  void seed; // fully authored plate
+  const { c, g } = sprite(128, 112);
+  // A small puddle gleam under it.
+  g.fillStyle = WATER.edge;
+  g.globalAlpha = 0.5;
+  g.beginPath();
+  g.ellipse(64, 92, 38, 9, 0, 0, Math.PI * 2);
+  g.fill();
+  g.globalAlpha = 1;
+  // The woven ring, slightly tilted.
+  g.save();
+  g.translate(64, 72);
+  g.rotate(-0.12);
+  g.strokeStyle = SAGE.deep;
+  g.lineWidth = 11;
+  g.beginPath();
+  g.ellipse(0, 0, 34, 17, 0, 0, Math.PI * 2);
+  g.stroke();
+  g.strokeStyle = SAGE.light;
+  g.lineWidth = 2.5;
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    g.beginPath();
+    g.moveTo(Math.cos(a) * 28, Math.sin(a) * 13);
+    g.lineTo(Math.cos(a + 0.3) * 40, Math.sin(a + 0.3) * 20);
+    g.stroke();
+  }
+  // One blue wrap (the garden's color).
+  g.strokeStyle = WATER.mid;
+  g.lineWidth = 6;
+  g.beginPath();
+  g.ellipse(0, 0, 34, 17, 0, -0.5, 0.4);
+  g.stroke();
+  g.restore();
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2;
+  g.beginPath();
+  g.ellipse(64, 72, 36, 19, -0.12, 0, Math.PI * 2);
+  g.stroke();
+  return { canvas: c, aspect: 128 / 112 };
+}
+
+/** Datou's toy at the camp (~0.7 m): a salvaged signal bell on a stand —
+ *  boop it and it answers. */
+export function drawEchoBell(seed: number): PropSprite {
+  const rng = new Rng(seed);
+  const { c, g } = sprite(128, 208);
+  // Stand.
+  wobblyLine(g, rng, 64, 196, 64, 60, 7, ROBOT.dark, 1.2, 4);
+  blob(g, rng, 64, 196, 26, 8, { fill: ROBOT.darkShade, outline: INK.line, lineWidth: 3 }, 8, 0.08);
+  // Curved hanger arm.
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 5;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(64, 62);
+  g.quadraticCurveTo(92, 52, 98, 74);
+  g.stroke();
+  // The bell — pale metal with a charcoal triangle stamp.
+  g.beginPath();
+  g.moveTo(82, 78);
+  g.quadraticCurveTo(98, 70, 114, 78);
+  g.lineTo(110, 108);
+  g.quadraticCurveTo(98, 116, 86, 108);
+  g.closePath();
+  g.fillStyle = CLAY.pale;
+  g.fill();
+  g.strokeStyle = INK.line;
+  g.lineWidth = 3.5;
+  g.lineJoin = 'round';
+  g.stroke();
+  g.strokeStyle = ROBOT.dark;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(98, 86);
+  g.lineTo(104, 98);
+  g.lineTo(92, 98);
+  g.closePath();
+  g.stroke();
+  // Clapper cord, reachable at Datou height.
+  g.strokeStyle = INK.soft;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(98, 112);
+  g.lineTo(96, 138);
+  g.stroke();
+  blob(g, rng, 96, 144, 6, 6, { fill: CLAY.mid, outline: INK.line, lineWidth: 2.5 }, 7, 0.1);
+  return { canvas: c, aspect: 128 / 208 };
+}

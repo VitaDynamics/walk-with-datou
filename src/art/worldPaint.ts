@@ -73,6 +73,57 @@ export function paintWorld(
   blob(g, rng, px(130), pz(-30), 80 * S, 68 * S, { fill: GROUND.path }, 14, 0.12);
   g.restore();
 
+  // Landmark aprons — each authored area stains the ground around it
+  // (positions match src/world/landmarks.ts). Billboarded plates are edge-on
+  // from the overview camera, so this paint IS the area's long-range
+  // signature, on the big map and the minimap alike.
+  //
+  // A. Trail Repair Commons (126,−28): a swept work-yard with a warm wash —
+  // packed pale earth where volunteers walk, one quiet amber-ochre note.
+  g.save();
+  g.globalAlpha = 0.8;
+  blob(g, rng, px(126), pz(-28), 16 * S, 13 * S, { fill: GROUND.path }, 14, 0.1);
+  g.globalAlpha = 0.16;
+  blob(g, rng, px(127), pz(-28.5), 10 * S, 8 * S, { fill: '#d9a441' }, 12, 0.12);
+  g.restore();
+  // B. Reedwater Pump Garden (14,110): a wet basin spreading from the pump,
+  // with two painted irrigation channels curving toward the lake water.
+  g.save();
+  g.globalAlpha = 0.55;
+  blob(g, rng, px(14), pz(110), 14 * S, 11 * S, { fill: WATER.sand }, 14, 0.1);
+  g.globalAlpha = 0.5;
+  blob(g, rng, px(15), pz(112), 9 * S, 7 * S, { fill: WATER.edge }, 12, 0.12);
+  g.strokeStyle = WATER.edge;
+  g.lineCap = 'round';
+  g.lineWidth = 1.3 * S;
+  g.globalAlpha = 0.8;
+  for (const [sx, sz, mx, mz, ex, ez] of [
+    [14, 108, 10, 113, 9, 119],
+    [14, 108, 18, 113, 21, 118],
+  ] as const) {
+    g.beginPath();
+    g.moveTo(px(sx), pz(sz));
+    g.quadraticCurveTo(px(mx), pz(mz), px(ex), pz(ez));
+    g.stroke();
+  }
+  g.restore();
+  // C. Old Pine Relay Camp (−114,−104): a kept clearing in the woods stain,
+  // its pale triangle ground-mark readable from above.
+  g.save();
+  g.globalAlpha = 0.55;
+  blob(g, rng, px(-114), pz(-104), 12 * S, 10 * S, { fill: GROUND.path }, 12, 0.12);
+  g.globalAlpha = 0.5;
+  g.strokeStyle = '#efe8d6';
+  g.lineWidth = 1.1 * S;
+  g.lineJoin = 'round';
+  g.beginPath();
+  g.moveTo(px(-114), pz(-107.5));
+  g.lineTo(px(-110.8), pz(-101.8));
+  g.lineTo(px(-117.2), pz(-101.8));
+  g.closePath();
+  g.stroke();
+  g.restore();
+
   // Worn paths from home to each zone heart (under the lake/woods features).
   g.strokeStyle = GROUND.path;
   g.lineCap = 'round';
