@@ -1,7 +1,7 @@
 /**
- * The walker's cutout plates — Mei & An from "Main Character Concepts", drawn
- * in the project's hand-drawn ink language (a canvas port of the design tool's
- * parametric figure). Three plates feed the billboarded HumanRig:
+ * Datou's human companions as cutout plates. Their identity comes from how
+ * they attend to him: practical maker clothes, listening faces, field-note
+ * bags, and one shared amber signal motif. Three plates feed the HumanRig:
  *
  *   head  — skin · per-character hair & face · headgear        (bottom-anchored)
  *   torso — outfit top · over-torso bottom · arms · extras     (bottom-anchored)
@@ -38,10 +38,11 @@ export interface TorsoSprite extends PropSprite {
   hand: { u: number; v: number };
 }
 
-// ---- the pen: matches the design's smoothed-line defaults (low wobble) ----
-const PEN: Pen = { ink: INK.line, sw: 2.3, amp: 0.35 };
+// Human plates use clean animation-cel contours. Datou and the world retain
+// their handmade wobble, but the people need stable anatomy and calm linework.
+const PEN: Pen = { ink: INK.line, sw: 1.45, amp: 0 };
 
-const ARM_OUT = 6;
+const ARM_OUT = 8;
 
 /** Resolved figure geometry for one age, in the shared ~210-wide frame. */
 interface Geo {
@@ -84,181 +85,278 @@ function ellipseTip(cx: number, cy: number, r: number): Pt[] {
 //  HEAD PLATE  — skin, hair (per character), face (personality), hat
 // =====================================================================
 
+function signalClip(g: CanvasRenderingContext2D, x: number, y: number, seed: number): void {
+  dot(g, x - 3.5, y + 3.5, 1.8, W.signal);
+  wShape(g, PEN, [[x - 1, y + 3], [x + 1, y], [x - 1, y - 3]], {
+    sw: 2,
+    stroke: W.signal,
+    seed,
+  });
+  wShape(g, PEN, [[x + 3, y + 5], [x + 6, y], [x + 3, y - 5]], {
+    sw: 1.8,
+    stroke: W.signal,
+    seed: seed + 1,
+  });
+}
+
+function faceBase(
+  g: CanvasRenderingContext2D,
+  geo: Geo,
+  skin: string,
+  side: boolean,
+  seed: number,
+): void {
+  const { cx, hcy, m } = geo;
+  const pts: Pt[] = side
+    ? [
+        [cx - m.hrx * 0.92, hcy - m.hry * 0.34],
+        [cx - m.hrx * 0.55, hcy - m.hry * 0.86],
+        [cx + m.hrx * 0.08, hcy - m.hry],
+        [cx + m.hrx * 0.7, hcy - m.hry * 0.66],
+        [cx + m.hrx * 0.9, hcy - m.hry * 0.18],
+        [cx + m.hrx * 1.1, hcy + m.hry * 0.08],
+        [cx + m.hrx * 0.91, hcy + m.hry * 0.28],
+        [cx + m.hrx * 0.72, hcy + m.hry * 0.58],
+        [cx + m.hrx * 0.38, hcy + m.hry * 0.86],
+        [cx - m.hrx * 0.18, hcy + m.hry * 0.92],
+        [cx - m.hrx * 0.72, hcy + m.hry * 0.58],
+        [cx - m.hrx, hcy + m.hry * 0.06],
+      ]
+    : [
+        [cx, hcy - m.hry],
+        [cx + m.hrx * 0.72, hcy - m.hry * 0.8],
+        [cx + m.hrx, hcy - m.hry * 0.2],
+        [cx + m.hrx * 0.9, hcy + m.hry * 0.42],
+        [cx + m.hrx * 0.5, hcy + m.hry * 0.8],
+        [cx, hcy + m.hry * 0.98],
+        [cx - m.hrx * 0.5, hcy + m.hry * 0.8],
+        [cx - m.hrx * 0.9, hcy + m.hry * 0.42],
+        [cx - m.hrx, hcy - m.hry * 0.2],
+        [cx - m.hrx * 0.72, hcy - m.hry * 0.8],
+      ];
+  wShape(g, PEN, pts, { closed: true, step: 7, fill: skin, seed });
+
+  g.save();
+  g.globalAlpha = 0.1;
+  g.fillStyle = '#9a6f5a';
+  g.beginPath();
+  if (side) {
+    g.moveTo(cx - m.hrx * 0.15, hcy + m.hry * 0.78);
+    g.quadraticCurveTo(cx + m.hrx * 0.48, hcy + m.hry * 0.88, cx + m.hrx * 0.72, hcy + m.hry * 0.5);
+    g.lineTo(cx + m.hrx * 0.3, hcy + m.hry * 0.34);
+  } else {
+    g.moveTo(cx, hcy + m.hry * 0.94);
+    g.quadraticCurveTo(cx + m.hrx * 0.72, hcy + m.hry * 0.76, cx + m.hrx * 0.86, hcy + m.hry * 0.3);
+    g.quadraticCurveTo(cx + m.hrx * 0.45, hcy + m.hry * 0.52, cx, hcy + m.hry * 0.48);
+  }
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
+function hairHighlight(g: CanvasRenderingContext2D, pts: Pt[], seed: number): void {
+  g.save();
+  g.globalAlpha = 0.2;
+  wShape(g, PEN, pts, { sw: 1.1, stroke: '#fff7e8', seed });
+  g.restore();
+}
+
+function hairStrand(g: CanvasRenderingContext2D, pts: Pt[], seed: number): void {
+  g.save();
+  g.globalAlpha = 0.58;
+  wShape(g, PEN, pts, { sw: 0.9, stroke: INK.soft, seed });
+  g.restore();
+}
+
+/** Mei's practical asymmetric bob sits behind the face and turns under. */
 function meiHairBehind(g: CanvasRenderingContext2D, geo: Geo, hair: string, seed: number): void {
   const { cx, hcy, m } = geo;
-  const bunR = m.hrx * 0.34;
-  wEllipse(g, PEN, cx - m.hrx * 0.94, hcy - m.hry * 0.7, bunR, bunR, { fill: hair, seed, n: 12 });
-  wEllipse(g, PEN, cx + m.hrx * 0.94, hcy - m.hry * 0.7, bunR, bunR, { fill: hair, seed: seed + 1, n: 12 });
-  bow(g, cx + m.hrx * 0.94, hcy - m.hry * 0.7 + bunR * 0.75, 1, seed + 4);
-}
-
-function bow(g: CanvasRenderingContext2D, x: number, y: number, s: number, seed: number): void {
-  wShape(g, PEN, [[x - 7 * s, y - 4 * s], [x - 1.5 * s, y], [x - 7 * s, y + 4 * s]], {
-    closed: true, step: 6, amp: 0.4, sw: 1.8, fill: W.butter, seed,
-  });
-  wShape(g, PEN, [[x + 7 * s, y - 4 * s], [x + 1.5 * s, y], [x + 7 * s, y + 4 * s]], {
-    closed: true, step: 6, amp: 0.4, sw: 1.8, fill: W.butter, seed: seed + 1,
-  });
-  dot(g, x, y, 2 * s, W.peachD);
-}
-
-function strand(g: CanvasRenderingContext2D, x: number, topY: number, len: number, s: number, hair: string, seed: number): void {
   wShape(g, PEN, [
-    [x, topY], [x + s * 4.5, topY + len * 0.35], [x + s * 3, topY + len * 0.85],
-    [x - s * 1, topY + len], [x - s * 4, topY + len * 0.45],
-  ], { closed: true, step: 7, fill: hair, seed });
+    [cx - m.hrx * 1.04, hcy - m.hry * 0.36],
+    [cx - m.hrx * 0.72, hcy - m.hry * 0.95],
+    [cx, hcy - m.hry * 1.1],
+    [cx + m.hrx * 0.8, hcy - m.hry * 0.82],
+    [cx + m.hrx * 1.05, hcy - m.hry * 0.18],
+    [cx + m.hrx * 0.92, hcy + m.hry * 0.7],
+    [cx + m.hrx * 0.45, hcy + m.hry * 0.92],
+    [cx - m.hrx * 0.68, hcy + m.hry * 0.82],
+    [cx - m.hrx * 1.04, hcy + m.hry * 0.34],
+  ], { closed: true, step: 9, fill: hair, seed });
 }
 
-/** Mei front hair — soft swooped bangs + face-framing strands. */
+/** Mei front hair — side part, clear eyes, one Datou-amber signal clip. */
 function meiHairFront(g: CanvasRenderingContext2D, geo: Geo, hair: string, seed: number): void {
   const { cx, hcy, m } = geo;
-  const by = hcy - m.hry * 0.3;
   const pts: Pt[] = [
-    [cx - m.hrx * 0.99, hcy + m.hry * 0.08], [cx - m.hrx * 0.92, hcy - m.hry * 0.52],
-    [cx - m.hrx * 0.45, hcy - m.hry * 1.0], [cx, hcy - m.hry * 1.08],
-    [cx + m.hrx * 0.45, hcy - m.hry * 1.0], [cx + m.hrx * 0.92, hcy - m.hry * 0.52],
-    [cx + m.hrx * 0.99, hcy + m.hry * 0.08], [cx + m.hrx * 0.66, by + 7],
-    [cx + m.hrx * 0.22, by - 3], [cx - m.hrx * 0.28, by + 6], [cx - m.hrx * 0.72, by + 2],
+    [cx - m.hrx * 1.02, hcy + m.hry * 0.02],
+    [cx - m.hrx * 0.92, hcy - m.hry * 0.55],
+    [cx - m.hrx * 0.42, hcy - m.hry * 1.02],
+    [cx + m.hrx * 0.1, hcy - m.hry * 1.08],
+    [cx + m.hrx * 0.62, hcy - m.hry * 0.92],
+    [cx + m.hrx * 0.96, hcy - m.hry * 0.42],
+    [cx + m.hrx * 0.96, hcy + m.hry * 0.06],
+    [cx + m.hrx * 0.62, hcy - m.hry * 0.18],
+    [cx + m.hrx * 0.22, hcy - m.hry * 0.34],
+    [cx - m.hrx * 0.2, hcy - m.hry * 0.04],
+    [cx - m.hrx * 0.62, hcy + m.hry * 0.1],
   ];
   wShape(g, PEN, pts, { closed: true, step: 9, fill: hair, seed });
-  strand(g, cx - m.hrx * 0.97, hcy - m.hry * 0.05, m.hry * 1.0, -1, hair, seed + 11);
-  strand(g, cx + m.hrx * 0.97, hcy - m.hry * 0.05, m.hry * 1.0, 1, hair, seed + 12);
+  hairHighlight(g, [
+    [cx - m.hrx * 0.42, hcy - m.hry * 0.84],
+    [cx - m.hrx * 0.1, hcy - m.hry * 0.98],
+    [cx + m.hrx * 0.24, hcy - m.hry * 0.9],
+  ], seed + 4);
+  hairStrand(g, [
+    [cx - m.hrx * 0.28, hcy - m.hry * 0.9],
+    [cx - m.hrx * 0.12, hcy - m.hry * 0.58],
+    [cx + m.hrx * 0.02, hcy - m.hry * 0.3],
+  ], seed + 5);
+  signalClip(g, cx - m.hrx * 0.66, hcy - m.hry * 0.52, seed + 11);
 }
 
-/** An front hair — styled fringe, soft pointed pieces sweeping right + a tuft. */
+/** An front hair — soft, slightly unruly waves with a rounded silhouette. */
 function anHairFront(g: CanvasRenderingContext2D, geo: Geo, hair: string, seed: number): void {
   const { cx, hcy, m } = geo;
-  const by = hcy - m.hry * 0.18;
   const pts: Pt[] = [
-    [cx - m.hrx * 1.0, hcy + m.hry * 0.12], [cx - m.hrx * 0.92, hcy - m.hry * 0.55],
-    [cx - m.hrx * 0.42, hcy - m.hry * 1.02], [cx + m.hrx * 0.05, hcy - m.hry * 1.1],
-    [cx + m.hrx * 0.5, hcy - m.hry * 0.98], [cx + m.hrx * 0.94, hcy - m.hry * 0.5],
-    [cx + m.hrx * 1.0, hcy + m.hry * 0.12], [cx + m.hrx * 0.74, by + 5],
-    [cx + m.hrx * 0.52, by - 6], [cx + m.hrx * 0.28, by + 6], [cx + m.hrx * 0.02, by - 6],
-    [cx - m.hrx * 0.26, by + 6], [cx - m.hrx * 0.5, by - 5], [cx - m.hrx * 0.7, by + 4],
+    [cx - m.hrx * 1.02, hcy + m.hry * 0.08],
+    [cx - m.hrx * 0.98, hcy - m.hry * 0.46],
+    [cx - m.hrx * 0.68, hcy - m.hry * 0.86],
+    [cx - m.hrx * 0.26, hcy - m.hry * 1.06],
+    [cx + m.hrx * 0.16, hcy - m.hry * 1.0],
+    [cx + m.hrx * 0.48, hcy - m.hry * 1.08],
+    [cx + m.hrx * 0.82, hcy - m.hry * 0.76],
+    [cx + m.hrx * 1.02, hcy - m.hry * 0.28],
+    [cx + m.hrx * 0.96, hcy + m.hry * 0.08],
+    [cx + m.hrx * 0.66, hcy - m.hry * 0.04],
+    [cx + m.hrx * 0.38, hcy - m.hry * 0.28],
+    [cx + m.hrx * 0.08, hcy - m.hry * 0.08],
+    [cx - m.hrx * 0.22, hcy - m.hry * 0.3],
+    [cx - m.hrx * 0.52, hcy - m.hry * 0.04],
+    [cx - m.hrx * 0.76, hcy + m.hry * 0.06],
   ];
   wShape(g, PEN, pts, { closed: true, step: 8, fill: hair, seed });
-  const tx = cx + m.hrx * 0.12;
-  const ty = hcy - m.hry * 1.1;
-  wShape(g, PEN, [[tx - 4, ty + 4], [tx - 1, ty - 8], [tx + 5, ty + 1]], {
-    closed: true, step: 6, amp: 0.5, sw: 2, fill: hair, seed: seed + 9,
-  });
+  hairHighlight(g, [
+    [cx - m.hrx * 0.48, hcy - m.hry * 0.82],
+    [cx - m.hrx * 0.12, hcy - m.hry * 0.96],
+    [cx + m.hrx * 0.2, hcy - m.hry * 0.88],
+  ], seed + 4);
+  hairStrand(g, [
+    [cx - m.hrx * 0.32, hcy - m.hry * 0.92],
+    [cx - m.hrx * 0.12, hcy - m.hry * 0.66],
+    [cx + m.hrx * 0.04, hcy - m.hry * 0.3],
+  ], seed + 5);
+  hairStrand(g, [
+    [cx + m.hrx * 0.2, hcy - m.hry * 0.9],
+    [cx + m.hrx * 0.35, hcy - m.hry * 0.65],
+    [cx + m.hrx * 0.48, hcy - m.hry * 0.35],
+  ], seed + 6);
 }
 
-function lashes(g: CanvasRenderingContext2D, ex: number, ey: number, s: number, seed: number): void {
-  wShape(g, PEN, [[ex + s * 2.6, ey - 2.6], [ex + s * 5.2, ey - 4.2]], { sw: 1.3, amp: 0.2, seed });
-  wShape(g, PEN, [[ex + s * 3.4, ey - 0.6], [ex + s * 6.2, ey - 1.4]], { sw: 1.3, amp: 0.2, seed: seed + 1 });
-}
-
-/** Front face — Mei: big sparkly lashed eyes + smile. An: relaxed eyes, brows, smirk. */
+/** Both faces look ready to listen; temperament, not gender, differentiates them. */
 function faceFront(g: CanvasRenderingContext2D, geo: Geo, isMei: boolean, seed: number): void {
   const { cx, hcy, m } = geo;
-  const ey = hcy + m.hry * 0.08;
-  const ex = m.hrx * 0.4;
-  const my = hcy + m.hry * 0.46;
-  if (isMei) {
-    dot(g, cx - ex, ey, 3.5, INK.line);
-    dot(g, cx + ex, ey, 3.5, INK.line);
-    dot(g, cx - ex - 1.2, ey - 1.3, 1.2, W.white);
-    dot(g, cx + ex - 1.2, ey - 1.3, 1.2, W.white);
-    dot(g, cx - ex + 1.1, ey + 1.4, 0.6, W.white);
-    dot(g, cx + ex + 1.1, ey + 1.4, 0.6, W.white);
-    lashes(g, cx - ex, ey, -1, seed + 8);
-    lashes(g, cx + ex, ey, 1, seed + 9);
-    wShape(g, PEN, [[cx - ex - 4, ey - 8], [cx - ex, ey - 9.8], [cx - ex + 4, ey - 8]], { sw: 1.2, amp: 0.3, seed });
-    wShape(g, PEN, [[cx + ex - 4, ey - 8], [cx + ex, ey - 9.8], [cx + ex + 4, ey - 8]], { sw: 1.2, amp: 0.3, seed: seed + 1 });
-    wShape(g, PEN, [[cx - 4.5, my], [cx, my + 5.5], [cx + 4.5, my]], {
-      closed: true, step: 5, sw: 1.6, amp: 0.3, fill: '#b0604a', seed: seed + 2,
-    });
-  } else {
-    wShape(g, PEN, [[cx - ex - 4, ey - 1], [cx - ex, ey + 2.6], [cx - ex + 4, ey - 1]], { sw: 2.1, amp: 0.25, seed });
-    wShape(g, PEN, [[cx + ex - 4, ey - 1], [cx + ex, ey + 2.6], [cx + ex + 4, ey - 1]], { sw: 2.1, amp: 0.25, seed: seed + 1 });
-    wShape(g, PEN, [[cx - ex - 4.5, ey - 7.5], [cx - ex + 3, ey - 8.6]], { sw: 1.3, amp: 0.25, seed: seed + 4 });
-    wShape(g, PEN, [[cx + ex - 3, ey - 8.6], [cx + ex + 4.5, ey - 7.5]], { sw: 1.3, amp: 0.25, seed: seed + 5 });
-    wShape(g, PEN, [[cx - 3.5, my + 0.5], [cx + 1, my + 2.6], [cx + 4.5, my]], { sw: 1.9, amp: 0.25, seed: seed + 2 });
+  const ey = hcy + m.hry * 0.02;
+  const ex = m.hrx * 0.38;
+  const my = hcy + m.hry * 0.5;
+  for (const x of [cx - ex, cx + ex]) {
+    g.fillStyle = INK.line;
+    g.beginPath();
+    g.ellipse(x, ey, isMei ? 2.7 : 2.5, isMei ? 4.2 : 3.8, 0, 0, Math.PI * 2);
+    g.fill();
+    dot(g, x - 0.8, ey - 1.5, 0.85, W.white);
+    dot(g, x + 0.65, ey + 1.35, 0.4, W.white, 0.75);
   }
-  dot(g, cx - m.hrx * 0.6, hcy + m.hry * 0.34, m.hrx * 0.13, W.blush, isMei ? 0.5 : 0.38);
-  dot(g, cx + m.hrx * 0.6, hcy + m.hry * 0.34, m.hrx * 0.13, W.blush, isMei ? 0.5 : 0.38);
+  wShape(g, PEN, [[cx - ex - 3.5, ey - 7.8], [cx - ex + 3.2, ey - 8.4]], { sw: 1.05, seed });
+  wShape(g, PEN, [[cx + ex - 3.2, ey - 8.4], [cx + ex + 3.5, ey - 7.8]], { sw: 1.05, seed: seed + 1 });
+  wShape(g, PEN, [[cx - 0.7, hcy + m.hry * 0.25], [cx + 0.4, hcy + m.hry * 0.29]], {
+    sw: 0.9,
+    stroke: INK.soft,
+    seed: seed + 3,
+  });
+  const mouth = isMei
+    ? [[cx - 3.2, my], [cx, my + 2], [cx + 3.2, my]] as Pt[]
+    : [[cx - 3.5, my + 0.3], [cx + 0.2, my + 1.7], [cx + 4, my - 0.2]] as Pt[];
+  wShape(g, PEN, mouth, { sw: 1.2, seed: seed + 2 });
+  dot(g, cx - m.hrx * 0.58, hcy + m.hry * 0.37, m.hrx * 0.12, W.blush, 0.22);
+  dot(g, cx + m.hrx * 0.58, hcy + m.hry * 0.37, m.hrx * 0.12, W.blush, 0.22);
 }
 
-/** Mei profile — the far bun shows at the back of the head, bow underneath. */
-function meiBunSide(g: CanvasRenderingContext2D, geo: Geo, hair: string, seed: number): void {
-  const { cx, hcy, m } = geo;
-  const bunR = m.hrx * 0.36;
-  const bx = cx - m.hrx * 1.0;
-  const by = hcy - m.hry * 0.55;
-  wEllipse(g, PEN, bx, by, bunR, bunR, { fill: hair, seed, n: 12 });
-  bow(g, bx, by + bunR * 0.8, 1, seed + 4);
-}
-
-/** Mei profile hair — swoop from forehead over the crown, tucked at the nape. */
+/** Mei profile hair — a tucked bob, longer at the cheek than the nape. */
 function meiHairSide(g: CanvasRenderingContext2D, geo: Geo, hair: string, seed: number): void {
   const { cx, hcy, m } = geo;
   const pts: Pt[] = [
-    [cx + m.hrx * 0.95, hcy - m.hry * 0.42],
-    [cx + m.hrx * 0.55, hcy - m.hry * 0.97],
-    [cx - m.hrx * 0.05, hcy - m.hry * 1.08],
-    [cx - m.hrx * 0.68, hcy - m.hry * 0.88],
-    [cx - m.hrx * 1.06, hcy - m.hry * 0.3],
-    [cx - m.hrx * 1.0, hcy + m.hry * 0.48],
-    [cx - m.hrx * 0.6, hcy + m.hry * 0.52],
-    [cx - m.hrx * 0.48, hcy - m.hry * 0.1],
-    [cx - m.hrx * 0.05, hcy - m.hry * 0.3],
-    [cx + m.hrx * 0.42, hcy - m.hry * 0.18],
+    [cx + m.hrx * 0.94, hcy - m.hry * 0.38],
+    [cx + m.hrx * 0.55, hcy - m.hry * 0.96],
+    [cx - m.hrx * 0.08, hcy - m.hry * 1.08],
+    [cx - m.hrx * 0.72, hcy - m.hry * 0.84],
+    [cx - m.hrx * 1.04, hcy - m.hry * 0.22],
+    [cx - m.hrx * 0.96, hcy + m.hry * 0.65],
+    [cx - m.hrx * 0.4, hcy + m.hry * 0.82],
+    [cx - m.hrx * 0.28, hcy + m.hry * 0.12],
+    [cx + m.hrx * 0.2, hcy - m.hry * 0.28],
+    [cx + m.hrx * 0.62, hcy - m.hry * 0.12],
   ];
   wShape(g, PEN, pts, { closed: true, step: 9, fill: hair, seed });
+  hairHighlight(g, [
+    [cx - m.hrx * 0.24, hcy - m.hry * 0.9],
+    [cx + m.hrx * 0.18, hcy - m.hry * 0.92],
+    [cx + m.hrx * 0.48, hcy - m.hry * 0.72],
+  ], seed + 4);
+  hairStrand(g, [
+    [cx + m.hrx * 0.1, hcy - m.hry * 0.88],
+    [cx + m.hrx * 0.3, hcy - m.hry * 0.58],
+    [cx + m.hrx * 0.44, hcy - m.hry * 0.3],
+  ], seed + 5);
+  signalClip(g, cx + m.hrx * 0.3, hcy - m.hry * 0.58, seed + 11);
 }
 
-/** An profile hair — fringe sweeping forward over the brow, short at the nape. */
+/** An profile hair — soft waves with a little volume at crown and nape. */
 function anHairSide(g: CanvasRenderingContext2D, geo: Geo, hair: string, seed: number): void {
   const { cx, hcy, m } = geo;
   const pts: Pt[] = [
-    [cx + m.hrx * 1.0, hcy - m.hry * 0.24],
-    [cx + m.hrx * 0.7, hcy - m.hry * 0.85],
-    [cx + m.hrx * 0.1, hcy - m.hry * 1.1],
-    [cx - m.hrx * 0.6, hcy - m.hry * 0.92],
-    [cx - m.hrx * 1.04, hcy - m.hry * 0.28],
+    [cx + m.hrx * 1.0, hcy - m.hry * 0.2],
+    [cx + m.hrx * 0.76, hcy - m.hry * 0.76],
+    [cx + m.hrx * 0.32, hcy - m.hry * 1.02],
+    [cx - m.hrx * 0.18, hcy - m.hry * 1.08],
+    [cx - m.hrx * 0.7, hcy - m.hry * 0.78],
+    [cx - m.hrx * 1.02, hcy - m.hry * 0.24],
     [cx - m.hrx * 0.96, hcy + m.hry * 0.38],
-    [cx - m.hrx * 0.55, hcy + m.hry * 0.2],
-    [cx - m.hrx * 0.3, hcy - m.hry * 0.28],
-    [cx + m.hrx * 0.05, hcy - m.hry * 0.45],
-    [cx + m.hrx * 0.32, hcy - m.hry * 0.18],
-    [cx + m.hrx * 0.62, hcy - m.hry * 0.5],
+    [cx - m.hrx * 0.62, hcy + m.hry * 0.32],
+    [cx - m.hrx * 0.34, hcy - m.hry * 0.18],
+    [cx + m.hrx * 0.04, hcy - m.hry * 0.38],
+    [cx + m.hrx * 0.42, hcy - m.hry * 0.12],
+    [cx + m.hrx * 0.68, hcy - m.hry * 0.38],
   ];
   wShape(g, PEN, pts, { closed: true, step: 8, fill: hair, seed });
-  const tx = cx + m.hrx * 0.05;
-  const ty = hcy - m.hry * 1.1;
-  wShape(g, PEN, [[tx - 4, ty + 4], [tx - 1, ty - 8], [tx + 5, ty + 1]], {
-    closed: true, step: 6, amp: 0.5, sw: 2, fill: hair, seed: seed + 9,
-  });
+  hairHighlight(g, [
+    [cx - m.hrx * 0.22, hcy - m.hry * 0.92],
+    [cx + m.hrx * 0.18, hcy - m.hry * 0.9],
+    [cx + m.hrx * 0.48, hcy - m.hry * 0.68],
+  ], seed + 4);
+  hairStrand(g, [
+    [cx + m.hrx * 0.04, hcy - m.hry * 0.9],
+    [cx + m.hrx * 0.24, hcy - m.hry * 0.6],
+    [cx + m.hrx * 0.38, hcy - m.hry * 0.34],
+  ], seed + 5);
 }
 
-/** Profile face — one eye, soft nose bump on the leading edge, single blush. */
-function faceSide(g: CanvasRenderingContext2D, geo: Geo, isMei: boolean, skin: string, seed: number): void {
+/** Profile face — one readable anime eye and a restrained expression. */
+function faceSide(g: CanvasRenderingContext2D, geo: Geo, isMei: boolean, seed: number): void {
   const { cx, hcy, m } = geo;
-  const ey = hcy + m.hry * 0.08;
+  const ey = hcy + m.hry * 0.02;
   const ex = cx + m.hrx * 0.52;
-  const my = hcy + m.hry * 0.48;
-  const nx = cx + m.hrx * 1.0;
-  const ny = hcy + m.hry * 0.18;
-  wShape(g, PEN, [[nx - 2, ny - 4], [nx + 3.4, ny - 0.5], [nx - 1.5, ny + 3]], {
-    closed: true, step: 4, amp: 0.3, sw: 1.8, fill: skin, seed: seed + 6,
-  });
-  if (isMei) {
-    dot(g, ex, ey, 3.5, INK.line);
-    dot(g, ex - 1.2, ey - 1.3, 1.2, W.white);
-    dot(g, ex + 1.1, ey + 1.4, 0.6, W.white);
-    lashes(g, ex, ey, 1, seed + 8);
-    wShape(g, PEN, [[ex - 4, ey - 8], [ex, ey - 9.8], [ex + 4, ey - 8]], { sw: 1.2, amp: 0.3, seed });
-    wShape(g, PEN, [[cx + m.hrx * 0.55, my], [cx + m.hrx * 0.72, my + 3.2], [cx + m.hrx * 0.88, my + 0.8]], {
-      sw: 1.6, amp: 0.3, seed: seed + 2,
-    });
-  } else {
-    wShape(g, PEN, [[ex - 4, ey - 1], [ex, ey + 2.6], [ex + 4, ey - 1]], { sw: 2.1, amp: 0.25, seed });
-    wShape(g, PEN, [[ex - 4.5, ey - 7.5], [ex + 3, ey - 8.6]], { sw: 1.3, amp: 0.25, seed: seed + 4 });
-    wShape(g, PEN, [[cx + m.hrx * 0.58, my + 1.5], [cx + m.hrx * 0.84, my + 0.2]], { sw: 1.9, amp: 0.25, seed: seed + 2 });
-  }
-  dot(g, cx + m.hrx * 0.3, hcy + m.hry * 0.34, m.hrx * 0.13, W.blush, isMei ? 0.5 : 0.38);
+  const my = hcy + m.hry * 0.5;
+  g.fillStyle = INK.line;
+  g.beginPath();
+  g.ellipse(ex, ey, isMei ? 2.7 : 2.5, isMei ? 4.2 : 3.8, 0, 0, Math.PI * 2);
+  g.fill();
+  dot(g, ex - 0.7, ey - 1.4, 0.8, W.white);
+  wShape(g, PEN, [[ex - 3.5, ey - 7.8], [ex + 3, ey - 8.3]], { sw: 1.05, seed });
+  const mouth = isMei
+    ? [[cx + m.hrx * 0.6, my], [cx + m.hrx * 0.75, my + 1.8], [cx + m.hrx * 0.88, my + 0.2]] as Pt[]
+    : [[cx + m.hrx * 0.61, my + 0.6], [cx + m.hrx * 0.76, my + 1.4], [cx + m.hrx * 0.9, my - 0.1]] as Pt[];
+  wShape(g, PEN, mouth, { sw: 1.15, seed: seed + 2 });
+  dot(g, cx + m.hrx * 0.34, hcy + m.hry * 0.37, m.hrx * 0.12, W.blush, 0.22);
 }
 
 function pawPatch(g: CanvasRenderingContext2D, x: number, y: number, s = 1): void {
@@ -293,7 +391,7 @@ function headgear(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: number,
       [cx - m.hrx * 0.72, by - 2], [cx - m.hrx * 0.55, hcy - m.hry * 1.26],
       [cx, hcy - m.hry * 1.38], [cx + m.hrx * 0.55, hcy - m.hry * 1.26], [cx + m.hrx * 0.72, by - 2],
     ], { closed: true, step: 8, fill: W.straw, seed: seed + 2 });
-    wShape(g, PEN, [[cx - m.hrx * 0.68, by - 5], [cx + m.hrx * 0.68, by - 5]], { sw: 4, amp: 0.5, stroke: band, seed: seed + 3 });
+    wShape(g, PEN, [[cx - m.hrx * 0.68, by - 5], [cx + m.hrx * 0.68, by - 5]], { sw: 3, stroke: band, seed: seed + 3 });
   }
   if (fit.extras.includes('nightcap')) {
     const col = ec.hat ?? W.butter;
@@ -313,11 +411,11 @@ function headgear(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: number,
     if (side) {
       const mx = cx + m.hrx * 0.45;
       const my = hcy - m.hry * 0.72;
-      wShape(g, PEN, [[mx - 6, my + 5], [cx - m.hrx * 0.95, my + 9]], { sw: 2.2, amp: 0.5, stroke: INK.line, seed: seed + 6 });
+      wShape(g, PEN, [[mx - 6, my + 5], [cx - m.hrx * 0.95, my + 9]], { sw: 1.4, stroke: INK.line, seed: seed + 6 });
       wShape(g, PEN, [[mx - 10, my - 5], [mx + 10, my - 5], [mx + 12, my + 4], [mx - 12, my + 4]], {
         closed: true, step: 6, fill: col, seed: seed + 5,
       });
-      wShape(g, PEN, [[mx - 5, my], [mx - 1, my + 1.5], [mx + 3, my]], { sw: 1.4, amp: 0.3, seed: seed + 7 });
+      wShape(g, PEN, [[mx - 5, my], [mx - 1, my + 1.5], [mx + 3, my]], { sw: 1.1, seed: seed + 7 });
     } else {
       const mx = cx - m.hrx * 0.42;
       const my = hcy - m.hry * 0.72;
@@ -325,11 +423,11 @@ function headgear(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: number,
       g.translate(mx, my);
       g.rotate((-14 * Math.PI) / 180);
       g.translate(-mx, -my);
-      wShape(g, PEN, [[mx - 8, my + 6], [cx + m.hrx * 0.9, my + 2]], { sw: 2.2, amp: 0.5, stroke: INK.line, seed: seed + 6 });
+      wShape(g, PEN, [[mx - 8, my + 6], [cx + m.hrx * 0.9, my + 2]], { sw: 1.4, stroke: INK.line, seed: seed + 6 });
       wShape(g, PEN, [[mx - 10, my - 5], [mx + 10, my - 5], [mx + 12, my + 4], [mx - 12, my + 4]], {
         closed: true, step: 6, fill: col, seed: seed + 5,
       });
-      wShape(g, PEN, [[mx - 5, my], [mx - 1, my + 1.5], [mx + 3, my]], { sw: 1.4, amp: 0.3, seed: seed + 7 });
+      wShape(g, PEN, [[mx - 5, my], [mx - 1, my + 1.5], [mx + 3, my]], { sw: 1.1, seed: seed + 7 });
       g.restore();
     }
   }
@@ -362,22 +460,26 @@ export function drawWalkerHead(char: CharId, dir: DirId, age: AgeId, view: ViewI
   g.scale(scale, scale);
   g.translate(-(cx - figW / 2), -(top - pad));
 
-  const nW = m.hrx * 0.34;
+  const nW = m.hrx * 0.3;
   const nCx = side ? cx - m.hrx * 0.06 : cx;
   wShape(g, PEN, [
-    [nCx - nW, hcy + m.hry * 0.7], [nCx + nW, hcy + m.hry * 0.7],
+    [nCx - nW * 0.72, hcy + m.hry * 0.72], [nCx + nW * 0.72, hcy + m.hry * 0.72],
     [nCx + nW, neckBot], [nCx - nW, neckBot],
   ], { closed: true, step: 8, fill: ch.skin, seed: seed + 30 });
+  g.save();
+  g.globalAlpha = 0.12;
+  g.fillStyle = '#8f6754';
+  g.fillRect(nCx - nW * 0.72, hcy + m.hry * 0.72, nW * 1.44, 3);
+  g.restore();
 
   if (side) {
-    if (isMei) meiBunSide(g, geo, ch.hair, seed + 70);
-    wEllipse(g, PEN, cx, hcy, m.hrx * 1.04, m.hry, { fill: ch.skin, seed, n: 16 });
+    faceBase(g, geo, ch.skin, true, seed);
     if (isMei) meiHairSide(g, geo, ch.hair, seed + 7);
     else anHairSide(g, geo, ch.hair, seed + 7);
-    faceSide(g, geo, isMei, ch.skin, seed + 20);
+    faceSide(g, geo, isMei, seed + 20);
   } else {
     if (isMei) meiHairBehind(g, geo, ch.hair, seed + 70);
-    wEllipse(g, PEN, cx, hcy, m.hrx, m.hry, { fill: ch.skin, seed, n: 16 });
+    faceBase(g, geo, ch.skin, false, seed);
     if (isMei) meiHairFront(g, geo, ch.hair, seed + 7);
     else anHairFront(g, geo, ch.hair, seed + 7);
     faceFront(g, geo, isMei, seed + 20);
@@ -425,6 +527,37 @@ function clipToShape(g: CanvasRenderingContext2D, pts: Pt[], seed: number): void
   g.clip();
 }
 
+function shadeGarment(
+  g: CanvasRenderingContext2D,
+  pts: Pt[],
+  cx: number,
+  top: number,
+  bottom: number,
+  seed: number,
+  side = false,
+): void {
+  g.save();
+  clipToShape(g, pts, seed);
+  g.globalAlpha = 0.09;
+  g.fillStyle = INK.line;
+  g.beginPath();
+  if (side) {
+    g.moveTo(cx - 2, top);
+    g.lineTo(cx + 42, top);
+    g.lineTo(cx + 42, bottom);
+    g.lineTo(cx + 7, bottom);
+  } else {
+    g.moveTo(cx + 6, top);
+    g.lineTo(cx + 70, top);
+    g.lineTo(cx + 70, bottom);
+    g.lineTo(cx + 13, bottom);
+    g.quadraticCurveTo(cx + 5, (top + bottom) / 2, cx + 6, top);
+  }
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
 function drawTorsoTop(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, isMei: boolean, seed: number): void {
   const { cx, torsoTop: t } = geo;
   const top = fit.top;
@@ -432,37 +565,54 @@ function drawTorsoTop(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, isMei: bo
   const { topW, botW } = torsoWidths(geo, top);
   const pts = torsoBasePts(geo, hem, topW, botW, isMei);
   wShape(g, PEN, pts, { closed: true, step: 12, fill: top.color, seed });
+  shadeGarment(g, pts, cx, t, hem, seed);
 
   if (top.stripes) {
     g.save();
     clipToShape(g, pts, seed);
     for (let y = t + 6; y < hem; y += 9) {
-      wShape(g, PEN, [[cx - 70, y], [cx + 70, y + 1]], { amp: 1, step: 14, sw: 3.5, stroke: top.stripes, seed: seed + y });
+      wShape(g, PEN, [[cx - 70, y], [cx + 70, y]], { step: 14, sw: 2.4, stroke: top.stripes, seed: seed + y });
     }
     g.restore();
   }
   if (top.type === 'tee') {
-    wShape(g, PEN, [[cx - 7, t + 2], [cx, t + 6.5], [cx + 7, t + 2]], { sw: PEN.sw * 0.8, amp: 0.5, seed: seed + 2 });
+    wShape(g, PEN, [[cx - 7, t + 2], [cx, t + 6.5], [cx + 7, t + 2]], { sw: PEN.sw * 0.8, seed: seed + 2 });
+  } else if (top.type === 'overshirt') {
+    const under = top.underColor ?? W.cream;
+    wShape(g, PEN, [[cx - 9, t + 2], [cx, t + 12], [cx + 9, t + 2]], {
+      closed: true, step: 6, sw: 1.2, fill: under, seed: seed + 2,
+    });
+    wShape(g, PEN, [[cx - 12, t + 2], [cx - 2, t + 13], [cx, hem - 5]], {
+      sw: 1.15, seed: seed + 3,
+    });
+    wShape(g, PEN, [[cx + 12, t + 2], [cx + 2, t + 13], [cx, hem - 5]], {
+      sw: 1.15, seed: seed + 4,
+    });
+    wShape(g, PEN, [
+      [cx + topW * 0.08, t + 17], [cx + topW * 0.32, t + 17],
+      [cx + topW * 0.32, t + 28], [cx + topW * 0.08, t + 28],
+    ], { closed: true, step: 5, sw: 1.1, fill: top.color, seed: seed + 5 });
+    dot(g, cx, t + (hem - t) * 0.62, 1.7, W.signal);
   } else if (top.type === 'pjTop') {
-    wShape(g, PEN, [[cx - 8, t + 1], [cx, t + 9]], { sw: PEN.sw * 0.7, amp: 0.5, seed: seed + 2 });
-    wShape(g, PEN, [[cx + 8, t + 1], [cx, t + 9]], { sw: PEN.sw * 0.7, amp: 0.5, seed: seed + 3 });
+    wShape(g, PEN, [[cx - 8, t + 1], [cx, t + 9]], { sw: PEN.sw * 0.7, seed: seed + 2 });
+    wShape(g, PEN, [[cx + 8, t + 1], [cx, t + 9]], { sw: PEN.sw * 0.7, seed: seed + 3 });
     for (const f of [0.28, 0.5, 0.72]) {
       const cy = t + (hem - t) * f;
       dot(g, cx, cy, 2.2, W.cream);
       wShape(g, PEN, ellipseTip(cx, cy, 2.2), { closed: true, step: 6, sw: 1.4, stroke: INK.line, seed: seed + 40 });
     }
   } else if (top.type === 'raincoat') {
-    wShape(g, PEN, [[cx, t + 8], [cx, hem - 4]], { sw: PEN.sw * 0.7, amp: 0.8, seed: seed + 2 });
+    wShape(g, PEN, [[cx, t + 8], [cx, hem - 4]], { sw: PEN.sw * 0.7, seed: seed + 2 });
     for (let i = 0; i < 2; i++) {
       const f = [0.3, 0.55][i];
       wShape(g, PEN, [
         [cx - 7, t + (hem - t) * f - 2], [cx - 1, t + (hem - t) * f - 2],
         [cx - 1, t + (hem - t) * f + 2], [cx - 7, t + (hem - t) * f + 2],
-      ], { closed: true, sw: 1.6, amp: 0.4, step: 5, fill: W.cream, seed: seed + 6 + i });
+      ], { closed: true, sw: 1.1, step: 5, fill: W.cream, seed: seed + 6 + i });
     }
-    wShape(g, PEN, [[cx + botW / 2 - 16, hem - 16], [cx + botW / 2 - 6, hem - 15]], { sw: PEN.sw * 0.8, amp: 0.5, seed: seed + 9 });
+    wShape(g, PEN, [[cx + botW / 2 - 16, hem - 16], [cx + botW / 2 - 6, hem - 15]], { sw: PEN.sw * 0.8, seed: seed + 9 });
   } else if (top.type === 'dress' && !top.stripes) {
-    wShape(g, PEN, [[cx - botW / 2 + 6, hem - 5], [cx + botW / 2 - 6, hem - 5]], { sw: 1.4, amp: 0.8, seed: seed + 4 });
+    wShape(g, PEN, [[cx - botW / 2 + 6, hem - 5], [cx + botW / 2 - 6, hem - 5]], { sw: 1.1, seed: seed + 4 });
   }
 }
 
@@ -474,8 +624,8 @@ function bottomFB(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: number)
   const bw = m.shW * 0.24;
   const blockTop = hipY - m.torsoH * 0.24;
   const strap = (sx: number): void => {
-    wShape(g, PEN, [[cx + sx * (m.shW / 2 - 7), t + 5], [cx + sx * bw, blockTop - 14]], { sw: 7, amp: 0.6, stroke: INK.line, seed: seed + sx * 3 + 10 });
-    wShape(g, PEN, [[cx + sx * (m.shW / 2 - 7), t + 5], [cx + sx * bw, blockTop - 14]], { sw: 4.5, amp: 0.6, stroke: col, seed: seed + sx * 3 + 10 });
+    wShape(g, PEN, [[cx + sx * (m.shW / 2 - 7), t + 5], [cx + sx * bw, blockTop - 14]], { sw: 4.6, stroke: INK.line, seed: seed + sx * 3 + 10 });
+    wShape(g, PEN, [[cx + sx * (m.shW / 2 - 7), t + 5], [cx + sx * bw, blockTop - 14]], { sw: 3, stroke: col, seed: seed + sx * 3 + 10 });
   };
   if (b.type === 'shorts' || b.type === 'overallShorts') {
     const isOverall = b.type === 'overallShorts';
@@ -509,10 +659,10 @@ function bottomFB(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: number)
   } else if (b.type === 'pinafore') {
     const waist = t + m.torsoH * 0.42;
     const hem = hipY + 14;
-    wShape(g, PEN, [[cx - (m.shW / 2 - 7), t + 5], [cx - bw, waist - 6]], { sw: 7, amp: 0.6, stroke: INK.line, seed: seed + 7 });
-    wShape(g, PEN, [[cx - (m.shW / 2 - 7), t + 5], [cx - bw, waist - 6]], { sw: 4.5, amp: 0.6, stroke: col, seed: seed + 7 });
-    wShape(g, PEN, [[cx + (m.shW / 2 - 7), t + 5], [cx + bw, waist - 6]], { sw: 7, amp: 0.6, stroke: INK.line, seed: seed + 13 });
-    wShape(g, PEN, [[cx + (m.shW / 2 - 7), t + 5], [cx + bw, waist - 6]], { sw: 4.5, amp: 0.6, stroke: col, seed: seed + 13 });
+    wShape(g, PEN, [[cx - (m.shW / 2 - 7), t + 5], [cx - bw, waist - 6]], { sw: 4.6, stroke: INK.line, seed: seed + 7 });
+    wShape(g, PEN, [[cx - (m.shW / 2 - 7), t + 5], [cx - bw, waist - 6]], { sw: 3, stroke: col, seed: seed + 7 });
+    wShape(g, PEN, [[cx + (m.shW / 2 - 7), t + 5], [cx + bw, waist - 6]], { sw: 4.6, stroke: INK.line, seed: seed + 13 });
+    wShape(g, PEN, [[cx + (m.shW / 2 - 7), t + 5], [cx + bw, waist - 6]], { sw: 3, stroke: col, seed: seed + 13 });
     wShape(g, PEN, [
       [cx - m.shW * 0.3, waist], [cx + m.shW * 0.3, waist], [cx + m.hipW * 0.78 + 6, hem - 4],
       [cx + m.hipW * 0.7, hem], [cx, hem + 2], [cx - m.hipW * 0.7, hem], [cx - m.hipW * 0.78 - 6, hem - 4],
@@ -523,35 +673,45 @@ function bottomFB(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: number)
   }
 }
 
-/** Both arms (front view). Long sleeves take the top colour; short = skin. */
-function arms(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, skin: string, seed: number): void {
+function frontArmPoints(geo: Geo, side: -1 | 1): Pt[] {
+  const { cx, torsoTop, m } = geo;
+  const shY = torsoTop + 10;
+  const shX = m.shW / 2 - 2;
+  return [
+    [cx + side * shX, shY],
+    [cx + side * (shX + ARM_OUT), shY + m.armL * 0.5],
+    [cx + side * (shX + ARM_OUT * 0.35), shY + m.armL],
+  ];
+}
+
+/** Both arms (front view), with a quiet elbow bend instead of tube limbs. */
+function arms(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, skin: string, seed: number): Pt {
   const { cx, torsoTop, m } = geo;
   const long = fit.top.sleeves === 'long';
   const armColor = long ? fit.top.color : skin;
   const shY = torsoTop + 9;
-  const shX = m.shW / 2 - 2;
-  for (const s of [-1, 1]) {
-    const pts: Pt[] = [
-      [cx + s * shX, shY],
-      [cx + s * (shX + ARM_OUT * 0.75), shY + m.armL * 0.55],
-      [cx + s * (shX + ARM_OUT * 0.55), shY + m.armL],
-    ];
+  let leashHand: Pt = [cx, shY + m.armL];
+  for (const s of [-1, 1] as const) {
+    const pts = frontArmPoints(geo, s);
     limb(g, PEN, pts, m.limbW, armColor, seed + (s + 1) * 11);
-    wEllipse(g, PEN, pts[2][0], pts[2][1] + 2, m.limbW * 0.62 + 1, m.limbW * 0.62 + 1, { fill: skin, seed: seed + 40 + s, n: 10 });
+    wEllipse(g, PEN, pts[2][0], pts[2][1] + 1.5, m.limbW * 0.54 + 0.8, m.limbW * 0.66 + 0.8, { fill: skin, seed: seed + 40 + s, n: 12 });
     if (!long) {
-      wEllipse(g, PEN, pts[0][0], shY + 4, m.limbW * 0.95, m.limbW * 1.2, { fill: fit.top.color, seed: seed + 50 + s, n: 10 });
+      wEllipse(g, PEN, pts[0][0], shY + 3, m.limbW * 0.85, m.limbW, { fill: fit.top.color, seed: seed + 50 + s, n: 12 });
     }
+    if (s === 1) leashHand = [pts[2][0], pts[2][1] + 1.5];
   }
+  return leashHand;
 }
 
-function boneClasp(g: CanvasRenderingContext2D, x: number, y: number): void {
-  g.fillStyle = W.cream;
-  for (const [dx, dy] of [[-3.4, -1.2], [-3.4, 1.2], [3.4, -1.2], [3.4, 1.2]] as const) {
-    g.beginPath();
-    g.arc(x + dx, y + dy, 1.7, 0, Math.PI * 2);
-    g.fill();
-  }
-  g.fillRect(x - 3.4, y - 1.6, 6.8, 3.2);
+function signalClasp(g: CanvasRenderingContext2D, x: number, y: number, seed: number): void {
+  dot(g, x, y, 2.4, W.signal);
+  wShape(g, PEN, ellipseTip(x, y, 3.5), {
+    closed: true,
+    step: 6,
+    sw: 1.2,
+    stroke: INK.line,
+    seed,
+  });
 }
 
 function cape(g: CanvasRenderingContext2D, geo: Geo, color: string, seed: number): void {
@@ -573,13 +733,13 @@ function extraOverTorso(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: n
   const ec = fit.extraColors ?? {};
   if (fit.extras.includes('satchel')) {
     const col = ec.satchel ?? W.sageD;
-    wShape(g, PEN, [[cx - (m.shW / 2 - 6), t + 4], [cx + (m.hipW / 2 + 2), hipY - 10]], { sw: 4, amp: 0.6, stroke: col, seed });
+    wShape(g, PEN, [[cx - (m.shW / 2 - 6), t + 4], [cx + (m.hipW / 2 + 2), hipY - 10]], { sw: 2.6, stroke: col, seed });
     wShape(g, PEN, [
       [cx + (m.hipW / 2 - 8), hipY - 12], [cx + (m.hipW / 2 + 14), hipY - 12],
       [cx + (m.hipW / 2 + 15), hipY + 6], [cx + (m.hipW / 2 - 9), hipY + 6],
     ], { closed: true, step: 7, fill: col, seed: seed + 1 });
-    wShape(g, PEN, [[cx + (m.hipW / 2 - 9), hipY - 4], [cx + (m.hipW / 2 + 14), hipY - 4]], { sw: 1.6, amp: 0.5, seed: seed + 2 });
-    boneClasp(g, cx + m.hipW / 2 + 3, hipY + 1);
+    wShape(g, PEN, [[cx + (m.hipW / 2 - 9), hipY - 4], [cx + (m.hipW / 2 + 14), hipY - 4]], { sw: 1.1, seed: seed + 2 });
+    signalClasp(g, cx + m.hipW / 2 + 3, hipY + 1, seed + 3);
   }
   if (fit.extras.includes('neckerchief')) {
     const col = ec.scarf ?? W.peach;
@@ -609,19 +769,32 @@ function drawTorsoTopSide(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, isMei
   const { topW, botW } = sideWidths(geo, top);
   const pts = torsoBasePts(geo, hem, topW, botW, isMei);
   wShape(g, PEN, pts, { closed: true, step: 12, fill: top.color, seed });
+  shadeGarment(g, pts, cx, t, hem, seed, true);
 
   if (top.stripes) {
     g.save();
     clipToShape(g, pts, seed);
     for (let y = t + 6; y < hem; y += 9) {
-      wShape(g, PEN, [[cx - 70, y], [cx + 70, y + 1]], { amp: 1, step: 14, sw: 3.5, stroke: top.stripes, seed: seed + y });
+      wShape(g, PEN, [[cx - 70, y], [cx + 70, y]], { step: 14, sw: 2.4, stroke: top.stripes, seed: seed + y });
     }
     g.restore();
   }
   // The garment's leading edge, interpolated shoulder→hem.
   const frontX = (y: number): number =>
     cx + topW / 2 + ((botW - topW) / 2) * ((y - t) / (hem - t));
-  if (top.type === 'pjTop') {
+  if (top.type === 'overshirt') {
+    const under = top.underColor ?? W.cream;
+    wShape(g, PEN, [
+      [frontX(t + 3) - 13, t + 3], [frontX(t + 12) - 6, t + 12],
+      [frontX(t + 22) - 12, t + 22],
+    ], { closed: true, step: 6, sw: 1.1, fill: under, seed: seed + 2 });
+    wShape(g, PEN, [
+      [frontX(t + 3) - 13, t + 3],
+      [frontX(t + 14) - 5, t + 14],
+      [frontX(hem - 5) - 5, hem - 5],
+    ], { sw: 1.1, seed: seed + 3 });
+    dot(g, frontX(t + (hem - t) * 0.62) - 5, t + (hem - t) * 0.62, 1.7, W.signal);
+  } else if (top.type === 'pjTop') {
     for (const f of [0.28, 0.5, 0.72]) {
       const cy = t + (hem - t) * f;
       const bx = frontX(cy) - 5;
@@ -629,10 +802,10 @@ function drawTorsoTopSide(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, isMei
       wShape(g, PEN, ellipseTip(bx, cy, 2.2), { closed: true, step: 6, sw: 1.4, stroke: INK.line, seed: seed + 40 });
     }
   } else if (top.type === 'raincoat') {
-    wShape(g, PEN, [[frontX(t + 8) - 3, t + 8], [frontX(hem - 4) - 4, hem - 4]], { sw: PEN.sw * 0.7, amp: 0.8, seed: seed + 2 });
-    wShape(g, PEN, [[cx - botW / 2 + 5, hem - 16], [cx - botW / 2 + 14, hem - 15]], { sw: PEN.sw * 0.8, amp: 0.5, seed: seed + 9 });
+    wShape(g, PEN, [[frontX(t + 8) - 3, t + 8], [frontX(hem - 4) - 4, hem - 4]], { sw: PEN.sw * 0.7, seed: seed + 2 });
+    wShape(g, PEN, [[cx - botW / 2 + 5, hem - 16], [cx - botW / 2 + 14, hem - 15]], { sw: PEN.sw * 0.8, seed: seed + 9 });
   } else if (top.type === 'dress' && !top.stripes) {
-    wShape(g, PEN, [[cx - botW / 2 + 5, hem - 5], [cx + botW / 2 - 5, hem - 5]], { sw: 1.4, amp: 0.8, seed: seed + 4 });
+    wShape(g, PEN, [[cx - botW / 2 + 5, hem - 5], [cx + botW / 2 - 5, hem - 5]], { sw: 1.1, seed: seed + 4 });
   }
 }
 
@@ -646,8 +819,8 @@ function bottomFBSide(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: num
   const blockTop = hipY - m.torsoH * 0.24;
   const strapSide = (bibX: number, bibY: number): void => {
     const pts: Pt[] = [[bibX, bibY], [cx + 2, t + 3], [cx - m.shW * 0.24, bibY + 6]];
-    wShape(g, PEN, pts, { sw: 7, amp: 0.6, stroke: INK.line, seed: seed + 10 });
-    wShape(g, PEN, pts, { sw: 4.5, amp: 0.6, stroke: col, seed: seed + 10 });
+    wShape(g, PEN, pts, { sw: 4.6, stroke: INK.line, seed: seed + 10 });
+    wShape(g, PEN, pts, { sw: 3, stroke: col, seed: seed + 10 });
   };
   const bib = (bibTop: number): void => {
     wShape(g, PEN, [[cx - bw, bibTop], [cx + bw, bibTop], [cx + bw + 1, bibTop + 18], [cx - bw - 1, bibTop + 18]], {
@@ -684,15 +857,15 @@ function armSide(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, skin: string, 
   const shY = torsoTop + 9;
   const pts: Pt[] = [
     [cx + 1, shY],
-    [cx + 5.5, shY + m.armL * 0.55],
-    [cx + 4, shY + m.armL],
+    [cx + 6, shY + m.armL * 0.5],
+    [cx + 2.5, shY + m.armL],
   ];
   limb(g, PEN, pts, m.limbW, armColor, seed + 11);
-  wEllipse(g, PEN, pts[2][0], pts[2][1] + 2, m.limbW * 0.62 + 1, m.limbW * 0.62 + 1, { fill: skin, seed: seed + 40, n: 10 });
+  wEllipse(g, PEN, pts[2][0], pts[2][1] + 1.5, m.limbW * 0.54 + 0.8, m.limbW * 0.66 + 0.8, { fill: skin, seed: seed + 40, n: 12 });
   if (!long) {
     wEllipse(g, PEN, pts[0][0], shY + 4, m.limbW * 0.95, m.limbW * 1.2, { fill: fit.top.color, seed: seed + 50, n: 10 });
   }
-  return [pts[2][0], pts[2][1] + 2];
+  return [pts[2][0], pts[2][1] + 1.5];
 }
 
 /** Cape in profile — trails behind the walker with a wavy hem. */
@@ -715,13 +888,13 @@ function extrasSide(g: CanvasRenderingContext2D, geo: Geo, fit: Fit, seed: numbe
   if (fit.extras.includes('satchel')) {
     const col = ec.satchel ?? W.sageD;
     const bagX = cx - m.hipW * 0.34;
-    wShape(g, PEN, [[cx + m.shW * 0.2, t + 4], [bagX + 4, hipY - 11]], { sw: 4, amp: 0.6, stroke: col, seed });
+    wShape(g, PEN, [[cx + m.shW * 0.2, t + 4], [bagX + 4, hipY - 11]], { sw: 2.6, stroke: col, seed });
     wShape(g, PEN, [
       [bagX - 11, hipY - 12], [bagX + 11, hipY - 12],
       [bagX + 12, hipY + 6], [bagX - 12, hipY + 6],
     ], { closed: true, step: 7, fill: col, seed: seed + 1 });
-    wShape(g, PEN, [[bagX - 12, hipY - 4], [bagX + 11, hipY - 4]], { sw: 1.6, amp: 0.5, seed: seed + 2 });
-    boneClasp(g, bagX, hipY + 1);
+    wShape(g, PEN, [[bagX - 12, hipY - 4], [bagX + 11, hipY - 4]], { sw: 1.1, seed: seed + 2 });
+    signalClasp(g, bagX, hipY + 1, seed + 3);
   }
   if (fit.extras.includes('neckerchief')) {
     const col = ec.scarf ?? W.peach;
@@ -775,11 +948,11 @@ export function drawWalkerTorso(char: CharId, dir: DirId, age: AgeId, view: View
     hoodBehind(g, geo, fit, seed + 2);
     drawTorsoTop(g, geo, fit, isMei, seed + 3);
     bottomFB(g, geo, fit, seed + 4);
-    arms(g, geo, fit, ch.skin, seed + 5);
+    const hand = arms(g, geo, fit, ch.skin, seed + 5);
     if (fit.extras.includes('cape')) cape(g, geo, fit.extraColors?.cape ?? W.peach, seed + 6);
     extraOverTorso(g, geo, fit, seed + 7);
-    handFx = cx + (m.shW / 2 - 2 + ARM_OUT * 0.55);
-    handFy = torsoTop + 9 + m.armL;
+    handFx = hand[0];
+    handFy = hand[1];
   }
   g.restore();
 
@@ -795,11 +968,22 @@ export function drawWalkerTorso(char: CharId, dir: DirId, age: AgeId, view: View
 function shoeF(g: CanvasRenderingContext2D, x: number, ground: number, color: string, boot: boolean, seed: number): void {
   if (boot) {
     wShape(g, PEN, [
-      [x - 7, ground - 24], [x + 7, ground - 24], [x + 8, ground - 8],
-      [x + 10, ground - 3], [x - 10, ground - 3], [x - 8, ground - 8],
+      [x - 5.5, ground - 23], [x + 5.5, ground - 23],
+      [x + 6.5, ground - 10], [x + 10, ground - 6],
+      [x + 9, ground - 2.5], [x - 8, ground - 2.5],
+      [x - 9, ground - 6], [x - 6, ground - 10],
     ], { closed: true, step: 8, fill: color, seed });
+    wShape(g, PEN, [[x - 8, ground - 5], [x + 8.5, ground - 5]], {
+      sw: 1,
+      stroke: INK.soft,
+      seed: seed + 1,
+    });
   } else {
-    wEllipse(g, PEN, x, ground - 6.5, 10, 6.5, { fill: color, seed });
+    wShape(g, PEN, [
+      [x - 7, ground - 10], [x + 5, ground - 10],
+      [x + 10, ground - 5], [x + 8, ground - 2.5],
+      [x - 8, ground - 2.5], [x - 9, ground - 5],
+    ], { closed: true, step: 7, fill: color, seed });
   }
 }
 
@@ -846,6 +1030,11 @@ export function drawWalkerLeg(char: CharId, dir: DirId, age: AgeId): PropSprite 
       ]
     : undefined;
   limb(g, PEN, [top, knee, bot], m.legW, legColor, seed, segs);
+  wShape(g, PEN, [[knee[0] - m.legW * 0.35, knee[1]], [knee[0] + m.legW * 0.28, knee[1] + 0.8]], {
+    sw: 0.9,
+    stroke: INK.soft,
+    seed: seed + 18,
+  });
   shoeF(g, lx + 2.5, ground, shoeColor, boot, seed + 31);
   g.restore();
 

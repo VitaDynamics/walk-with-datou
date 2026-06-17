@@ -112,3 +112,8 @@ const STAGE_ORDER: Record<FamiliarityStage, number> = {
 export function clipAllowed(clip: SignatureClip, stage: FamiliarityStage): boolean {
   return STAGE_ORDER[stage] >= STAGE_ORDER[CLIP_STAGE[clip]];
 }
+
+/** True once the relationship is at least `min` deep (gates earned beats). */
+export function stageReached(stage: FamiliarityStage, min: FamiliarityStage): boolean {
+  return STAGE_ORDER[stage] >= STAGE_ORDER[min];
+}

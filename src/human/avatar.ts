@@ -1,8 +1,7 @@
 /**
- * The walker's identity — which designed character (Mei / An) and which outfit
- * "direction" the player walks as. Chosen in ⚙ settings, persisted in
- * localStorage, applied live to the HumanRig (no reload). Mirrors the cast and
- * wardrobe from "Main Character Concepts".
+ * The walker's identity — which human companion (Mei / An) and which shared-life
+ * outfit the player walks as. Chosen in settings, persisted in localStorage,
+ * and applied live to the HumanRig without breaking legacy saves.
  */
 
 import { AGE_ORDER, DIRECTION_ORDER, type AgeId, type CharId, type DirId } from '../art/walkerData';

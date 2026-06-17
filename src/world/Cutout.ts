@@ -35,6 +35,9 @@ export class Cutout {
 
   constructor(sprite: PropSprite, opts: CutoutOptions) {
     const tex = canvasTexture(sprite.canvas);
+    void sprite.ready?.then(() => {
+      tex.needsUpdate = true;
+    });
     const w = opts.height * sprite.aspect;
     const geo = new THREE.PlaneGeometry(w, opts.height);
     const mat = new THREE.MeshBasicMaterial({

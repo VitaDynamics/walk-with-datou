@@ -17,11 +17,13 @@ describe('Backpack', () => {
   it('adds, counts, and takes items', () => {
     const pack = new Backpack('test.pack');
     pack.add('twig', 2);
+    pack.add('clay-lump');
     expect(pack.count('twig')).toBe(2);
+    expect(pack.count('clay-lump')).toBe(1);
     expect(pack.take('twig')).toBe(true);
     expect(pack.count('twig')).toBe(1);
     expect(pack.take('pebble')).toBe(false);
-    expect(pack.held()).toEqual(['twig']);
+    expect(pack.held()).toEqual(['twig', 'clay-lump']);
   });
 
   it('persists across instances', () => {

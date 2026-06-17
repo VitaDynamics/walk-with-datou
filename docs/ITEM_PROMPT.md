@@ -562,3 +562,190 @@ Before merging a batch:
 - no two primary assets survive solely because their colors differ;
 - all prompts, seeds, model versions, scores, and rejection reasons are stored;
 - the batch makes the world feel more intentional, not merely more populated.
+
+
+## Quick Single-Asset Path (skip the 6-card pipeline)
+
+When a form's identity is already obvious and you do not need the full Stage 1–6
+exploration, use these templates instead. They produce one baseline-correct image
+prompt directly. For any form whose identity is uncertain, ambiguous against an
+existing neighbor, or part of a same-family group, **do not use this path** — run
+Stages 1–6 so identity is resolved before generation.
+
+All templates below share the project's binding art direction. Substitute the same
+resolved fields you would pass to the Stage 3 template; these are the same prompt,
+shortened.
+
+### Shared art direction (every quick template inherits this)
+
+```text
+Art direction: calm, warm, premium companion-robot world — a refined handmade
+cutout, as if drawn for a quiet robotics-lab / future-home / miniature tabletop
+space shared with an intelligent quadruped robot. Front or gentle three-quarter
+elevation. Flat readable masses with one restrained shade pass. Subtle warm ink
+contour, not a thick cartoon sticker outline. Low saturation, physically
+believable, slightly handmade with restrained irregularity and material honesty.
+Clear at 64 px. Designed rather than generated.
+
+Palette (use the project tokens; no more than three dominant color families):
+paper/off-white #F5F2EC #FAF8F3 #ECE7DF · ink #3A372F #5A564B ·
+sage #B5C2A2 #94A781 #7C8C7A #67785F · clay/wood #ECDFC9 #DCC3A4 #C2A07C #9A7E5E ·
+blossom #D9B3A0 · water/glass #9CB4AB #ABC1B7 #C4D2C4 ·
+robot neutral #F1EFE6 #DDD9CB #34373A · amber accent #D9A441 (small focal detail only).
+
+Output: exactly one complete, centered object on a transparent background.
+No floor plane, no environment scene, no room, no pedestal, no UI card, no border,
+no text, no logo, no character, no drop-shadow halo, no rarity glow, no dramatic
+perspective, no extra props, no cropped parts.
+```
+
+### Single Item Prompt Template
+
+```text
+Create one isolated 2D cutout asset of [ITEM NAME] for Walk with Datou.
+
+Identity and shape:
+- [ONE-SENTENCE CORE IDENTITY — the object without color or rarity]
+- Primary mass: [BROAD CATEGORY MASS]
+- Secondary structure: [ROOFLINE / SUPPORTS / OPENING / FRAME / LOAD PATH]
+- Functional signature: [ONE EXACT WORKING FEATURE UNIQUE TO THIS FORM]
+- Readable silhouette suitable for a small game icon.
+
+Construction and detail:
+- Sized to read beside Datou (the quadruped robot) without competing with it.
+- A few bold structural details — joints, rails, openings, working parts —
+  before any fine material texture. No decorative noise.
+- Materials: [TWO TO FOUR VISIBLE MATERIALS FROM THE PALETTE].
+
+State (optional): time [MORNING / NOON / EVENING / NIGHT] ·
+season [SPRING / SUMMER / AUTUMN / WINTER] ·
+weather [SUNNY / RAINY / CLOUDY / SNOWY / WINDY] ·
+interaction stage [STAGE DESCRIPTION].
+
+[INHERIT SHARED ART DIRECTION + OUTPUT BLOCK ABOVE]
+```
+
+### Multi-stage Interactive Item Prompt
+
+For an item that changes as the player and Datou use it over time (e.g. a planter
+that grows, a feeder that fills, a workbench mid-repair).
+
+```text
+Create four isolated 2D cutout sprites of the same [ITEM NAME] across interaction
+stages, for Walk with Datou.
+
+Stages:
+1. [INITIAL STATE]
+2. [AFTER FIRST INTERACTION]
+3. [AFTER CONTINUED INTERACTION]
+4. [SETTLED / USEFUL / RESOLVED STATE]
+
+Consistency:
+- Keep the same primary mass, silhouette, camera angle, and scale across all four.
+- Show progress through structural and material change — a part added, a surface
+  filled, a mechanism opened, a posture settled — not through glow, sparkle, or
+  added effects.
+- Each stage stays recognizable as the same object and readable at 64 px.
+- Use small honest differences rather than redesigning the object.
+
+[INHERIT SHARED ART DIRECTION + OUTPUT BLOCK ABOVE — four separate sprites]
+```
+
+### Time-of-day Variation Prompt
+
+```text
+Create four variations of the same [ITEM NAME] across the day, for Walk with Datou.
+
+Time variations (lighting and atmosphere only — shape, materials, and camera stay
+identical):
+1. Morning: soft warm low light, cool quiet shadows, calm and unhurried.
+2. Noon: even neutral daylight, clearest material reading, settled and present.
+3. Evening: warm amber key light, longer soft shadows, restful.
+4. Night: dim cool ambient, one small warm pool of light if the object has a lamp
+   or window — a believable light source, never magical glow or sparkles.
+
+Rules:
+- Same object, same silhouette, same perspective and scale.
+- Only lighting and shadow change. No added particles or effects.
+
+[INHERIT SHARED ART DIRECTION + OUTPUT BLOCK ABOVE]
+```
+
+### Seasonal Variation Prompt
+
+```text
+Create four seasonal variations of the same [ITEM NAME], for Walk with Datou.
+
+Seasonal variations (small honest dressing — identity unchanged):
+1. Spring: a few fresh sage-green sprouts or buds, pale and restrained.
+2. Summer: fuller foliage, warm even light, calm and lived-in.
+3. Autumn: muted clay and amber tones, a scatter of dry leaves, quietly nostalgic.
+4. Winter: a light dusting of snow, cool soft shadows, frost at the edges, still.
+
+Consistency:
+- Same object identity, same size, same camera angle.
+- Seasonal detail is sparse and material-honest, never cluttered or candy-bright.
+- Stay within three dominant color families per render.
+
+[INHERIT SHARED ART DIRECTION + OUTPUT BLOCK ABOVE]
+```
+
+### Weather Variation Prompt
+
+```text
+Create weather variations of the same [ITEM NAME], for Walk with Datou.
+
+Weather variations (subtle and readable — composition unchanged):
+1. Sunny: soft warm highlights, clear material reading, calm.
+2. Rainy: damp surface sheen, a few raindrops, a small puddle at the base, quiet.
+3. Cloudy: muted colors, soft diffuse light, low contrast, still.
+4. Snowy: light snow cover, frosty edges, cool gentle tones.
+5. Windy: a slight lean or one ribbon/leaf caught mid-motion, restrained.
+
+Rules:
+- Same object and composition. Weather effects subtle and believable.
+- No background scene. No added particles beyond the noted weather detail.
+
+[INHERIT SHARED ART DIRECTION + OUTPUT BLOCK ABOVE]
+```
+
+### Batch Prompt Format
+
+Use only when each listed item is already a resolved, distinct form (each has its
+own primary mass, secondary structure, and functional signature). Do not batch
+near-siblings — they collapse into one another. Each line below is a worked
+example of the required specificity, not a fixed list.
+
+```text
+Generate a consistent set of isolated 2D cutout assets for Walk with Datou, the
+calm companion world shared with a quadruped robot. Apply the shared art direction
+and output block to every item, and keep all assets readable beside Datou and at
+64 px.
+
+Items (each must be a distinct form, not an adjective on a shared body):
+1. Clay seedling planter — wide low bowl, raised rim, a single sprout breaking soil.
+2. Wall mailbox — slotted box with a hinged flap and a small raised signal flag.
+3. Bedside lamp — weighted base, slim stem, a soft matte shade over a warm bulb.
+4. Hanging chime — a top ring with three drop rods of differing length on cords.
+5. Pet bed — low round cushion with a thick folded rim, sized for Datou to settle.
+6. Wooden stool — three splayed legs, a stretcher brace, a slightly dished seat.
+7. Ceramic food bowl — shallow footed dish, thumb-worn rim, robot-paw scale.
+8. Garden lantern — stacked stone base, an open glazed light box, a flat cap.
+9. Keepsake box — small lidded chest with a recessed clasp and a divided tray.
+10. Repair cradle — an open frame that holds a small robot part mid-maintenance.
+
+[INHERIT SHARED ART DIRECTION + OUTPUT BLOCK ABOVE, applied per item]
+```
+
+### Negative Prompt
+
+```text
+photorealistic, realistic 3D render, plastic toy look, hard sci-fi, cyberpunk,
+neon, glow, rarity aura, magic runes, sparkles, fireflies, fairy-tale, fantasy
+loot, candy colors, oversized cartoon proportions, thick sticker outline, horror,
+dark fantasy, sharp aggressive shapes, random gears/pipes/straps/badges,
+decorative noise, cluttered background, environment scene, floor, room, pedestal,
+UI frame, border, text, logo, watermark, character, animal, copyrighted character,
+imitation of an existing IP, drop-shadow halo, dramatic perspective, harsh shadows,
+overexposed bloom, oversaturated colors, low-resolution, blurry, noisy.
+```

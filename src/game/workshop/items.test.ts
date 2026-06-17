@@ -13,7 +13,14 @@ import {
   rarityFor,
   sizesFor,
 } from './items';
-import { FORMS, FORM_IDS, ITEM_RARITIES, type Form, type FormId } from './forms';
+import {
+  FORMS,
+  FORM_IDS,
+  ITEM_RARITIES,
+  STARTER_ITEM_FORMS,
+  type Form,
+  type FormId,
+} from './forms';
 import { CATALOG_FORMS } from './formCatalog';
 import { MATERIALS, MATERIAL_IDS, materialsInGroup } from './materials';
 import { setLang } from '../../i18n';
@@ -47,7 +54,7 @@ describe('Workshop materials', () => {
 describe('Workshop forms', () => {
   it('offers at least 500 distinct forms', () => {
     expect(FORM_IDS.length).toBeGreaterThanOrEqual(500);
-    expect(Object.keys(CATALOG_FORMS)).toHaveLength(450);
+    expect(Object.keys(CATALOG_FORMS)).toHaveLength(942);
   });
 
   it('every form accepts at least one group and has a valid tier', () => {
@@ -109,6 +116,19 @@ describe('Workshop forms', () => {
       expect(formName(id), id).not.toContain('form.');
       expect(formName(id), id).not.toContain('-');
     }
+  });
+
+  it('ships ten distinct opening forms with readable localized names', () => {
+    expect(STARTER_ITEM_FORMS).toHaveLength(10);
+    expect(new Set(STARTER_ITEM_FORMS).size).toBe(10);
+    for (const id of STARTER_ITEM_FORMS) {
+      expect(FORM_IDS).toContain(id);
+      for (const lang of ['en', 'zh'] as const) {
+        setLang(lang);
+        expect(formName(id), `${lang}:${id}`).not.toContain('form.');
+      }
+    }
+    setLang('en');
   });
 });
 

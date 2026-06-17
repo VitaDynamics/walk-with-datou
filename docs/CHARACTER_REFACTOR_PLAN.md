@@ -99,6 +99,42 @@ at every moment, including when nothing is happening.
 | 好奇+乐于助人 | Asks: what did you watch today? anything interesting happen? need any help? |
 | 勇敢 | Runs solo errands; **at night walks ahead of you with his light on** |
 
+### 1.6 The humans who choose Datou
+
+Datou should not be paired with generic "girl/boy" avatars. The likely person
+who keeps coming back to him is a **patient tinkerer, gentle observer, and adult
+who still enjoys small absurdities**. They do not need to match his ENFP volume.
+They enjoy being invited into his discoveries, answer his chatter seriously,
+and give his excitement somewhere calm to land.
+
+That produces two complementary human companions:
+
+| Companion | Relationship to Datou | Appearance language |
+|---|---|---|
+| **Mei — field-note maker** | Notices what Datou notices; records his discoveries; treats every "Babo~ I found it!" as worth investigating | Compact rounded silhouette; asymmetric practical bob; open attentive eyes; one tiny amber signal clip echoing Datou's antenna; cream rolled sleeves; sage utility pinafore/vest; field notebook satchel; patched sturdy boots |
+| **An — warm repairer** | Lets Datou explain his theories; fixes and builds beside him; answers over-excitement with dry humor rather than dismissal | Relaxed longer silhouette; soft tousled waves; kind listening eyes and crooked smile; layered repair overshirt; loose cuffed trousers; utility sling; sturdy shoes |
+
+Shared rules:
+
+- Datou remains the visual focus. The humans look **toward him and the thing he
+  found**, not out at the player as costume models.
+- Gender is secondary to temperament. No bows/lashes/princess shorthand for
+  Mei; no pointed anime fringe/permanent cool-guy smirk for An.
+- Clothes imply shared verbs: walking, note-taking, light repair, workshop
+  mornings, night leading, and sheltering Datou from rain.
+- Human rendering follows a clean Japanese-animation cel language: stable
+  contours, readable anatomy, shaped faces, and restrained two-tone shading.
+  Do not apply seeded ink wobble to their silhouettes; the paper texture can
+  remain in Datou and the surrounding world.
+- Palette stays paper cream + sage + clay/charcoal. Amber is a tiny relationship
+  motif only: Mei's clip, bag clasps, or one garment fastener.
+- Saved character IDs remain `mei` / `an`; the redesign is visual and does not
+  invalidate existing players' choices.
+
+Concept reference: [Datou human companions](art/datou-human-companions-concept.webp).
+The shipped canvas sprites simplify this sheet for the game's small paper-doll
+scale without reverting to chibi proportions or hand-painted, twisted lines.
+
 Design theory cited: Hook model (trigger → action → variable reward →
 investment), Norman's visceral/behavioral/reflective levels, Eisenhower
 urgency/importance for arbitrating what he reacts to.

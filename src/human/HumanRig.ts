@@ -1,6 +1,6 @@
 /**
- * HumanRig — the player's cutout puppet, now one of the two designed walkers
- * (Mei or An, from "Main Character Concepts") in a selectable outfit and age.
+ * HumanRig — the player's cutout puppet, one of Datou's two human companions
+ * (Mei or An) in a selectable shared-life outfit and age.
  * Billboarded plates — head, torso (with the leash arm + outfit), two legs —
  * driven by a simple two-beat walk cycle, breathing idle, and facing flip.
  *
@@ -147,7 +147,7 @@ export class HumanRig {
     }
   }
 
-  /** Swap the walker's character (Mei/An) live — redraws all plates. */
+  /** Swap the human companion (Mei/An) live — redraws all plates. */
   setCharacter(char: CharId): void {
     if (char === this.char) return;
     this.char = char;

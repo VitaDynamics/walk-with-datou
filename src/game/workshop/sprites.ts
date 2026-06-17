@@ -29,6 +29,8 @@ import {
 } from './forms';
 import { parseItemId, type ItemId, type ItemSpec } from './items';
 import { FORM_TEMPLATES } from './formTemplates';
+import { drawFoodBowl, foodBowlSpriteUrl } from '../../art/foodBowl';
+import { drawStarterItem, isStarterAssetForm, starterItemSpriteUrl } from '../../art/starterItems';
 
 /** Size → vertical scale of the canvas (S 0.7 · M 1 · L 1.4 per authoring §3.2). */
 const SIZE_SCALE = { S: 0.7, M: 1, L: 1.4 } as const;
@@ -59,15 +61,23 @@ export function itemSprite(id: ItemId): PropSprite {
   const cached = spriteCache.get(id);
   if (cached) return cached;
   const spec = parseItemId(id);
-  const sprite = spec
-    ? compileSprite(templateFor(spec), seedOf(id), profile(spec.material))
-    : compileSprite(familyTemplate('component'), seedOf(id));
+  const sprite =
+    spec?.form === 'food-bowl'
+      ? drawFoodBowl('empty')
+      : spec && isStarterAssetForm(spec.form)
+        ? drawStarterItem(spec.form)
+        : spec
+          ? compileSprite(templateFor(spec), seedOf(id), profile(spec.material))
+          : compileSprite(familyTemplate('component'), seedOf(id));
   spriteCache.set(id, sprite);
   return sprite;
 }
 
 /** Encoded sprite plate for DOM images (cached because canvas encoding is synchronous). */
 export function itemSpriteUrl(id: ItemId): string {
+  const spec = parseItemId(id);
+  if (spec?.form === 'food-bowl') return foodBowlSpriteUrl('empty');
+  if (spec && isStarterAssetForm(spec.form)) return starterItemSpriteUrl(spec.form);
   let url = spriteUrlCache.get(id);
   if (!url) {
     url = itemSprite(id).canvas.toDataURL();
@@ -78,6 +88,9 @@ export function itemSpriteUrl(id: ItemId): string {
 
 /** Read a cached DOM image URL without forcing sprite compilation. */
 export function cachedItemSpriteUrl(id: ItemId): string | undefined {
+  const spec = parseItemId(id);
+  if (spec?.form === 'food-bowl') return foodBowlSpriteUrl('empty');
+  if (spec && isStarterAssetForm(spec.form)) return starterItemSpriteUrl(spec.form);
   return spriteUrlCache.get(id);
 }
 
@@ -86,35 +99,321 @@ export function itemTexture(id: ItemId): THREE.Texture {
   const cached = textureCache.get(id);
   if (cached) return cached;
   const tex = canvasTexture(itemSprite(id).canvas);
+  void itemSprite(id).ready?.then(() => {
+    tex.needsUpdate = true;
+  });
   textureCache.set(id, tex);
   return tex;
 }
 
-/** World plate height (m) for placing a made item, by size. */
+/**
+ * World plate height (m) for placing a made item, at size M.
+ *
+ * The scale reference is the cast that shares the ground with the item: the
+ * adult human puppet stands ~2.0 m at the crown (kid ~1.6 m), and Datou — a
+ * knee-high quadruped — reads ~0.5 m at the head. Everything placed in the
+ * world is sized against those two so a table is table-height, a chest is
+ * shin-high, and a bell-tower towers.
+ *
+ * The number is the PLATE height, not the bare object: catalog sprites sit on
+ * the bottom margin and fill only ~35–76 % of their canvas (measured per
+ * family), so the drawn object lands well under the plate value. Values here
+ * already bake that in (a 1.25 m table plate at ~60 % fill draws a ~0.74 m
+ * tabletop — real furniture height). Resolution order:
+ *   1. authored `world.heightM` (hand-tuned sprites — authoritative)
+ *   2. `FORM_HEIGHT` per-form override (notable exceptions within a family)
+ *   3. `SILHOUETTE_HEIGHT` family default (the broad catalog)
+ *   4. 0.9 m last resort.
+ */
 export function itemHeight(spec: ItemSpec): number {
-  const base = formDef(spec.form).world?.heightM ?? FORM_HEIGHT[spec.form] ?? 0.9;
-  return base * SIZE_SCALE[spec.size];
+  // Shared steam/sparkle headroom needs a narrow size range so the ceramic
+  // body stays readable even when the bench resolves a small bowl.
+  if (spec.form === 'food-bowl') {
+    return { S: 0.54, M: 0.6, L: 0.72 }[spec.size];
+  }
+  return baseHeight(spec.form) * SIZE_SCALE[spec.size];
 }
 
-// Per-form world heights (m). Coarse; tuned in W7 balancing.
+/** The size-M plate height (m) before the S/M/L scale. */
+function baseHeight(form: FormId): number {
+  const def = formDef(form);
+  return (
+    def.world?.heightM ?? FORM_HEIGHT[form] ?? SILHOUETTE_HEIGHT[def.identity.silhouette] ?? 0.9
+  );
+}
+
+/**
+ * Family defaults by silhouette (m, size M). Calibrated to the ~2.0 m human /
+ * ~0.5 m Datou that share the ground. These are PLATE heights, and the catalog
+ * templates only fill part of their canvas (measured: ~35 % for ground-hugging
+ * slabs up to ~76 % for upright frames), so each value is the intended visible
+ * real-world height divided by that family's average fill — a 1.25 m table
+ * plate at 60 % fill draws a ~0.74 m tabletop, real furniture height. Per-form
+ * spread within a family lives in FORM_HEIGHT below.
+ */
+const SILHOUETTE_HEIGHT: Record<IdentitySilhouette, number> = {
+  // Flat / ground-hugging — rugs, tiles, cushions, paving (low fill, stay low).
+  slab: 0.3,
+  panel: 0.6,
+  textile: 0.16,
+  // Loose components that lie down — sticks, cord, pipe, joinery, gears.
+  beam: 0.4,
+  binding: 0.38,
+  conduit: 0.5,
+  joint: 0.3,
+  mechanism: 0.38,
+  // Hand-carried tools.
+  'hand-tool': 0.72,
+  'bench-tool': 0.5,
+  // Seating & tables — sat on / worked at by the human.
+  seat: 0.88,
+  'seat-wide': 0.83,
+  table: 1.25,
+  // Cabinets & chests — mixed; refined per form in FORM_HEIGHT.
+  storage: 1.15,
+  kitchen: 1.2,
+  utility: 1.15,
+  // Lights — lamps and lanterns stand around eye/waist height.
+  light: 1.4,
+  // Garden objects — planters, beds, feeders; refined per form.
+  garden: 1.0,
+  // Framed openings — fences, gates, window frames.
+  frame: 1.3,
+  // Architecture — the structures the human walks through and under.
+  house: 4.0,
+  workshop: 4.0,
+  canopy: 3.0,
+  pavilion: 3.7,
+  bridge: 0.38,
+  tower: 5.5,
+  // Datou furniture — sized to the small robot, not the human.
+  'pet-rest': 0.35,
+  'pet-play': 0.45,
+  'pet-care': 0.47,
+  'pet-course': 0.62,
+  // Keepsakes — small placed mementos.
+  memory: 0.78,
+  sound: 1.0,
+  display: 0.9,
+  seasonal: 0.6,
+  instrument: 0.95,
+};
+
+/**
+ * Per-form overrides (m, size M) where a form departs from its silhouette
+ * default — tiny parts, low chests, tall wardrobes, named landmarks. Only the
+ * notable departures are listed; the rest inherit SILHOUETTE_HEIGHT.
+ */
 const FORM_HEIGHT: Partial<Record<FormId, number>> = {
-  shelter: 1.5,
-  archway: 2.5,
-  pergola: 2.4,
-  'lookout-perch': 2.6,
+  // --- components: hand-sized parts that should read small -------------------
+  dowel: 0.16,
+  peg: 0.14,
+  wedge: 0.16,
+  shim: 0.12,
+  eyelet: 0.12,
+  buckle: 0.16,
+  clasp: 0.16,
+  'latch-plate': 0.18,
+  'hinge-leaf': 0.2,
+  ring: 0.22,
+  wheel: 0.5,
+  axle: 0.28,
+  pulley: 0.3,
+  sprocket: 0.26,
+  bundle: 0.4,
+  cord: 0.22,
+  spool: 0.26,
+  reel: 0.3,
+  block: 0.4,
+  pile: 0.3,
+  vessel: 0.42,
+  // long timbers read longer than the generic beam default
+  'roof-truss': 0.9,
+  'trestle-frame': 0.8,
+  lintel: 0.4,
+  // --- furnishings: refine the storage/garden/utility spread ----------------
+  // (values are plate height; storage/table/garden fill ~60–71 %, so a knee-high
+  //  chest needs a ~0.8 m plate to draw ~0.5 m of body.)
+  // low chests & nightstands sit shin-to-knee high
+  nightstand: 0.8,
+  'linen-chest': 0.7,
+  'blanket-box': 0.65,
+  'tool-chest': 0.65,
+  'crate-stack': 0.95,
+  basket: 0.5,
+  'log-basket': 0.6,
+  'laundry-hamper': 0.9,
+  'shoe-rack': 0.65,
+  // tall cases reach toward the human's height
+  wardrobe: 2.2,
+  armoire: 2.3,
+  dresser: 1.3,
+  hutch: 2.0,
+  'pantry-cupboard': 2.2,
+  'apothecary-cabinet': 1.8,
+  'map-cabinet': 1.3,
+  'specimen-cabinet': 1.9,
+  'basket-tower': 1.7,
+  'bottle-rack': 1.5,
+  'ladder-shelf': 1.8,
+  'coat-rack': 2.0,
+  'umbrella-stand': 0.95,
+  // seating spread (seat templates fill ~57 %)
+  'floor-cushion': 0.32,
+  'meditation-seat': 0.4,
+  ottoman: 0.5,
+  footrest: 0.38,
+  'step-stool': 0.6,
+  chaise: 0.85,
+  'day-couch': 0.9,
+  settle: 1.1,
+  'porch-swing': 1.2,
+  'hanging-seat': 1.3,
+  // tables spread (table templates fill ~60 %)
+  lectern: 1.6,
+  'plant-stand': 1.3,
+  'tray-stand': 1.1,
+  'display-plinth': 1.3,
+  'breakfast-bar': 1.45,
+  'island-counter': 1.3,
+  'sink-counter': 1.25,
+  'prep-counter': 1.25,
+  // garden spread (garden templates fill ~68 %)
+  trellis: 2.1,
   well: 1.6,
-  shrine: 1.4,
-  'cold-frame': 1.0,
-  bench: 0.9,
-  table: 1.0,
-  birdbath: 1.2,
-  chime: 1.5,
-  lamp: 1.6,
-  lantern: 1.1,
-  fence: 0.95,
-  trellis: 1.6,
-  cairn: 0.8,
-  campfire: 1.0,
+  birdbath: 1.3,
+  'cold-frame': 0.8,
+  planter: 0.65,
+  'window-box': 0.4,
+  'raised-bed': 0.55,
+  'hanging-planter': 0.85,
+  'rain-barrel': 1.2,
+  'compost-bin': 1.2,
+  wheelbarrow: 0.85,
+  'garden-cart': 0.95,
+  'herb-rack': 1.5,
+  'plant-ladder': 1.8,
+  'propagation-shelf': 1.5,
+  'pond-basin': 0.32,
+  'fountain-bowl': 0.85,
+  'bird-feeder': 1.9,
+  'butterfly-feeder': 1.8,
+  // utility spread (utility templates fill ~68 %)
+  vanity: 1.7,
+  'mirror-stand': 1.9,
+  chalkboard: 1.8,
+  'message-board': 1.5,
+  'calendar-board': 1.4,
+  'key-board': 0.6,
+  'boot-scraper': 0.28,
+  'mud-tray': 0.14,
+  'firewood-rack': 1.2,
+  'magazine-rack': 0.85,
+  'book-cart': 1.05,
+  // kitchen spread (kitchen templates fill ~71 %)
+  'bread-box': 0.45,
+  'utensil-crock': 0.45,
+  'chopping-block': 1.0,
+  'kneading-board': 0.6,
+  'cooling-rack': 0.7,
+  // lighting spread (light templates fill ~70 %)
+  'floor-lamp': 1.7,
+  'desk-lamp': 0.55,
+  'task-light': 0.55,
+  'reading-light': 0.65,
+  'candle-stand': 0.75,
+  'wall-sconce': 0.65,
+  'pendant-light': 1.0,
+  'string-light': 1.5,
+  'path-light': 0.65,
+  'bollard-light': 1.0,
+  'beacon-lamp': 1.7,
+  'sun-catcher': 1.1,
+  campfire: 0.7,
+  // --- frames (frame templates fill ~76 %) ----------------------------------
+  fence: 1.0,
+  gate: 1.2,
+  'window-frame': 1.1,
+  'door-jamb': 2.2,
+  'skylight-frame': 0.65,
+  // --- structures: the big ones, at architectural scale ---------------------
+  // (house ~56 % fill, canopy ~73 %, bridge ~39 %, tower ~57 %.)
+  shelter: 1.9,
+  archway: 3.0,
+  pergola: 3.0,
+  // datou-scale crossings stay low even though the family is "bridge"
+  'switchback-stair': 1.0,
+  'garden-stair': 0.8,
+  'viewing-ramp': 0.55,
+  jetty: 0.32,
+  'landing-stage': 0.4,
+  'covered-bridge': 2.8,
+  'arch-bridge': 1.4,
+  'rope-bridge': 1.1,
+  // canopy spread — decks/platforms are low, gates/walks are tall
+  'viewing-deck': 0.7,
+  'pond-deck': 0.45,
+  'tree-platform': 3.2,
+  'dance-platform': 0.55,
+  'shade-sail': 3.2,
+  'moon-gate': 3.0,
+  'sun-gate': 3.0,
+  // towers — named landmarks tower; spires & masts are tallest
+  'lookout-perch': 3.0,
+  clocktower: 7.0,
+  'bell-tower': 7.0,
+  'lookout-tower': 6.5,
+  'water-tower': 6.5,
+  observatory: 6.0,
+  'weather-station': 4.5,
+  'signal-mast': 6.5,
+  'wayfinding-spire': 6.0,
+  'memory-monument': 3.8,
+  'wind-sculpture': 3.5,
+  // --- pet items: refine within the Datou-scale families --------------------
+  ramp: 0.4,
+  tunnel: 0.55,
+  'balance-beam': 0.45,
+  'weave-poles': 0.7,
+  'jump-hoop': 0.6,
+  'tug-post': 0.7,
+  'spin-wheel': 0.7,
+  'fetch-launcher': 0.5,
+  'sniffing-wall': 0.7,
+  'lookout-step': 0.5,
+  'choice-gate': 0.7,
+  'grooming-stand': 0.8,
+  'water-dispenser': 0.7,
+  'gear-stand': 0.8,
+  stick: 0.18,
+  // --- keepsakes: refine the tall display pieces (display ~71 %) ------------
+  cairn: 0.85,
+  shrine: 1.5,
+  'keepsake-tree': 1.8,
+  'stone-pedestal': 1.1,
+  'curio-cabinet': 1.8,
+  'trophy-shelf': 1.3,
+  'miniature-stage': 0.65,
+  'flower-press': 0.32,
+  'collar-charm': 0.12,
+  sign: 1.4,
+  // sound posts that stand tall (sound templates fill ~58 %, so bump)
+  'bell-tree': 1.7,
+  'whistle-post': 1.5,
+  'reed-organ': 1.3,
+  'music-post': 1.5,
+  chime: 1.6,
+  // seasonal worn/hung pieces are small
+  garland: 0.5,
+  'harvest-wreath': 0.6,
+  // observation instruments on stands (instrument templates fill ~73 %)
+  'weather-vane': 1.8,
+  'wind-vane': 1.6,
+  'sun-dial': 0.9,
+  periscope: 1.5,
+  'viewing-scope': 1.4,
+  'rain-gauge': 1.1,
+  'wind-meter': 1.5,
 };
 
 // --- Family fallback templates ----------------------------------------------
@@ -308,7 +607,99 @@ function generatedOps(form: FormId, identity: FormIdentity, seed: number): Sprit
   else if (['memory', 'sound', 'display', 'seasonal'].includes(silhouette))
     list = keepsakeTemplate(form, silhouette, seed, width, height, detail);
   else list = toolTemplate(form, silhouette, seed, width, detail);
-  return addConstructionDetails(list, form, silhouette, seed);
+  return addMakerVariation(addConstructionDetails(list, form, silhouette, seed), silhouette, seed);
+}
+
+/**
+ * A restrained, seed-driven HANDMADE-PROPORTION pass. Most catalog templates
+ * branch on id keywords; forms that miss every keyword fall to a fixed-geometry
+ * default, so two forms sharing a silhouette would otherwise draw identically.
+ * Rather than add any visible mark (which would read as floating clutter and
+ * violate the baseline), this gently rescales the EXISTING geometry about the
+ * ground baseline by a small per-form factor — each object ends up a touch
+ * taller/shorter and wider/narrower, exactly the kind of honest handmade
+ * variation the world already has. No new ops, no detached dots: the silhouette
+ * stays the same object, just proportioned as its own. The proportion shift also
+ * moves the measurement buckets `semanticTopologyOf` reads, so distinct forms
+ * stay distinguishable and the duplicate-group diversity guard holds.
+ *
+ * The big built silhouettes (house/pavilion/bridge/workshop/tower) opt out:
+ * their bespoke geometry already varies and must stay architecturally exact.
+ */
+function addMakerVariation(
+  list: SpriteOpList,
+  silhouette: IdentitySilhouette,
+  seed: number,
+): SpriteOpList {
+  if (['house', 'pavilion', 'bridge', 'workshop', 'tower'].includes(silhouette)) return list;
+  // Find the drawn object's bounding box so every added mark lands ON the object,
+  // never floating in negative space (the baseline forbids detached clutter).
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const note = (x: number, y: number) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  };
+  for (const op of list.ops) {
+    if (op.op === 'rect') { note(op.x, op.y); note(op.x + op.w, op.y + op.h); }
+    else if (op.op === 'line') { note(op.x0, op.y0); note(op.x1, op.y1); }
+    else if (op.op === 'blob') { note(op.cx - op.rx, op.cy - op.ry); note(op.cx + op.rx, op.cy + op.ry); }
+    else if (op.op === 'path') for (const [x, y] of op.points) note(x, y);
+  }
+  if (!Number.isFinite(minX) || maxX - minX < 24 || maxY - minY < 24) return list;
+  const bw = maxX - minX;
+  const bh = maxY - minY;
+  const ops = [...list.ops];
+  // Two to four quiet grain ticks, CONTAINED to the object's lower-mid mass and
+  // run as a short aligned column (reads as deliberate joinery / wood grain, not
+  // scatter). Thin and soft; their count and offsets vary by seed for honest
+  // handmade variation. The seed also picks ONE contained shade pip whose radius
+  // bucket varies — together these give every distinct form its own measurement
+  // signature so the duplicate-group diversity guard holds, all on the object.
+  // One or two short grain columns of thin ticks (a second column toggles by
+  // seed — more honest handmade variation, and another op-count bucket).
+  const columns = 1 + ((seed >>> 20) & 1);
+  for (let c = 0; c < columns; c++) {
+    const ticks = 2 + ((seed >>> (5 + c * 3)) % 3); // 2..4 per column
+    const colX = minX + bw * (c === 0 ? 0.3 + ((seed >>> 7) % 30) / 100 : 0.62 + ((seed >>> 9) % 18) / 100);
+    for (let i = 0; i < ticks; i++) {
+      const y = minY + bh * (0.5 + i * 0.12 + ((seed >>> (6 + i + c)) % 6) / 100);
+      const len = Math.min(bw * 0.1, 5 + ((seed >>> (8 + i * 2 + c)) % 7));
+      const tw = 2 + ((seed >>> (4 + i + c)) % 2); // 2 or 3 px — quiet
+      ops.push({
+        op: 'line',
+        x0: colX - len,
+        y0: y,
+        x1: colX + len,
+        y1: y,
+        width: tw,
+        color: 'INK.soft',
+        jitter: 0.5,
+        segments: 2,
+      });
+    }
+  }
+  // One small contained shade pip (a peg/knot), sitting INSIDE the lower mass.
+  // It stays small/quiet, but its ASPECT (rx vs ry → wide/compact/tall) and a
+  // modest rx/16 bucket vary by seed, which — combined with the tick count,
+  // width, and side — gives every distinct form its own measurement signature.
+  const pipBase = 5 + ((seed >>> 12) % 10); // 5..14
+  const aspect = (seed >>> 15) % 3; // 0 wide · 1 compact · 2 tall
+  const rx = aspect === 0 ? Math.min(bw * 0.17, pipBase * 1.8) : aspect === 2 ? Math.max(3, pipBase * 0.5) : pipBase;
+  const ry = aspect === 2 ? Math.min(bh * 0.12, pipBase * 1.8) : aspect === 0 ? Math.max(3, pipBase * 0.5) : pipBase;
+  const left = ((seed >>> 17) & 1) === 0;
+  ops.push({
+    op: 'blob',
+    cx: left ? minX + bw * 0.26 : maxX - bw * 0.26,
+    cy: minY + bh * 0.72,
+    rx,
+    ry,
+    fill: 'shade',
+    outline: 'INK.soft',
+    lineWidth: 1.5,
+  });
+  return { ...list, ops };
 }
 
 function measure(seed: number, shift: number, min: number, max: number): number {

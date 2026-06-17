@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORM_TEMPLATES } from './formTemplates';
-import { FORM_IDS, FORMS, type FormId, type IdentitySilhouette } from './forms';
+import { FORM_IDS, FORMS, STARTER_ITEM_FORMS, type FormId, type IdentitySilhouette } from './forms';
 import { CATALOG_FORMS, CATALOG_GROUPS } from './formCatalog';
 import { catalogFormTemplate } from './sprites';
 import type { SpriteOp, SpriteOpList } from '../../art/spriteOps';
@@ -75,6 +75,7 @@ describe('form sprite templates', () => {
     'drinking-bowl',
     'bug-hotel',
     'raft',
+    ...STARTER_ITEM_FORMS,
   ] as const;
 
   it('reference only palette tokens or material fill/shade', () => {
@@ -139,7 +140,7 @@ describe('form sprite templates', () => {
       }
     }
     expect(opTotal / ids.length).toBeGreaterThan(5.5);
-    expect(structureCount).toBe(95);
+    expect(structureCount).toBe(103);
     expect(structureTopologies.size).toBeGreaterThan(50);
   });
 

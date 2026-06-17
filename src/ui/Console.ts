@@ -43,6 +43,18 @@ import {
 } from '../art/props';
 import { drawFood } from '../art/orchard';
 import { drawAcorn } from '../art/critters';
+import {
+  drawInspirationBulb,
+  drawTimeMachine,
+  drawRainShelter,
+  drawWhisperLantern,
+  drawToolRoll,
+  drawWobbleToy,
+  drawThoughtAntenna,
+  drawFieldNote,
+  drawBaboBell,
+  drawPoofCard,
+} from '../art/labItems';
 
 export interface ConsoleCallbacks {
   onLeashToggle(): void;
@@ -77,6 +89,7 @@ const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }>
   feather: (seed) => drawDiscovery('feather', seed),
   reed: drawReed,
   'old-bolt': drawBolt,
+  'clay-lump': drawPebble,
   stick: drawStick,
   cairn: drawCairn,
   garland: drawGarland,
@@ -91,6 +104,20 @@ const ICON_DRAW: Record<ItemId, (seed: number) => { canvas: HTMLCanvasElement }>
   birdbath: drawBirdbath,
   windchime: drawWindchime,
   archway: drawArchway,
+};
+
+/** Pack icons for BOBO's field-lab keepsakes (the resting plate, ink-wobble). */
+const LAB_ICON_DRAW: Record<string, (seed: number) => { canvas: HTMLCanvasElement }> = {
+  'lab-bulb': drawInspirationBulb,
+  'lab-time': drawTimeMachine,
+  'lab-shelter': drawRainShelter,
+  'lab-lantern': drawWhisperLantern,
+  'lab-toolroll': drawToolRoll,
+  'lab-wobble': drawWobbleToy,
+  'lab-antenna': drawThoughtAntenna,
+  'lab-note': drawFieldNote,
+  'lab-bell': drawBaboBell,
+  'lab-poof': drawPoofCard,
 };
 
 function el<T extends HTMLElement>(id: string): T {
@@ -158,12 +185,8 @@ export class Console {
     el<HTMLButtonElement>('placing-cancel').addEventListener('click', () =>
       callbacks.onCancelPlace(),
     );
-    el<HTMLButtonElement>('pickup-take').addEventListener('click', () =>
-      callbacks.onPickupTake(),
-    );
-    el<HTMLButtonElement>('pickup-move').addEventListener('click', () =>
-      callbacks.onPickupMove(),
-    );
+    el<HTMLButtonElement>('pickup-take').addEventListener('click', () => callbacks.onPickupTake());
+    el<HTMLButtonElement>('pickup-move').addEventListener('click', () => callbacks.onPickupMove());
 
     memories.onChange(() => {
       if (!this.memoriesPanel.hidden) this.renderMemories();
@@ -360,7 +383,8 @@ export class Console {
   private icon(id: PackId): string {
     let url = this.icons.get(id);
     if (!url) {
-      const draw = (ICON_DRAW as Partial<Record<string, (typeof ICON_DRAW)[ItemId]>>)[id];
+      const draw =
+        (ICON_DRAW as Partial<Record<string, (typeof ICON_DRAW)[ItemId]>>)[id] ?? LAB_ICON_DRAW[id];
       url = draw ? draw(7).canvas.toDataURL() : itemSpriteUrl(id);
       this.icons.set(id, url);
     }
@@ -379,7 +403,7 @@ export class Console {
     for (const id of held) {
       const spec = parseItemId(id);
       // Unknown id from a stale save — skip rather than crash the pack.
-      if (!spec && !(id in ICON_DRAW)) continue;
+      if (!spec && !(id in ICON_DRAW) && !(id in LAB_ICON_DRAW)) continue;
       const btn = document.createElement('button');
       btn.className = 'pack-item';
       btn.type = 'button';

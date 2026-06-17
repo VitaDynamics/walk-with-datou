@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { arrangement, canonical, filledCount, mass, isEmpty, EMPTY } from './pattern';
 import { EXACT_PATTERNS, matchExact, patternKeys } from './patterns';
-import { FORMS } from './forms';
+import { FORMS, STARTER_ITEM_FORMS } from './forms';
 
 const rowWood = arrangement(
   [null, null, null, 'wood', 'wood', 'wood', null, null, null],
@@ -93,6 +93,18 @@ describe('exact pattern table', () => {
     for (const id of authoredAdditions) {
       const recipes = EXACT_PATTERNS.filter((pattern) => pattern.result === id);
       expect(recipes, id).toHaveLength(1);
+      const cells = filledCount(recipes[0]);
+      expect(cells, id).toBeLessThanOrEqual(FORMS[id].tier === 1 ? 4 : 7);
+      if (FORMS[id].tier === 2) expect(cells, id).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('makes all ten starter items discoverable with tier-appropriate recipes', () => {
+    expect(STARTER_ITEM_FORMS).toHaveLength(10);
+    expect(new Set(STARTER_ITEM_FORMS).size).toBe(10);
+    for (const id of STARTER_ITEM_FORMS) {
+      const recipes = EXACT_PATTERNS.filter((pattern) => pattern.result === id);
+      expect(recipes.length, id).toBeGreaterThanOrEqual(1);
       const cells = filledCount(recipes[0]);
       expect(cells, id).toBeLessThanOrEqual(FORMS[id].tier === 1 ? 4 : 7);
       if (FORMS[id].tier === 2) expect(cells, id).toBeGreaterThanOrEqual(4);

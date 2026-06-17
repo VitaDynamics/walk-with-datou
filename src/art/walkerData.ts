@@ -1,8 +1,7 @@
 /**
- * The two designed walkers (Mei & An) and their five outfit "directions",
- * ported from the "Main Character Concepts" handoff. The walker the player
- * controls is one of these characters in one of these outfits; the HumanRig
- * draws head / torso / leg plates from this data.
+ * The two human companions (Mei & An) and five moments from their shared life
+ * with Datou. Their clothes are practical, soft, and activity-led: field notes,
+ * workshop mornings, night walks, slow Sundays, and rain shelter.
  *
  * Geometry lives in the HumanRig; here we keep only identity (skin, hair,
  * personality stance) and wardrobe (top / bottom / shoes / accessories).
@@ -17,9 +16,9 @@ export type AgeId = 'kid' | 'teen' | 'adult';
 export const AGE_ORDER: AgeId[] = ['kid', 'teen', 'adult'];
 
 /**
- * Per-age figure metrics (the design's `AGE_M`): the head stays big while the
- * torso and limbs stretch with age, so the three ages read as the same cast at
- * kid / teen / adult. Coordinates are in the shared ~210×218 figure frame.
+ * Per-age figure metrics. The cast keeps a gently stylised animation silhouette
+ * while moving toward believable human proportions as they age: roughly
+ * 4.5 heads tall as kids, 5.5 as teens, and 6.5 as adults.
  */
 export interface AgeMetrics {
   hrx: number;
@@ -36,9 +35,9 @@ export interface AgeMetrics {
 }
 
 export const AGE_M: Record<AgeId, AgeMetrics> = {
-  kid: { hrx: 37, hry: 34, neckL: 4, torsoH: 39, shW: 45, hipW: 40, legL: 40, armL: 31, limbW: 9.5, legW: 11 },
-  teen: { hrx: 32, hry: 29.5, neckL: 7, torsoH: 52, shW: 45, hipW: 40, legL: 59, armL: 47, limbW: 8.5, legW: 10 },
-  adult: { hrx: 29.5, hry: 28, neckL: 9, torsoH: 60, shW: 49, hipW: 43, legL: 73, armL: 58, limbW: 9, legW: 10.2 },
+  kid: { hrx: 32, hry: 33, neckL: 3.5, torsoH: 45, shW: 45, hipW: 39, legL: 50, armL: 37, limbW: 8.2, legW: 9.5 },
+  teen: { hrx: 28.5, hry: 30, neckL: 5, torsoH: 60, shW: 49, hipW: 42, legL: 75, armL: 55, limbW: 7.8, legW: 9 },
+  adult: { hrx: 26, hry: 29, neckL: 6, torsoH: 70, shW: 53, hipW: 44, legL: 92, armL: 66, limbW: 8, legW: 9.5 },
 };
 
 export interface Cast {
@@ -54,10 +53,11 @@ export const CAST: Record<CharId, Cast> = {
 };
 
 export interface TopSpec {
-  type: 'tee' | 'dress' | 'pjTop' | 'raincoat';
+  type: 'tee' | 'dress' | 'pjTop' | 'raincoat' | 'overshirt';
   color: string;
   sleeves: 'short' | 'long';
   stripes?: string;
+  underColor?: string;
 }
 
 export interface BottomSpec {
@@ -98,104 +98,104 @@ export const DIRECTION_ORDER: DirId[] = ['scout', 'pajama', 'cape', 'picnic', 'r
 
 export const DIRECTIONS: Record<DirId, Direction> = {
   scout: {
-    title: 'Trailside Scout',
+    title: 'Field Notes',
     fits: {
       mei: {
-        top: { type: 'tee', color: W.butter, sleeves: 'short' },
+        top: { type: 'tee', color: W.cream, sleeves: 'long' },
         bottom: { type: 'overallShorts', color: W.sage },
-        socks: W.cream,
-        shoes: { boot: true, color: W.peachD },
+        socks: W.sageD,
+        shoes: { boot: true, color: W.leather },
         extras: ['satchel'],
-        extraColors: { satchel: W.sageD },
+        extraColors: { satchel: W.leatherLight },
       },
       an: {
-        top: { type: 'tee', color: W.sage, sleeves: 'long' },
-        bottom: { type: 'shorts', color: W.creamD },
+        top: { type: 'overshirt', color: W.creamD, underColor: W.sageD, sleeves: 'long' },
+        bottom: { type: 'pants', color: W.sageD },
         socks: null,
-        shoes: { boot: false, color: W.butter },
-        extras: ['bucketHat', 'neckerchief'],
-        extraColors: { hat: W.sageD, scarf: W.peach },
+        shoes: { boot: true, color: W.leather },
+        extras: ['satchel'],
+        extraColors: { satchel: W.leatherLight },
       },
     },
   },
   pajama: {
-    title: 'Pajama Stroll',
+    title: 'Workshop Morning',
     fits: {
       mei: {
-        top: { type: 'dress', color: W.peachL, sleeves: 'long', stripes: W.peach },
-        bottom: { type: 'none' },
-        socks: null,
-        shoes: { boot: false, color: W.butter },
-        extras: ['sleepMask'],
-        extraColors: { mask: W.peach },
-      },
-      an: {
-        top: { type: 'pjTop', color: W.butterL, sleeves: 'long' },
+        top: { type: 'pjTop', color: W.creamD, sleeves: 'long' },
         bottom: { type: 'pjPants', color: W.sageL },
         socks: null,
-        shoes: { boot: false, color: W.peach },
+        shoes: { boot: false, color: W.leather },
+        extras: ['sleepMask'],
+        extraColors: { mask: W.sage },
+      },
+      an: {
+        top: { type: 'pjTop', color: W.sageL, sleeves: 'long' },
+        bottom: { type: 'pjPants', color: W.creamD },
+        socks: null,
+        shoes: { boot: false, color: W.leather },
         extras: ['nightcap'],
-        extraColors: { hat: W.butter },
+        extraColors: { hat: W.creamD },
       },
     },
   },
   cape: {
-    title: 'Storybook Cape',
+    title: 'Night Walk',
     fits: {
       mei: {
-        top: { type: 'dress', color: W.butterL, sleeves: 'short' },
-        bottom: { type: 'none' },
+        top: { type: 'overshirt', color: W.sageD, underColor: W.cream, sleeves: 'long' },
+        bottom: { type: 'pants', color: W.charcoal },
         socks: null,
-        shoes: { boot: true, color: W.peachD },
-        extras: ['cape'],
-        extraColors: { cape: W.peach },
+        shoes: { boot: true, color: W.leather },
+        extras: ['satchel', 'neckerchief'],
+        extraColors: { satchel: W.leather, scarf: W.signal },
       },
       an: {
-        top: { type: 'tee', color: W.creamD, sleeves: 'long' },
+        top: { type: 'overshirt', color: W.charcoal, underColor: W.creamD, sleeves: 'long' },
         bottom: { type: 'pants', color: W.sageD },
         socks: null,
-        shoes: { boot: true, color: W.butter },
-        extras: ['cape'],
-        extraColors: { cape: W.sage },
+        shoes: { boot: true, color: W.leather },
+        extras: ['satchel', 'neckerchief'],
+        extraColors: { satchel: W.leatherLight, scarf: W.signal },
       },
     },
   },
   picnic: {
-    title: 'Picnic Sunday',
+    title: 'Slow Sunday',
     fits: {
       mei: {
-        top: { type: 'tee', color: W.butter, sleeves: 'short' },
-        bottom: { type: 'pinafore', color: W.peach },
+        top: { type: 'tee', color: W.cream, sleeves: 'long' },
+        bottom: { type: 'pinafore', color: W.sageL },
         socks: null,
-        shoes: { boot: false, color: W.peachD },
+        shoes: { boot: false, color: W.leather },
         extras: ['strawHat'],
-        extraColors: { band: W.peachD },
+        extraColors: { band: W.signal },
       },
       an: {
-        top: { type: 'tee', color: W.butterL, sleeves: 'short' },
-        bottom: { type: 'overalls', color: W.sage },
+        top: { type: 'overshirt', color: W.creamD, underColor: W.sage, sleeves: 'long' },
+        bottom: { type: 'pants', color: W.sageD },
         socks: null,
-        shoes: { boot: false, color: W.peachD },
+        shoes: { boot: false, color: W.leather },
         extras: ['strawHat'],
-        extraColors: { band: W.sageD },
+        extraColors: { band: W.signal },
       },
     },
   },
   rain: {
-    title: 'Drizzle Day',
+    title: 'Rain Shelter',
     fits: {
       mei: {
-        top: { type: 'raincoat', color: W.butter, sleeves: 'long' },
+        top: { type: 'raincoat', color: W.sage, sleeves: 'long' },
         bottom: { type: 'none' },
         socks: null,
-        shoes: { boot: true, color: W.sage },
+        shoes: { boot: true, color: W.leather },
         extras: ['hood'],
       },
       an: {
-        top: { type: 'raincoat', color: W.peach, sleeves: 'long' },
+        top: { type: 'raincoat', color: W.creamD, sleeves: 'long' },
         bottom: { type: 'none' },
         socks: null,
-        shoes: { boot: true, color: W.butter },
+        shoes: { boot: true, color: W.leather },
         extras: ['hood'],
       },
     },

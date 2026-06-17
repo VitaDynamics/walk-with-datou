@@ -19,7 +19,7 @@
 import { canonical, type ExactPattern } from './pattern';
 import type { FormId } from './forms';
 
-export const PATTERNS_VERSION = 2;
+export const PATTERNS_VERSION = 3;
 
 const W = 'wood';
 const S = 'stone';
@@ -83,6 +83,40 @@ export const EXACT_PATTERNS: readonly ExactPattern[] = [
   pat('drinking-bowl', [S, _, S, S, S, S, _, _, _], [1, 0, 1, 2, 1, 2, 0, 0, 0]),
   // A timber frame divided into plant-filled nesting rooms → a bug hotel.
   pat('bug-hotel', [W, W, W, W, P, W, _, P, _], [1, 1, 1, 2, 1, 2, 0, 1, 0]),
+  // A little clay pot holding one living sprout.
+  pat('sprout-pot', [_, P, _, S, S, S, _, _, _], [0, 1, 0, 1, 2, 1, 0, 0, 0]),
+  // A roofed letter box on a wooden post.
+  pat('mailbox', [W, W, _, _, F, _, _, W, _], [1, 1, 0, 0, 1, 0, 0, 2, 0]),
+  // A mushroom cap gathered around a small found-light center.
+  pat('mushroom-lamp', [P, P, P, _, F, _, _, W, _], [1, 2, 1, 0, 1, 0, 0, 2, 0]),
+  // A padded nest with an open center for Datou to curl into.
+  pat('pet-bed', [P, P, P, P, _, P, _, P, _], [1, 1, 1, 1, 0, 1, 0, 1, 0]),
+  // A shallow ceramic bowl prepared for a meal.
+  pat('food-bowl', [_, _, _, S, _, S, _, S, S], [0, 0, 0, 1, 0, 1, 0, 2, 2]),
+  // A stone cap and window carried by a squat pedestal.
+  pat('garden-lantern', [S, S, S, S, F, S, _, S, _], [1, 1, 1, 1, 1, 1, 0, 2, 0]),
+  // A compartmented wooden chest with seeds tucked inside.
+  pat('seed-chest', [W, P, W, W, _, W, W, _, W], [1, 1, 1, 1, 0, 1, 2, 0, 2]),
+  // A small toy body with found joints and a repaired wooden foot.
+  pat('repair-toy', [F, W, F, _, F, _, W, _, W], [1, 1, 1, 0, 2, 0, 1, 0, 1]),
+
+  // --- Interactive park keepsakes (the eight code-cutout items, tier 2) ------
+  // A fired-clay vessel cradled in a paste collar on a wood foot → steam-rest.
+  pat('steam-rest', [_, P, _, P, F, P, _, W, _], [0, 1, 0, 1, 1, 1, 0, 1, 0]),
+  // A wide stone carcass with plant nose-tabs under a wood lid → nose-puzzle.
+  pat('nose-puzzle-drawer', [_, W, _, P, S, P, _, _, _], [0, 1, 0, 1, 2, 1, 0, 0, 0]),
+  // A low plank spine spread with water wells → paw-rinse-step.
+  pat('paw-rinse-step', [_, W, _, P, P, P, W, _, W], [0, 1, 0, 1, 2, 1, 1, 0, 1]),
+  // A glass water globe over a squat clay tripod → moonwater-lamp.
+  pat('moonwater-lamp', [_, W, _, P, W, P, P, P, P], [0, 1, 0, 1, 1, 1, 2, 1, 2]),
+  // An F-flanked woven grid on a stick leg → bird-nesting-fiber-frame.
+  pat('bird-nesting-fiber-frame', [F, P, F, P, P, P, _, S, _], [1, 1, 1, 1, 2, 1, 0, 1, 0]),
+  // A paper disc with a sage glyph ring on a wood easel → weather-log-wheel.
+  pat('weather-log-wheel', [_, P, _, S, P, S, _, W, _], [0, 1, 0, 1, 1, 1, 0, 1, 0]),
+  // A cross-braced sage wheel on a clay foot → spin-choice-wheel.
+  pat('spin-choice-wheel', [_, P, _, W, S, W, _, F, _], [0, 1, 0, 1, 2, 1, 0, 1, 0]),
+  // A found lid over a soft pad in a heavy stone round → shared-snack-tin.
+  pat('shared-snack-tin', [_, F, _, S, P, S, _, S, _], [0, 1, 0, 2, 1, 2, 0, 2, 0]),
 
   // --- For Datou & keepsakes (tier 1) ---------------------------------------
   // A garland: a sweeping arc of flowers.
@@ -215,7 +249,9 @@ export function patternByKey(key: string): ExactPattern | null {
 }
 
 /** A readable recipe: how many filled cells of each material group a pattern wants. */
-export function patternRecipe(p: ExactPattern): Partial<Record<'wood' | 'stone' | 'plant' | 'found', number>> {
+export function patternRecipe(
+  p: ExactPattern,
+): Partial<Record<'wood' | 'stone' | 'plant' | 'found', number>> {
   const need: Record<string, number> = {};
   for (let i = 0; i < 9; i++) {
     const g = p.cells[i];

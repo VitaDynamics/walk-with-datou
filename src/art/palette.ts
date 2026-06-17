@@ -67,10 +67,9 @@ export const ROBOT = {
 } as const;
 
 /**
- * Cozy-pastel walker palette — the two designed companions Mei & An
- * (from "Main Character Concepts"). A wobbly-ink paper-doll cast: warm,
- * low-saturation, sitting inside the same INK as the rest of the diorama.
- * Peach · butter · sage · cream, with two skin/hair tones to tell them apart.
+ * Quiet maker palette for Mei & An. They belong beside Datou rather than
+ * competing with him: paper cream · sage · clay, with the same tiny amber
+ * signal color as his antenna and ear light.
  */
 export const WALKER = {
   peach: '#f2b79b',
@@ -85,16 +84,29 @@ export const WALKER = {
   cream: '#fbf4e6',
   creamD: '#efe2c8',
   white: '#fffdf7',
+  signal: '#d9a441',
+  charcoal: '#55534b',
+  leather: '#7a604c',
+  leatherLight: '#9a7b60',
   skinMei: '#f9e4cb',
   skinAn: '#f0d2ae',
-  hairMei: '#7b5340',
-  hairAn: '#55453a',
+  hairMei: '#625047',
+  hairAn: '#4f4941',
   blush: '#f2a28d',
 } as const;
 
 /** Warm lamp glow tint (baked softly into sprites — never a real bloom). */
 export const GLOW = 'rgba(217, 178, 199, 0)';
 export const LAMP_WARM = 'rgba(233, 196, 124, 0.35)';
+
+/**
+ * Quiet warm focal accent for placed-item overlays (a tended-leaf bud, a raised
+ * stitch, a chosen seed). Deliberately NOT `#d9a441` — that amber is Datou's
+ * own signal color (ROBOT.accent / WALKER.signal), reserved for the robot so a
+ * keepsake never borrows his light. This is a softer dust-rose-tan that reads as
+ * "handmade warmth" without competing for the eye.
+ */
+export const ACCENT_WARM = '#d6bfa7';
 
 /** Contact-shadow ink (soft, warm, low alpha gradient center). */
 export const SHADOW = 'rgba(58, 55, 47, 0.42)';

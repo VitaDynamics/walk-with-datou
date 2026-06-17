@@ -16,6 +16,13 @@ phases land.
 | C7 | Day cycle + rain *scene* | planned (§7) — note: rain *data* already exists |
 | C8 | Divergence + bestFriend tier | planned (§8) |
 
+**Human companion appearance (June 2026): implemented.** Mei and An were
+redesigned around §1.6 of the refactor plan: attentive maker/repairer
+silhouettes, practical shared-life wardrobe, and restrained amber motifs that
+visually connect them to Datou without competing with him. Their canvas plates
+use stable cel-animation contours, more believable age proportions, shaped
+anime faces, and restrained two-tone shading instead of seeded line wobble.
+
 ---
 
 ## 0. Code facts the design binds to (verified)

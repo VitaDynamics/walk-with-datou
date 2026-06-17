@@ -15,6 +15,8 @@ export interface PropSprite {
   canvas: HTMLCanvasElement;
   /** Width / height — used to keep world planes in proportion. */
   aspect: number;
+  /** Asset-backed sprites resolve this after their pixels have reached the canvas. */
+  ready?: Promise<void>;
 }
 
 function sprite(w: number, h: number): { c: HTMLCanvasElement; g: CanvasRenderingContext2D } {

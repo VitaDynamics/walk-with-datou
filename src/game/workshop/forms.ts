@@ -22,7 +22,7 @@
 import type { MaterialGroup, MaterialId } from './materials';
 import { CATALOG_FORMS, type CatalogFormId } from './formCatalog';
 
-export const FORMS_VERSION = 3;
+export const FORMS_VERSION = 4;
 
 /** Tree-tab branches (BUILDING_SYSTEM §2.2 groupings). */
 export type FormFamily = 'component' | 'furnishing' | 'structure' | 'datou' | 'keepsake' | 'tool';
@@ -374,6 +374,171 @@ const CORE_FORMS = {
     inspiration: 'meadow + breeze + spring + curious mood, bond 30+',
     world: { heightM: 1.1, shadowRadiusM: 0.48, colliderM: 0.3, placement: 'billboard' },
   },
+  'sprout-pot': {
+    family: 'furnishing',
+    accepts: ['stone'],
+    materials: ['flat-stone', 'stone-block', 'clay-lump'],
+    use: 'place',
+    tier: 1,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You water the tiny sprout together and Datou checks each new leaf on the way home.',
+    inspiration: 'home + clear + spring + curious mood, bond 0+',
+    world: { heightM: 0.48, shadowRadiusM: 0.3, colliderM: 0.18, placement: 'billboard' },
+  },
+  mailbox: {
+    family: 'furnishing',
+    accepts: ['wood'],
+    materials: ['twig', 'bark', 'plank', 'driftwood'],
+    use: 'place',
+    tier: 1,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'Datou waits beside the little door while you check whether a neighbor left a note.',
+    inspiration: 'home + clear + any season + calm mood, bond 0+',
+    world: { heightM: 0.95, shadowRadiusM: 0.32, colliderM: 0.2, placement: 'billboard' },
+  },
+  'food-bowl': {
+    family: 'furnishing',
+    accepts: ['stone', 'found'],
+    materials: ['flat-stone', 'stone-block', 'clay-lump', 'shell'],
+    use: 'place',
+    tier: 1,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You set down a small meal and stay nearby while Datou settles into its evening routine.',
+    inspiration: 'home + clear + any season + tired mood, bond 0+',
+    world: { heightM: 0.25, shadowRadiusM: 0.34, colliderM: 0.18, placement: 'billboard' },
+  },
+  'garden-lantern': {
+    family: 'furnishing',
+    accepts: ['stone'],
+    materials: ['flat-stone', 'stone-block', 'clay-lump'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You light the low garden lantern and Datou follows its warm pool along the path.',
+    inspiration: 'home + evening + autumn + calm mood, bond 0+',
+    world: { heightM: 0.92, shadowRadiusM: 0.42, colliderM: 0.26, placement: 'billboard' },
+  },
+  'seed-chest': {
+    family: 'furnishing',
+    accepts: ['wood'],
+    materials: ['twig', 'bark', 'plank', 'driftwood'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You choose seeds for the next planting while Datou noses the open compartments.',
+    inspiration: 'home + clear + spring + curious mood, bond 0+',
+    world: { heightM: 0.62, shadowRadiusM: 0.5, colliderM: 0.38, placement: 'billboard' },
+  },
+
+  // --- Interactive park keepsakes (the eight code-cutout items) --------------
+  'steam-rest': {
+    family: 'furnishing',
+    accepts: ['stone'],
+    materials: ['flat-stone', 'stone-block', 'clay-lump'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You warm the cup and Datou settles beside you to watch the steam curl up.',
+    inspiration: 'home + clear + winter + tired mood, bond 0+',
+    world: { heightM: 0.45, shadowRadiusM: 0.27, colliderM: 0.32, placement: 'billboard' },
+  },
+  'nose-puzzle-drawer': {
+    family: 'datou',
+    accepts: ['stone', 'wood', 'plant'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You slide a drawer and Datou noses out the hidden scent — solved, never frustrated.',
+    inspiration: 'home + clear + any season + curious mood, bond 20+',
+    world: { heightM: 0.45, shadowRadiusM: 0.5, colliderM: 0.7, placement: 'billboard' },
+  },
+  'paw-rinse-step': {
+    family: 'furnishing',
+    accepts: ['stone'],
+    materials: ['flat-stone', 'stone-block', 'clay-lump'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You fill the four little wells and Datou rinses each muddy paw before coming home.',
+    inspiration: 'home + rain + any season + tired mood, bond 20+',
+    world: { heightM: 0.28, shadowRadiusM: 0.62, colliderM: 0.55, placement: 'billboard' },
+  },
+  'moonwater-lamp': {
+    family: 'keepsake',
+    accepts: ['stone', 'found'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You light it at dusk and the still water holds a small warm pool you both watch.',
+    inspiration: 'lake + evening + summer + calm mood, bond 0+',
+    world: { heightM: 0.34, shadowRadiusM: 0.36, colliderM: 0.42, placement: 'billboard' },
+  },
+  'bird-nesting-fiber-frame': {
+    family: 'furnishing',
+    accepts: ['wood', 'plant'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You set out soft fibers and return to find what the little birds took for their nests.',
+    inspiration: 'meadow + clear + spring + curious mood, bond 0+',
+    world: { heightM: 0.55, shadowRadiusM: 0.42, colliderM: 0.36, placement: 'billboard' },
+  },
+  'weather-log-wheel': {
+    family: 'keepsake',
+    accepts: ['wood', 'plant'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      "You turn the dial one notch to today's sky and Datou reads the new glyph with you.",
+    inspiration: 'home + any weather + any season + calm mood, bond 0+',
+    world: { heightM: 0.55, shadowRadiusM: 0.3, colliderM: 0.34, placement: 'billboard' },
+  },
+  'spin-choice-wheel': {
+    family: 'furnishing',
+    accepts: ['wood', 'stone', 'plant'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'Datou turns the pointer to pick which game you play — the choice is honestly its own.',
+    inspiration: 'meadow + clear + any season + playful mood, bond 20+',
+    world: { heightM: 0.62, shadowRadiusM: 0.26, colliderM: 0.3, placement: 'billboard' },
+  },
+  'shared-snack-tin': {
+    family: 'furnishing',
+    accepts: ['stone', 'found'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'You nose the lid open together for a quiet once-a-day share, shoulder to shoulder.',
+    inspiration: 'home + clear + any season + tired mood, bond 0+',
+    world: { heightM: 0.34, shadowRadiusM: 0.34, colliderM: 0.5, placement: 'billboard' },
+  },
 
   // --- Structures (§2.2) — the big keepsakes, consume bulk stock -------------
   shelter: {
@@ -470,6 +635,19 @@ const CORE_FORMS = {
     inspiration: 'home + clear + any season + playful mood, bond 15+',
     world: { heightM: 0.3, shadowRadiusM: 0.22, colliderM: 0.12, placement: 'billboard' },
   },
+  'pet-bed': {
+    family: 'datou',
+    accepts: ['wood', 'plant', 'found'],
+    materials: ['bark', 'grass-wisp', 'reed', 'flower', 'feather'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    finishes: true,
+    companionshipHook:
+      'Datou circles the soft bed, curls down, and leaves room for you to sit close beside it.',
+    inspiration: 'home + evening + any season + tired mood, bond 0+',
+    world: { heightM: 0.34, shadowRadiusM: 0.52, colliderM: 0.28, placement: 'billboard' },
+  },
 
   // --- Keepsakes (§2.2) -----------------------------------------------------
   'memory-frame': { family: 'keepsake', accepts: ['wood'], use: 'place', tier: 1, finishes: true },
@@ -502,6 +680,18 @@ const CORE_FORMS = {
     use: 'throw',
     tier: 1,
     legacySprite: 'drawStick',
+  },
+  'repair-toy': {
+    family: 'keepsake',
+    accepts: ['wood', 'found'],
+    materials: ['twig', 'plank', 'driftwood', 'old-bolt'],
+    use: 'place',
+    tier: 2,
+    sizes: true,
+    companionshipHook:
+      'You tighten the toy together and Datou watches its familiar little wobble return.',
+    inspiration: 'home + rain + any season + curious mood, bond 0+',
+    world: { heightM: 0.46, shadowRadiusM: 0.26, colliderM: 0.12, placement: 'billboard' },
   },
 
   // --- Tools (§8.2) — same grammar; gate resource nodes ---------------------
@@ -546,6 +736,20 @@ const CORE_FORMS = {
 
 type CoreFormId = keyof typeof CORE_FORMS;
 export type FormId = CoreFormId | CatalogFormId;
+
+/** The ten hand-authored forms revealed by the home coffer in the first session. */
+export const STARTER_ITEM_FORMS = [
+  'sprout-pot',
+  'mailbox',
+  'mushroom-lamp',
+  'chime',
+  'pet-bed',
+  'stool',
+  'food-bowl',
+  'garden-lantern',
+  'seed-chest',
+  'repair-toy',
+] as const satisfies readonly FormId[];
 
 function defaultCoreRarity(def: CoreForm): ItemRarity {
   if (def.tier === 1) return 'common';
@@ -609,6 +813,19 @@ const CORE_SILHOUETTES: Partial<Record<CoreFormId, IdentitySilhouette>> = {
   'cache-box': 'storage',
   'drinking-bowl': 'pet-care',
   'bug-hotel': 'garden',
+  'sprout-pot': 'garden',
+  mailbox: 'storage',
+  'food-bowl': 'pet-care',
+  'garden-lantern': 'light',
+  'seed-chest': 'storage',
+  'steam-rest': 'kitchen',
+  'nose-puzzle-drawer': 'pet-play',
+  'paw-rinse-step': 'pet-care',
+  'moonwater-lamp': 'light',
+  'bird-nesting-fiber-frame': 'garden',
+  'weather-log-wheel': 'instrument',
+  'spin-choice-wheel': 'pet-play',
+  'shared-snack-tin': 'kitchen',
   shelter: 'house',
   archway: 'canopy',
   pergola: 'canopy',
@@ -625,12 +842,14 @@ const CORE_SILHOUETTES: Partial<Record<CoreFormId, IdentitySilhouette>> = {
   tunnel: 'pet-course',
   'ball-run': 'pet-play',
   'play-ball': 'pet-play',
+  'pet-bed': 'pet-rest',
   'memory-frame': 'memory',
   'postcard-stand': 'display',
   cairn: 'display',
   'wind-vane': 'instrument',
   'music-post': 'sound',
   stick: 'pet-play',
+  'repair-toy': 'memory',
   axe: 'hand-tool',
   pickaxe: 'hand-tool',
   shears: 'hand-tool',
