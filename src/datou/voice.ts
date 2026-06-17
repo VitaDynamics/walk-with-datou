@@ -29,7 +29,38 @@ export type VoiceContext =
   | 'startled'
   | 'wonder'
   | 'showTell'
-  | 'ask';
+  | 'ask'
+  // BOBO's own captions on his ten field-lab items (one canonical line each).
+  | 'labBulb'
+  | 'labTime'
+  | 'labShelter'
+  | 'labLantern'
+  | 'labToolroll'
+  | 'labWobble'
+  | 'labAntenna'
+  | 'labNote'
+  | 'labBell'
+  | 'labPoof'
+  // BOBO's captions on the nine authored starter keepsakes (one line each).
+  | 'starterSprout'
+  | 'starterMailboxNote'
+  | 'starterMailboxEmpty'
+  | 'starterMushroomLamp'
+  | 'starterPetBed'
+  | 'starterStool'
+  | 'starterGardenLantern'
+  | 'starterSeedChest'
+  | 'starterChime'
+  | 'starterRepairToy'
+  // BOBO's captions on the eight new interactive park keepsakes (one line each).
+  | 'parkSteamRest'
+  | 'parkNosePuzzle'
+  | 'parkPawRinse'
+  | 'parkMoonwater'
+  | 'parkNestingFrame'
+  | 'parkWeatherWheel'
+  | 'parkSpinWheel'
+  | 'parkSnackTin';
 
 /** Lines per context — i18n holds `voice.<context>.1 … .<n>` in en + zh. */
 export const VOICE_POOL: Record<VoiceContext, number> = {
@@ -47,6 +78,37 @@ export const VOICE_POOL: Record<VoiceContext, number> = {
   wonder: 6,
   showTell: 4,
   ask: 4,
+  // One canonical caption per lab item (the design's BOBO voice line).
+  labBulb: 1,
+  labTime: 1,
+  labShelter: 1,
+  labLantern: 1,
+  labToolroll: 1,
+  labWobble: 1,
+  labAntenna: 1,
+  labNote: 1,
+  labBell: 1,
+  labPoof: 1,
+  // One canonical caption per authored starter keepsake.
+  starterSprout: 1,
+  starterMailboxNote: 1,
+  starterMailboxEmpty: 1,
+  starterMushroomLamp: 1,
+  starterPetBed: 1,
+  starterStool: 1,
+  starterGardenLantern: 1,
+  starterSeedChest: 1,
+  starterChime: 1,
+  starterRepairToy: 1,
+  // One canonical caption per interactive park keepsake.
+  parkSteamRest: 1,
+  parkNosePuzzle: 1,
+  parkPawRinse: 1,
+  parkMoonwater: 1,
+  parkNestingFrame: 1,
+  parkWeatherWheel: 1,
+  parkSpinWheel: 1,
+  parkSnackTin: 1,
 };
 
 const AMBIENT: ReadonlySet<VoiceContext> = new Set(['wonder', 'ask']);

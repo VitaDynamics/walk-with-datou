@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { VOICE_POOL, Voice, type VoiceContext } from './voice';
+import { STARTER_VOICE_CONTEXTS } from '../game/starterInteractions';
+import { PARK_VOICE_CONTEXTS } from '../game/parkInteractions';
 
 function makeVoice(seq: number[] = [0.0]): Voice {
   let i = 0;
@@ -55,9 +57,46 @@ describe('Voice — rate limiting (one quiet chip at a time)', () => {
   });
 });
 
+/**
+ * The field-lab item captions are one canonical line each (the design handoff
+ * gives each co-invention a single signature line, e.g. 灵感灯泡 → "比 100 个还亮").
+ * They're authored payloads tied to a specific item, not chatter pools that need
+ * variety — so they're exempt from the ≥3 rule, and pinned to exactly 1.
+ */
+const LAB_CONTEXTS: readonly VoiceContext[] = [
+  'labBulb',
+  'labTime',
+  'labShelter',
+  'labLantern',
+  'labToolroll',
+  'labWobble',
+  'labAntenna',
+  'labNote',
+  'labBell',
+  'labPoof',
+];
+
+/**
+ * The authored starter keepsakes carry the same kind of single signature line
+ * as the lab items (one caption tied to a specific item, not a chatter pool),
+ * so they're exempt from the ≥3 rule and pinned to exactly 1.
+ */
+const SINGLE_LINE_CONTEXTS: readonly VoiceContext[] = [
+  ...LAB_CONTEXTS,
+  ...STARTER_VOICE_CONTEXTS,
+  ...PARK_VOICE_CONTEXTS,
+];
+
 describe('Voice — pools', () => {
-  it('every context has at least 3 authored lines', () => {
-    for (const n of Object.values(VOICE_POOL)) expect(n).toBeGreaterThanOrEqual(3);
+  it('every chatter context has at least 3 authored lines', () => {
+    for (const [ctx, n] of Object.entries(VOICE_POOL)) {
+      if (SINGLE_LINE_CONTEXTS.includes(ctx as VoiceContext)) continue;
+      expect(n, ctx).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('every lab-item and starter-item caption is exactly one canonical line', () => {
+    for (const ctx of SINGLE_LINE_CONTEXTS) expect(VOICE_POOL[ctx], ctx).toBe(1);
   });
 
   it('cycles through a pool without throwing for any rand value', () => {

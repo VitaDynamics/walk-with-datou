@@ -10,12 +10,46 @@
 
 import { RECIPES, type RecipeUse } from './Crafting';
 import { parseItemId } from './workshop/items';
+import { isLabItem } from './labItems';
+import type { FoodBowlStage } from '../art/foodBowl';
+import type {
+  SproutStage,
+  BedStage,
+  SeatStage,
+  SeedStage,
+} from './starterInteractions';
 
 /** One keepsake set down in the world. `id` is a legacy CraftedId or a Workshop ItemId. */
 export interface PlacedEntry {
   id: string;
   x: number;
   z: number;
+  /** Only used by the staged food-bowl interaction. */
+  bowlStage?: FoodBowlStage;
+  // --- Starter-item interaction state (one small field per interactive form,
+  //     never overloaded; savePlaced() serializes the entry so each persists). ---
+  /** sprout-pot: dry → watered → leafing → bloom (renewable). */
+  sproutStage?: SproutStage;
+  /** sprout-pot: dailyKey() of the last leaf-check, gating the daily return beat. */
+  sproutDay?: string;
+  /** mailbox: dailyKey() of the day a note was last collected (once-daily open). */
+  mailDay?: string;
+  /** mushroom-lamp / garden-lantern: lit toggle (lantern reverts on daily rollover). */
+  lampLit?: boolean;
+  lanternLit?: boolean;
+  /** pet-bed: made → circled → nested. */
+  bedStage?: BedStage;
+  /** stool: empty → seated → rested. */
+  seatStage?: SeatStage;
+  /** seed-chest: full → sorted → chosen (one-time). */
+  seedStage?: SeedStage;
+  // --- Interactive park keepsakes (parkInteractions.ts) -----------------------
+  /** The current ordered state of a park item (its form defines the union). */
+  parkState?: string;
+  /** dailyKey() of the last park-item payoff, gating the once-a-day reactions. */
+  parkDay?: string;
+  /** weather-log-wheel / spin-choice-wheel: which notch/wedge is showing. */
+  parkNotch?: number;
 }
 
 /** The legacy `wwd.built` entry shape (pre-unification). */
@@ -46,5 +80,6 @@ export function migratePlaced(
  *  recipe use; raw materials have no verb (they feed the bench instead). */
 export function verbFor(id: string): RecipeUse | null {
   if (parseItemId(id)) return 'place';
+  if (isLabItem(id)) return 'place'; // a field-lab keepsake — set it down, then tap it
   return RECIPES.find((r) => r.id === id)?.use ?? null;
 }

@@ -380,6 +380,11 @@ export class DatouRig {
     if (this.armMode !== 'carry') this.reachLeft = seconds;
   }
 
+  /** True while a reach-down beat is still playing (re-fire guard for callers). */
+  isReaching(): boolean {
+    return this.reachLeft > 0;
+  }
+
   /**
    * Set how full the back bucket reads (BUILDING_SYSTEM §7). Snaps to three
    * sketch states (empty/half/full) so it's a clear glanceable signal; hidden

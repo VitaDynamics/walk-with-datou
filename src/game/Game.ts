@@ -29,7 +29,7 @@ import {
 } from '../art/props';
 import { DatouRig } from '../datou/DatouRig';
 import { EmotionEngine } from '../datou/emotion';
-import { amplitude, clipAllowed, familiarityStage, gazeUrgency } from '../datou/character';
+import { amplitude, clipAllowed, familiarityStage, gazeUrgency, stageReached } from '../datou/character';
 import { Voice, type VoiceContext } from '../datou/voice';
 import { Behaviors } from '../datou/behaviors';
 import { Rng } from '../physics/mujoco/rng';
@@ -100,7 +100,7 @@ import {
 } from './workshop/items';
 import { canonical } from './workshop/pattern';
 import { patternForForm, patternRecipe } from './workshop/patterns';
-import type { FormId } from './workshop/forms';
+import { STARTER_ITEM_FORMS, type FormId } from './workshop/forms';
 import { itemSprite, itemHeight } from './workshop/sprites';
 import type { MaterialId, MaterialGroup } from './workshop/materials';
 import { MATERIALS, MATERIAL_IDS, groupOf } from './workshop/materials';
@@ -113,6 +113,68 @@ import { Tools } from './workshop/tools';
 import { Harvest } from './workshop/Harvest';
 import { NODE_DEFS, NODE_PLACEMENTS, type NodePlacement } from './workshop/nodes';
 import { drawNode } from '../art/nodes';
+import {
+  drawFoodBowl,
+  nextFoodBowlStage,
+  normalizeFoodBowlStage,
+  type FoodBowlStage,
+} from '../art/foodBowl';
+import {
+  drawInspirationBulb,
+  drawTimeMachine,
+  drawRainShelter,
+  drawWhisperLantern,
+  drawToolRoll,
+  drawWobbleToy,
+  drawThoughtAntenna,
+  drawFieldNote,
+  drawBaboBell,
+  drawPoofCard,
+} from '../art/labItems';
+import { LAB_ITEMS, labItemFor, isLabItem, type LabItem } from './labItems';
+import {
+  drawSproutPot,
+  drawMailbox,
+  drawMushroomLamp,
+  drawPetBed,
+  drawStool,
+  drawGardenLantern,
+  drawSeedChest,
+} from '../art/starterOverlays';
+import { isStarterAssetForm } from '../art/starterItems';
+import {
+  RITUAL_REACTIONS,
+  lightStarterFor,
+  starterFormOf,
+  normalizeSproutStage,
+  normalizeBedStage,
+  nextBedStage,
+  normalizeSeatStage,
+  nextSeatStage,
+  normalizeSeedStage,
+  nextSeedStage,
+  type RitualForm,
+  type StarterReaction,
+} from './starterInteractions';
+import {
+  drawSteamRest,
+  drawNosePuzzle,
+  drawPawRinse,
+  drawMoonwaterLamp,
+  drawNestingFrame,
+  drawWeatherWheel,
+  drawSpinWheel,
+  drawSnackTin,
+} from '../art/parkItems';
+import {
+  PARK_ITEMS,
+  parkItemFor,
+  parkFormOf,
+  normalizeParkState,
+  nextParkState,
+  type ParkItem,
+  type ParkItemForm,
+} from './parkInteractions';
 
 const MAX_DT = 1 / 30;
 const TRUST_FULL = 120;
@@ -137,6 +199,67 @@ const MAJOR_VERB: Record<MajorProp['kind'], string> = {
 };
 /** The starter coffer sits just off the home pad, in easy first-walk reach. */
 const COFFER_POS = { x: -1.8, z: 4.0 } as const;
+
+/**
+ * Staged-ritual config for the three two-step starters (pet-bed / stool /
+ * seed-chest). Each maps its PlacedEntry stage field to the ordered states, the
+ * normalize/next helpers, the beat that fires Datou's payoff, the terminal
+ * state, and an optional mid-transition toast.
+ */
+type StagedConfig = {
+  field: 'bedStage' | 'seatStage' | 'seedStage';
+  states: readonly string[];
+  normalize: (s: unknown) => string;
+  next: (s: string) => string;
+  payoffBeat: string;
+  terminal: string;
+  midToast?: string;
+  payoffToast?: string;
+};
+const STAGED: Record<'pet-bed' | 'stool' | 'seed-chest', StagedConfig> = {
+  'pet-bed': {
+    field: 'bedStage',
+    states: ['made', 'circled', 'nested'],
+    normalize: (s) => normalizeBedStage(s),
+    next: (s) => nextBedStage(s as 'made' | 'circled' | 'nested'),
+    payoffBeat: 'nested',
+    terminal: 'nested',
+    payoffToast: 'item.pet-bed.nested',
+  },
+  stool: {
+    field: 'seatStage',
+    states: ['empty', 'seated', 'rested'],
+    normalize: (s) => normalizeSeatStage(s),
+    next: (s) => nextSeatStage(s as 'empty' | 'seated' | 'rested'),
+    payoffBeat: 'rested',
+    terminal: 'rested',
+    payoffToast: 'item.stool.rested',
+  },
+  'seed-chest': {
+    field: 'seedStage',
+    states: ['full', 'sorted', 'chosen'],
+    normalize: (s) => normalizeSeedStage(s),
+    next: (s) => nextSeedStage(s as 'full' | 'sorted' | 'chosen'),
+    payoffBeat: 'chosen',
+    terminal: 'chosen',
+    midToast: 'item.seed-chest.sorted',
+    payoffToast: 'item.seed-chest.chosen',
+  },
+};
+
+/** Field-lab item plate draw, by id: (seed, active) → the resting/active sprite. */
+const LAB_DRAW: Record<string, (seed: number, active: boolean) => PropSprite> = {
+  'lab-bulb': drawInspirationBulb,
+  'lab-time': drawTimeMachine,
+  'lab-shelter': drawRainShelter,
+  'lab-lantern': drawWhisperLantern,
+  'lab-toolroll': drawToolRoll,
+  'lab-wobble': drawWobbleToy,
+  'lab-antenna': drawThoughtAntenna,
+  'lab-note': drawFieldNote,
+  'lab-bell': drawBaboBell,
+  'lab-poof': drawPoofCard,
+};
 
 type BuildableKind =
   | 'cairn'
@@ -210,6 +333,24 @@ export class Game {
   private readonly placedItems: PlacedItem[] = [];
   private pickupTarget: PlacedItem | null = null;
   private pendingPickup: PlacedEntry | null = null;
+  /** A placed keepsake a long-press landed on (armed for pick-up / move). */
+  private holdPickup: PlacedItem | null = null;
+  private pendingBowl: { target: PlacedItem; actor: 'player' | 'datou' } | null = null;
+  // A field-lab item is mid-loop: 'player' = walking over to start it; 'datou'
+  // = the manipulation ran and he's coming to react.
+  private pendingLabReact: { target: PlacedItem; lab: LabItem; actor: 'player' | 'datou' } | null =
+    null;
+  // A starter-item ritual is mid-loop. `beat` is the transition the arrival will
+  // resolve (e.g. 'watered', 'nested', 'lit'); `actor` is who we're waiting on.
+  private pendingStarter:
+    | { target: PlacedItem; form: RitualForm; beat: string; actor: 'player' | 'datou' }
+    | null = null;
+  // chime / repair-toy: Datou is trotting over to give the warm tap→reaction.
+  private pendingLightStarter: { target: PlacedItem; reaction: StarterReaction } | null = null;
+  // A park keepsake is mid-loop: Datou is trotting over to give its payoff (the
+  // state has already advanced + re-plated; `gated` says whether the bond/voice
+  // fires or only the muted body beat — same once-a-day gate the starters use).
+  private pendingPark: { target: PlacedItem; item: ParkItem; gated: boolean } | null = null;
   private lastPointer: { x: number; y: number } | null = null;
   // Resource nodes & tools (W8).
   private readonly nodeState = new NodeState();
@@ -232,7 +373,13 @@ export class Game {
   private pendingShake: OrchardTree | null = null;
   /** Fruit mid-fall (eased drop), then resting on the ground until picked.
    *  Fallen fruit is session-local — overnight, the squirrels get it. */
-  private readonly fallingFruit: { kind: FruitKind; x: number; z: number; cut: Cutout; t: number }[] = [];
+  private readonly fallingFruit: {
+    kind: FruitKind;
+    x: number;
+    z: number;
+    cut: Cutout;
+    t: number;
+  }[] = [];
   private readonly fallenFruit: { kind: FruitKind | 'acorn'; x: number; z: number; cut: Cutout }[] =
     [];
   private pendingFruit: { kind: FruitKind | 'acorn'; x: number; z: number; cut: Cutout } | null =
@@ -343,6 +490,80 @@ export class Game {
       oldBuilt,
       oldWorkshop,
     );
+    // Dev/QA: put one authored bowl beside the home pad without touching saves.
+    const bowlQaRaw = new URLSearchParams(location.search).get('bowl');
+    const bowlQaStage = normalizeFoodBowlStage(bowlQaRaw);
+    if (bowlQaRaw === bowlQaStage) {
+      placedSave.push({
+        id: itemId({
+          form: 'food-bowl',
+          material: 'shell',
+          size: 'S',
+          finish: 'plain',
+        }),
+        x: 2.5,
+        z: 0.2,
+        bowlStage: bowlQaStage,
+      });
+    }
+    // Dev/QA: ?lab=1 pre-places all ten field-lab items in a row by the home
+    // pad so headless screenshots can QA the plates. Inert in normal play.
+    if (new URLSearchParams(location.search).get('lab') === '1') {
+      LAB_ITEMS.forEach((it, i) => {
+        placedSave.push({ id: it.id, x: -3.5 + i * 1.0, z: -2.6 });
+      });
+    }
+    // Dev/QA: ?items=1 pre-places the nine authored starter keepsakes in a row
+    // (chime + repair-toy included) so headless screenshots can QA the plates
+    // and their states. Inert in normal play.
+    if (new URLSearchParams(location.search).get('items') === '1') {
+      const forms: FormId[] = [
+        'sprout-pot',
+        'mailbox',
+        'mushroom-lamp',
+        'chime',
+        'pet-bed',
+        'stool',
+        'garden-lantern',
+        'seed-chest',
+        'repair-toy',
+      ];
+      // The advanced/active state per ritual form, so a second row shows the
+      // overlay payoff beside the resting plate.
+      const activeState: Partial<Record<string, Partial<PlacedEntry>>> = {
+        'sprout-pot': { sproutStage: 'bloom' },
+        'mushroom-lamp': { lampLit: true },
+        'pet-bed': { bedStage: 'nested' },
+        stool: { seatStage: 'rested' },
+        'garden-lantern': { lanternLit: true },
+        'seed-chest': { seedStage: 'chosen' },
+      };
+      forms.forEach((form, i) => {
+        const material = materialsAcceptedBy(form)[0];
+        if (!material) return;
+        const id = itemId({ form, material, size: 'M', finish: 'plain' });
+        placedSave.push({ id, x: -4 + i * 1.0, z: -2.0 });
+        const active = activeState[form];
+        if (active) placedSave.push({ id, x: -4 + i * 1.0, z: -3.4, ...active });
+      });
+    }
+    // Dev/QA: ?park=1 pre-places the eight interactive park keepsakes in a row,
+    // with a second row showing each item's active read. Inert in normal play.
+    if (new URLSearchParams(location.search).get('park') === '1') {
+      PARK_ITEMS.forEach((item, i) => {
+        const material = materialsAcceptedBy(item.form)[0];
+        if (!material) return;
+        const id = itemId({ form: item.form, material, size: 'M', finish: 'plain' });
+        placedSave.push({ id, x: -4 + i * 1.0, z: -2.0, parkState: item.states[0] });
+        placedSave.push({
+          id,
+          x: -4 + i * 1.0,
+          z: -3.4,
+          parkState: item.activeState,
+          parkNotch: 2,
+        });
+      });
+    }
     for (const entry of placedSave) this.spawnPlaced(entry);
     if (oldBuilt.length || oldWorkshop.length) {
       this.savePlaced();
@@ -580,6 +801,8 @@ export class Game {
     if (this.loadRaw('wwd.lastOpen') !== dailyKey()) {
       this.saveRaw('wwd.lastOpen', dailyKey());
       this.morningNoteIn = 6; // let the scene settle, then today's hook
+      this.rolloverStarters();
+      this.rolloverPark();
     }
     this.placeCoffer();
 
@@ -665,6 +888,16 @@ export class Game {
     this.say('greet');
     this.lastTime = performance.now();
     requestAnimationFrame(this.tick);
+
+    // Dev/QA: ?labtap=<lab-id> plays one field-lab item's loop on start (with a
+    // high bond so the earned reaction is visible) for headless screenshots.
+    // Inert in normal play. Pairs with ?lab=1 (which pre-places the row).
+    const labTap = new URLSearchParams(location.search).get('labtap');
+    if (labTap) {
+      this.bond.add('discovery', 200); // best-friend, so every reaction unlocks
+      const hit = this.placedItems.find((p) => p.entry.id === labTap);
+      if (hit) window.setTimeout(() => this.interactWithLabItem(hit), 400);
+    }
   }
 
   /** Live human-companion swap (Mei/An) from settings. */
@@ -695,8 +928,7 @@ export class Game {
       this.datouRig.pulse();
       // A pet while he's already glowing reads as praise — the canon answer
       // is the spin (原地转圈), earned at friend stage, never back-to-back.
-      const alreadyJoyful =
-        this.emotion.state.kind === 'joy' && this.emotion.state.intensity > 0.6;
+      const alreadyJoyful = this.emotion.state.kind === 'joy' && this.emotion.state.intensity > 0.6;
       this.emotion.apply('pet');
       if (
         alreadyJoyful &&
@@ -762,6 +994,24 @@ export class Game {
     // A placed keepsake under the tap → offer to pick it up (walk over first).
     const placedHit = this.placedAt(p.x, p.z);
     if (placedHit) {
+      if (this.isFoodBowl(placedHit.entry.id)) {
+        this.interactWithFoodBowl(placedHit);
+        return;
+      }
+      if (isLabItem(placedHit.entry.id)) {
+        this.interactWithLabItem(placedHit);
+        return;
+      }
+      const parkForm = parkFormOf(placedHit.entry.id);
+      if (parkForm) {
+        this.interactWithParkItem(placedHit, parkForm);
+        return;
+      }
+      const starterForm = starterFormOf(placedHit.entry.id);
+      if (starterForm) {
+        this.interactWithStarter(placedHit, starterForm);
+        return;
+      }
       const d = Math.hypot(placedHit.entry.x - this.player.x, placedHit.entry.z - this.player.z);
       if (d <= 2.2) {
         this.offerPickup(placedHit);
@@ -809,7 +1059,10 @@ export class Game {
     // A great thing (E2) → name it; Datou heads over and the beat plays.
     const sp = setpieceNear(p.x, p.z);
     if (sp) {
-      this.ui.showName(tDyn(`setpiece.${sp.id}.name`), tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`));
+      this.ui.showName(
+        tDyn(`setpiece.${sp.id}.name`),
+        tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`),
+      );
       this.companion.investigate(sp.x, sp.z);
       this.armedSetpiece = sp;
       return;
@@ -892,14 +1145,33 @@ export class Game {
   }
 
   private handleHoldStart(clientX: number, clientY: number): void {
-    if (this.pick(clientX, clientY) === 'datou') {
+    const hit = this.pick(clientX, clientY);
+    if (hit === 'datou') {
       this.ui.notifyInteracted();
       this.comforting = true;
       this.comfortPulseIn = 0;
+      return;
+    }
+    // Long-press on a placed keepsake → arm pick-up / move. This is the one
+    // gesture that always reaches every placed item (tap is the item's ritual),
+    // so the reversible-placement invariant holds for the ritual items too.
+    if (hit && typeof hit === 'object') {
+      this.holdPickup = this.placedAt(hit.x, hit.z);
     }
   }
 
   private handleHoldEnd(duration: number): void {
+    // A long-press that landed on a placed keepsake offers to pick it up / move
+    // it (only when the player is near it, so it's a deliberate gesture).
+    const held = this.holdPickup;
+    this.holdPickup = null;
+    if (held && duration >= 0.5 && this.placedItems.includes(held)) {
+      const d = Math.hypot(held.entry.x - this.player.x, held.entry.z - this.player.z);
+      if (d <= 2.4) {
+        this.offerPickup(held);
+        return;
+      }
+    }
     if (!this.comforting) return;
     this.comforting = false;
     if (duration >= 0.8) {
@@ -993,11 +1265,39 @@ export class Game {
   private placedVisual(
     id: string,
     seed = 0,
+    bowlStage: FoodBowlStage = 'empty',
+    labActive = false,
+    entry?: PlacedEntry,
   ): { sprite: PropSprite; height: number; shadowRadius: number } | null {
+    const lab = labItemFor(id);
+    if (lab) {
+      return {
+        sprite: LAB_DRAW[id](seed, labActive),
+        height: lab.height,
+        shadowRadius: lab.shadowRadius,
+      };
+    }
     const spec = parseItemId(id);
     if (spec) {
+      // Interactive park keepsakes (code-cutout, two-read plates) resolve first —
+      // their height/shadow come from the park item def, like the lab items.
+      const park = parkItemFor(spec.form);
+      if (park) {
+        const sprite = this.parkSprite(spec.form, entry) ?? itemSprite(id);
+        return { sprite, height: park.height, shadowRadius: park.shadowRadius };
+      }
       const h = itemHeight(spec);
-      return { sprite: itemSprite(id), height: h, shadowRadius: h * 0.45 };
+      const authoredBowl = spec.form === 'food-bowl';
+      const starterSprite = this.starterSprite(spec.form, entry);
+      const sprite = authoredBowl
+        ? drawFoodBowl(bowlStage)
+        : (starterSprite ?? itemSprite(id));
+      // Authored watercolor plates (the bowl + every starter asset, including
+      // the two light keepsakes that render their PNG via itemSprite) carry a
+      // wider contact shadow than the procedural cutouts.
+      const authored = authoredBowl || isStarterAssetForm(spec.form);
+      const authoredShadow = authored ? h * 0.6 : h * 0.45;
+      return { sprite, height: h, shadowRadius: authoredShadow };
     }
     if (id in BUILD_LOOK) {
       const kind = id as BuildableKind;
@@ -1015,6 +1315,65 @@ export class Game {
       return { sprite: drawBuild(seed), ...BUILD_LOOK[kind] };
     }
     return null;
+  }
+
+  /**
+   * State-driven plate for a ritual starter form, read off its persisted entry
+   * field (so a reload redraws identically). Returns null for non-ritual forms —
+   * the light tap→reaction items (chime, repair-toy) keep their plain authored
+   * plate. Mailbox derives its resting flag from today's deterministic roll.
+   */
+  private starterSprite(form: string, entry?: PlacedEntry): PropSprite | null {
+    switch (form) {
+      case 'sprout-pot':
+        return drawSproutPot(normalizeSproutStage(entry?.sproutStage));
+      case 'mailbox':
+        return drawMailbox(this.mailboxRead(entry));
+      case 'mushroom-lamp':
+        return drawMushroomLamp(entry?.lampLit ?? false);
+      case 'pet-bed':
+        return drawPetBed(normalizeBedStage(entry?.bedStage));
+      case 'stool':
+        return drawStool(normalizeSeatStage(entry?.seatStage));
+      case 'garden-lantern':
+        return drawGardenLantern(entry?.lanternLit ?? false);
+      case 'seed-chest':
+        return drawSeedChest(normalizeSeedStage(entry?.seedStage));
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * State-driven plate for an interactive park keepsake, read off its persisted
+   * `parkState` (so a reload redraws identically). Seed is the placement hash so
+   * each instance's hand-wobble is stable. Returns null for non-park forms.
+   */
+  private parkSprite(form: string, entry?: PlacedEntry): PropSprite | null {
+    if (!parkItemFor(form)) return null;
+    const seed = entry ? Math.round(entry.x * 31 + entry.z * 7) : 0;
+    const state = normalizeParkState(form as ParkItemForm, entry?.parkState);
+    const notch = entry?.parkNotch ?? 0;
+    switch (form) {
+      case 'steam-rest':
+        return drawSteamRest(seed, state === 'warm');
+      case 'nose-puzzle-drawer':
+        return drawNosePuzzle(seed, state === 'open');
+      case 'paw-rinse-step':
+        return drawPawRinse(seed, state as 'dry' | 'filled' | 'clean');
+      case 'moonwater-lamp':
+        return drawMoonwaterLamp(seed, state === 'lit');
+      case 'bird-nesting-fiber-frame':
+        return drawNestingFrame(seed, state === 'taken');
+      case 'weather-log-wheel':
+        return drawWeatherWheel(seed, state === 'logged', notch);
+      case 'spin-choice-wheel':
+        return drawSpinWheel(seed, state === 'landed', notch);
+      case 'shared-snack-tin':
+        return drawSnackTin(seed, state === 'open');
+      default:
+        return null;
+    }
   }
 
   /** Human name for a placeable id (composed Workshop name or legacy table). */
@@ -1085,11 +1444,660 @@ export class Game {
   /** Stand a saved/just-placed keepsake in the world and register it. */
   private spawnPlaced(entry: PlacedEntry): void {
     const seed = Math.round(entry.x * 31 + entry.z * 7);
-    const vis = this.placedVisual(entry.id, seed);
+    if (this.isFoodBowl(entry.id)) {
+      entry.bowlStage = normalizeFoodBowlStage(entry.bowlStage);
+    }
+    this.normalizeStarter(entry);
+    const vis = this.placedVisual(entry.id, seed, entry.bowlStage, false, entry);
     if (!vis) return; // unknown id from an old save — leave it untracked
     const cut = new Cutout(vis.sprite, { height: vis.height, shadowRadius: vis.shadowRadius });
     this.world.placeCutout(cut, entry.x, entry.z);
     this.placedItems.push({ entry, cut, height: vis.height });
+  }
+
+  private isFoodBowl(id: string): boolean {
+    return parseItemId(id)?.form === 'food-bowl';
+  }
+
+  /** Coerce a starter entry's persisted stage back into range on load. */
+  private normalizeStarter(entry: PlacedEntry): void {
+    const form = parseItemId(entry.id)?.form;
+    if (form === 'sprout-pot') entry.sproutStage = normalizeSproutStage(entry.sproutStage);
+    else if (form === 'pet-bed') entry.bedStage = normalizeBedStage(entry.bedStage);
+    else if (form === 'stool') entry.seatStage = normalizeSeatStage(entry.seatStage);
+    else if (form === 'seed-chest') entry.seedStage = normalizeSeedStage(entry.seedStage);
+    else if (form && parkItemFor(form)) {
+      entry.parkState = normalizeParkState(form as ParkItemForm, entry.parkState);
+    }
+  }
+
+  /** Today's resting mailbox plate: flag up only if a note waits, uncollected. */
+  private mailboxRead(entry?: PlacedEntry): 'flag-down' | 'flag-up' | 'open' {
+    if (!entry) return 'flag-down';
+    return this.mailboxHasNote(entry) && entry.mailDay !== dailyKey() ? 'flag-up' : 'flag-down';
+  }
+
+  /** Deterministic per-item, per-day note roll (most days nothing; never RNG). */
+  private mailboxHasNote(entry: PlacedEntry): boolean {
+    const seed = (dailySeed() ^ (Math.round(entry.x * 31 + entry.z * 7) >>> 0)) >>> 0;
+    return new Rng(seed).next() < 0.28;
+  }
+
+  /** Re-plate any placed item to match its current persisted entry state. */
+  private replateStarter(target: PlacedItem, openMailbox = false): void {
+    const form = parseItemId(target.entry.id)?.form;
+    const sprite =
+      openMailbox && form === 'mailbox'
+        ? drawMailbox('open')
+        : this.starterSprite(form ?? '', target.entry);
+    if (!sprite) return;
+    const h = target.height;
+    this.world.removeCutout(target.cut);
+    target.cut = new Cutout(sprite, { height: h, shadowRadius: h * 0.6 });
+    this.world.placeCutout(target.cut, target.entry.x, target.entry.z);
+  }
+
+  // --- Interactive park keepsakes (the eight new code-cutout items) ---
+  //
+  // A park item is a calm placed ritual: tap it → the state advances and the
+  // plate re-plates to its active read (steam, an open drawer, brimming wells, a
+  // lit pool, a turned wheel, a propped lid) → the REAL Datou trots over and the
+  // payoff lands on his arrival. The calm ones use only the warm body beat +
+  // emotion; the two play items (nose-puzzle, choice-wheel) add an EARNED
+  // signature clip exactly like the lab items. Farmable emotions are gated once
+  // a day; the play wheel rides reactCooldown. No new rig art, ever.
+
+  /** Re-plate a park keepsake to match its current persisted parkState. */
+  private replatePark(target: PlacedItem): void {
+    const form = parseItemId(target.entry.id)?.form;
+    const sprite = this.parkSprite(form ?? '', target.entry);
+    if (!sprite) return;
+    const h = target.height;
+    this.world.removeCutout(target.cut);
+    target.cut = new Cutout(sprite, { height: h, shadowRadius: h * 0.6 });
+    this.world.placeCutout(target.cut, target.entry.x, target.entry.z);
+  }
+
+  /**
+   * Tap a placed park keepsake. Advances its state to the active read, re-plates,
+   * and summons Datou — the payoff lands on his arrival, gated per the item's
+   * cadence (once-a-day for the farmable emotions; the choice-wheel re-spins
+   * freely on reactCooldown). Re-taps after the day's payoff are a quiet beat.
+   */
+  private interactWithParkItem(target: PlacedItem, form: ParkItemForm): void {
+    const item = parkItemFor(form);
+    if (!item) return;
+    const e = target.entry;
+    const today = dailyKey();
+    const firstToday = e.parkDay !== today;
+
+    // The choice-wheel is a free toy: every tap re-spins to a fresh seeded wedge.
+    if (item.gate === 'free') {
+      e.parkNotch = this.parkPick(target);
+      e.parkState = item.activeState;
+      this.replatePark(target);
+      this.savePlaced();
+      // Settle the wheel back to rest shortly after the pick reads.
+      window.setTimeout(() => {
+        if (this.placedItems.includes(target)) {
+          e.parkState = item.states[0];
+          this.replatePark(target);
+        }
+      }, 1400);
+      this.pendingPark = { target, item, gated: true };
+      this.companion.investigate(e.x, e.z);
+      return;
+    }
+
+    // Daily-gated items: already paid out today → a quiet fidget, no payoff.
+    if (!firstToday) {
+      const cur = normalizeParkState(form, e.parkState);
+      // Staged items (paw-rinse: filled → clean) advance one quiet step toward
+      // their terminal "all done" read; two-state items toggle off↔on visually.
+      if (item.states.length > 2) {
+        e.parkState = nextParkState(form, cur);
+        if (cur === e.parkState) return; // already terminal — nothing to re-show
+      } else {
+        e.parkState = cur === item.activeState ? item.states[0] : item.activeState;
+      }
+      this.replatePark(target);
+      this.savePlaced();
+      this.datouRig.pulse();
+      return;
+    }
+
+    // The day's first interaction: advance to the active read + summon Datou.
+    if (form === 'weather-log-wheel') e.parkNotch = ((e.parkNotch ?? 0) + 1) % 8;
+    e.parkState = item.activeState;
+    this.replatePark(target);
+    this.savePlaced();
+    this.armPark(target, item);
+  }
+
+  /** A deterministic seeded pick for the choice-wheel (never Math.random). */
+  private parkPick(target: PlacedItem): number {
+    const h = Math.round(target.entry.x * 31 + target.entry.z * 7) >>> 0;
+    const seed = (dailySeed() ^ h ^ ((target.entry.parkNotch ?? 0) + 1)) >>> 0;
+    return Math.floor(new Rng(seed).next() * 6);
+  }
+
+  /** Walk the player over if far, then summon Datou for the park payoff. */
+  private armPark(target: PlacedItem, item: ParkItem): void {
+    this.pendingPark = { target, item, gated: true };
+    this.companion.investigate(target.entry.x, target.entry.z);
+  }
+
+  /** Datou reached a park keepsake → fire its canonical payoff (with clip). */
+  private resolveParkArrival(target: PlacedItem, item: ParkItem, gated: boolean): void {
+    const e = target.entry;
+    const r = item.reaction;
+    const stage = familiarityStage(this.bond.level);
+
+    // The earned signature burst (spin / stomp), if the relationship permits it;
+    // otherwise the warm body beat carries the read. (Quiet items: clip null.)
+    if (r.clip && clipAllowed(r.clip, stage)) {
+      this.datouRig.playClip(r.clip);
+    } else {
+      this.datouRig.pulse();
+      this.datouRig.reach();
+    }
+
+    if (gated) {
+      if (r.event) this.emotion.apply(r.event);
+      if (r.note) this.personality.note(r.note);
+      if (r.bond > 0) this.bond.add('discovery', r.bond);
+      this.saying = { text: tDyn(`voice.${r.voice}.1`), left: 4.5 };
+      this.ui.toast(tDyn(item.toast));
+      // Stamp the day so the once-a-day gate holds (the free toy never stamps).
+      if (item.gate === 'daily') {
+        e.parkDay = dailyKey();
+        this.savePlaced();
+      }
+    }
+  }
+
+  /**
+   * Daily-rollover hook: each daily park item re-arms for a fresh beat. The
+   * lamps/steam/lid revert to their resting (off/cool/closed) read; the nesting
+   * frame re-rolls whether birds took fibers (and shows it); the rinse tray
+   * drains back to dry. The wheels keep their notch (a running log/last pick).
+   */
+  private rolloverPark(): void {
+    let changed = false;
+    for (const p of this.placedItems) {
+      const form = parseItemId(p.entry.id)?.form;
+      if (!form || !parkItemFor(form)) continue;
+      const item = parkItemFor(form)!;
+      // A new day clears the once-a-day gate.
+      p.entry.parkDay = undefined;
+      if (form === 'bird-nesting-fiber-frame') {
+        // Re-roll: most days the birds take some (shows the "taken" read).
+        const seed = (dailySeed() ^ (Math.round(p.entry.x * 31 + p.entry.z * 7) >>> 0)) >>> 0;
+        p.entry.parkState = new Rng(seed).next() < 0.6 ? 'taken' : 'full';
+        this.replatePark(p);
+        changed = true;
+      } else if (form === 'weather-log-wheel' || form === 'spin-choice-wheel') {
+        // The wheels rest (un-highlighted) but keep their notch.
+        p.entry.parkState = item.states[0];
+        this.replatePark(p);
+        changed = true;
+      } else if (p.entry.parkState !== item.states[0]) {
+        // Lamps / steam / wells / tin revert to their resting read overnight.
+        p.entry.parkState = item.states[0];
+        this.replatePark(p);
+        changed = true;
+      }
+    }
+    if (changed) this.savePlaced();
+  }
+
+  // --- Field-lab items (BOBO's ten co-inventions) ---
+  //
+  // A lab item is a small loop you play on a placed keepsake: tap it → the
+  // plate runs a brief manipulation (re-plated to its "active" sprite) → the
+  // REAL Datou trots over and reacts in character (emotion + an earned
+  // signature clip), speaks his caption, and the moment seeds a proactive note.
+  // His appearance never changes — every reaction reuses the existing rig
+  // grammar, gated by familiarity exactly as the design handoff specifies.
+
+  /** Tap on a placed lab item: walk over first if far, else play its loop. */
+  private interactWithLabItem(target: PlacedItem): void {
+    const lab = labItemFor(target.entry.id);
+    if (!lab) return;
+    const d = Math.hypot(target.entry.x - this.player.x, target.entry.z - this.player.z);
+    if (d <= 2.4) {
+      this.playLabItem(target, lab);
+    } else {
+      // Defer: walk over, then the same loop fires on arrival.
+      this.pendingLabReact = { target, lab, actor: 'player' };
+      this.player.walkTo(target.entry.x, target.entry.z);
+    }
+  }
+
+  /** Run the manipulation + queue Datou's in-character reaction. */
+  private playLabItem(target: PlacedItem, lab: LabItem): void {
+    // The max-bond easter egg is doubly gated: best-friend stage AND a long
+    // cooldown — so when it fires you read it as earned intimacy, never noise.
+    const stage = familiarityStage(this.bond.level);
+    if (lab.cooldownDays && this.labOnCooldown(lab)) {
+      this.ui.toast(t('lab.resting'));
+      this.companion.investigate(target.entry.x, target.entry.z);
+      return;
+    }
+    if (!stageReached(stage, lab.minStage)) {
+      // Locked: a quiet "earned, not given" beat — a calm muted look, no clip.
+      this.ui.toast(t('lab.locked', { stage: t(`stage.${lab.minStage}`) }));
+      this.companion.investigate(target.entry.x, target.entry.z);
+      return;
+    }
+
+    // Re-plate to the active sprite for the manipulation, then settle back.
+    this.replateLab(target, true);
+    window.setTimeout(() => {
+      if (this.placedItems.includes(target)) this.replateLab(target, false);
+    }, lab.manipDur);
+
+    // Datou comes over to react; the payoff lands on arrival.
+    this.companion.investigate(target.entry.x, target.entry.z);
+    this.pendingLabReact = { target, lab, actor: 'datou' };
+  }
+
+  /** Swap a lab item's plate between its resting and active reads. */
+  private replateLab(target: PlacedItem, active: boolean): void {
+    const seed = Math.round(target.entry.x * 31 + target.entry.z * 7);
+    const vis = this.placedVisual(target.entry.id, seed, 'empty', active);
+    if (!vis) return;
+    this.world.removeCutout(target.cut);
+    target.cut = new Cutout(vis.sprite, { height: vis.height, shadowRadius: vis.shadowRadius });
+    target.height = vis.height;
+    this.world.placeCutout(target.cut, target.entry.x, target.entry.z);
+  }
+
+  /** Datou reached the tapped lab item → his canonical reaction fires. */
+  private fireLabReaction(lab: LabItem): void {
+    const stage = familiarityStage(this.bond.level);
+    const raining = document.body.classList.contains('rain');
+
+    // The shelter's beat is weather-driven: weathering rain together is the big
+    // bond moment (afraid → 安心 calm); on a clear day it's a curious dwell.
+    const event = lab.weatherAware && raining ? 'comfort' : lab.emotion;
+    this.emotion.apply(event);
+
+    // The earned signature burst (spin / stomp / backTurn / shyTurn), if the
+    // relationship permits it. character.ts owns the gate; the rig refuses overlap.
+    if (lab.clip && clipAllowed(lab.clip, stage)) {
+      this.datouRig.playClip(lab.clip);
+      if (lab.clip2 && clipAllowed(lab.clip2, stage)) {
+        const c2 = lab.clip2;
+        window.setTimeout(() => this.datouRig.playClip(c2), 1500);
+      }
+    } else {
+      // No clip (or not yet earned): the warm body beat still lands.
+      this.datouRig.pulse();
+      this.datouRig.reach();
+    }
+
+    // BOBO's caption — the item's payload, so it bypasses the chatter pacing.
+    this.saying = { text: tDyn(`voice.${lab.voice}.1`), left: 4.5 };
+
+    // It seeds a proactive note, grants a little bond, and (the poof) banks its cooldown.
+    this.bond.add('discovery', 2);
+    this.ui.toast(tDyn(`lab.${lab.id}.proactive`));
+    if (lab.cooldownDays) this.noteLabUsed(lab);
+  }
+
+  /** Days since the Unix epoch (for the easter-egg cooldown). */
+  private epochDay(): number {
+    return Math.floor(Date.now() / 86_400_000);
+  }
+
+  private labOnCooldown(lab: LabItem): boolean {
+    if (!lab.cooldownDays) return false;
+    const last = Number(this.loadRaw(`wwd.lab.${lab.id}.day`));
+    if (!Number.isFinite(last) || last === 0) return false;
+    return this.epochDay() - last < lab.cooldownDays;
+  }
+
+  private noteLabUsed(lab: LabItem): void {
+    this.saveRaw(`wwd.lab.${lab.id}.day`, String(this.epochDay()));
+  }
+
+  /** A bowl is a three-beat care ritual; its final state keeps the normal pickup verb. */
+  private interactWithFoodBowl(target: PlacedItem): void {
+    const stage = normalizeFoodBowlStage(target.entry.bowlStage);
+    if (stage === 'reward') {
+      this.offerPickup(target);
+      return;
+    }
+
+    if (stage === 'filled') {
+      this.pendingBowl = { target, actor: 'datou' };
+      this.companion.investigate(target.entry.x, target.entry.z);
+      return;
+    }
+
+    const d = Math.hypot(target.entry.x - this.player.x, target.entry.z - this.player.z);
+    if (d <= 2.2) {
+      this.advanceFoodBowl(target);
+    } else {
+      this.pendingBowl = { target, actor: 'player' };
+      this.player.walkTo(target.entry.x, target.entry.z);
+    }
+  }
+
+  private advanceFoodBowl(target: PlacedItem): void {
+    const current = normalizeFoodBowlStage(target.entry.bowlStage);
+    const next = nextFoodBowlStage(current);
+    if (next === current) return;
+
+    target.entry.bowlStage = next;
+    const vis = this.placedVisual(target.entry.id, 0, next);
+    if (!vis) return;
+    this.world.removeCutout(target.cut);
+    target.cut = new Cutout(vis.sprite, {
+      height: vis.height,
+      shadowRadius: vis.shadowRadius,
+    });
+    target.height = vis.height;
+    this.world.placeCutout(target.cut, target.entry.x, target.entry.z);
+    this.savePlaced();
+
+    if (next === 'filled') {
+      this.ui.toast(t('bowl.filled'));
+      this.pendingBowl = { target, actor: 'datou' };
+      this.companion.investigate(target.entry.x, target.entry.z);
+    } else if (next === 'enjoyed') {
+      this.pendingBowl = null;
+      this.datouRig.pulse();
+      this.datouRig.reach();
+      this.emotion.apply('helped');
+      this.ui.toast(t('bowl.enjoyed'));
+    } else {
+      this.personality.note('care');
+      this.emotion.apply('praise');
+      this.ui.toast(t('bowl.reward'));
+    }
+  }
+
+  // --- Starter-item interactions (the seven calm domestic rituals + two light
+  //     tap→reaction keepsakes). Same two-actor arrival grammar as the bowl:
+  //     the player walks over to start a beat, then Datou walks over (via
+  //     companion.investigate) and the warm body beat lands on arrival. No
+  //     signature clip — these stay quiet so Datou stays the focal character.
+
+  /** Tap on a placed starter item: route to its ritual, or the light reaction. */
+  private interactWithStarter(target: PlacedItem, form: RitualForm | (string & {})): void {
+    switch (form) {
+      case 'sprout-pot':
+        return this.interactWithSproutPot(target);
+      case 'mailbox':
+        return this.interactWithMailbox(target);
+      case 'mushroom-lamp':
+        return this.interactWithLamp(target, 'mushroom-lamp');
+      case 'garden-lantern':
+        return this.interactWithLamp(target, 'garden-lantern');
+      case 'pet-bed':
+        return this.interactWithStaged(target, 'pet-bed');
+      case 'stool':
+        return this.interactWithStaged(target, 'stool');
+      case 'seed-chest':
+        return this.interactWithStaged(target, 'seed-chest');
+      default:
+        // chime / repair-toy — the lightweight tap→reaction (walk over, react).
+        return this.interactWithLightStarter(target, form);
+    }
+  }
+
+  /** Arm a beat: if far, the player walks over; the payoff fires on arrival. */
+  private armStarter(
+    target: PlacedItem,
+    form: RitualForm,
+    beat: string,
+    onPlayerArrive: () => void,
+  ): void {
+    const d = Math.hypot(target.entry.x - this.player.x, target.entry.z - this.player.z);
+    if (d <= 2.2) {
+      onPlayerArrive();
+    } else {
+      this.pendingStarter = { target, form, beat, actor: 'player' };
+      this.player.walkTo(target.entry.x, target.entry.z);
+    }
+  }
+
+  /** Hand the beat to Datou: he trots over and the payoff lands on his arrival. */
+  private summonDatou(target: PlacedItem, form: RitualForm, beat: string): void {
+    this.pendingStarter = { target, form, beat, actor: 'datou' };
+    this.companion.investigate(target.entry.x, target.entry.z);
+  }
+
+  /**
+   * Daily-rollover hook: both lamps go dark overnight (so lighting them is a
+   * fresh evening beat each day), the per-lamp once-a-day payoff guard falls
+   * stale on its own, and the mailbox re-rolls whether a note waits. The sprout
+   * leaf-check re-arms by virtue of `sproutDay` no longer matching today.
+   * Reuses the existing date-seeded rollover.
+   */
+  private rolloverStarters(): void {
+    let changed = false;
+    for (const p of this.placedItems) {
+      const form = parseItemId(p.entry.id)?.form;
+      if (form === 'garden-lantern' && p.entry.lanternLit) {
+        p.entry.lanternLit = false;
+        this.replateStarter(p);
+        changed = true;
+      } else if (form === 'mushroom-lamp' && p.entry.lampLit) {
+        p.entry.lampLit = false;
+        this.replateStarter(p);
+        changed = true;
+      } else if (form === 'mailbox') {
+        // A new day re-rolls whether a note waits — refresh the resting flag.
+        this.replateStarter(p);
+      }
+    }
+    if (changed) this.savePlaced();
+  }
+
+  /** Fire the canonical Datou payoff for a resolved reaction (no clip). */
+  private fireStarterReaction(r: StarterReaction, toast?: string): void {
+    this.datouRig.pulse();
+    this.datouRig.reach();
+    if (r.event) this.emotion.apply(r.event);
+    if (r.note) this.personality.note(r.note);
+    if (r.bond > 0) this.bond.add('discovery', r.bond);
+    if (toast) this.ui.toast(tDyn(toast));
+    this.saying = { text: tDyn(`voice.${r.voice}.1`), left: 4.5 };
+  }
+
+  /** Look up a ritual beat's reaction payload. */
+  private ritualReaction(form: RitualForm, beat: string): StarterReaction | undefined {
+    const table = RITUAL_REACTIONS as unknown as Record<string, Record<string, StarterReaction>>;
+    return table[form]?.[beat];
+  }
+
+  /** Per-instance localStorage stem for a placed item's daily guards. */
+  private starterDayKey(target: PlacedItem, kind: string): string {
+    const form = parseItemId(target.entry.id)?.form ?? 'x';
+    const h = Math.round(target.entry.x * 31 + target.entry.z * 7);
+    return `wwd.starter.${kind}.${form}.${h}`;
+  }
+
+  // ── sprout-pot: dry → watered → leafing → bloom (renewable) ──────────────
+  private interactWithSproutPot(target: PlacedItem): void {
+    const stage = normalizeSproutStage(target.entry.sproutStage);
+    if (stage === 'dry') {
+      // The one player-led beat: you water it together (silent tend, like the
+      // bowl's silent fill). No emotion, no toast — just the visible damp soil.
+      this.armStarter(target, 'sprout-pot', 'watered', () => {
+        target.entry.sproutStage = 'watered';
+        this.personality.note('care');
+        this.replateStarter(target);
+        this.savePlaced();
+      });
+      return;
+    }
+    if (stage === 'watered') {
+      // Datou comes to see the first water take; the first leaf shows (→ leafing)
+      // and the day is gated, so the bud only opens on a later return visit.
+      this.summonDatou(target, 'sprout-pot', 'watered');
+      return;
+    }
+    if (stage === 'leafing') {
+      // The "checks each new leaf on the way home" beat: on a NEW return day,
+      // Datou inspects and the bud opens (→ bloom). Same-day re-tap is a gentle
+      // look only, so growth is earned by returning, never on its own.
+      if (target.entry.sproutDay === dailyKey()) {
+        this.datouRig.pulse();
+        return;
+      }
+      this.summonDatou(target, 'sprout-pot', 'bloom');
+      return;
+    }
+    // bloom: the keepsake is ready; a tap is a quiet admire (long-press to pick
+    // it up / move it — re-placing re-seeds a fresh dry pot, the renewable loop).
+    this.datouRig.pulse();
+  }
+
+  // ── mailbox: a once-daily "is there a note?" with a deterministic roll ────
+  private interactWithMailbox(target: PlacedItem): void {
+    if (target.entry.mailDay === dailyKey()) {
+      this.datouRig.pulse(); // already opened today — no door swing, no payoff
+      return;
+    }
+    this.armStarter(target, 'mailbox', 'open', () => {
+      this.summonDatou(target, 'mailbox', 'open');
+    });
+  }
+
+  // ── mushroom-lamp / garden-lantern: a calm lit ⇄ unlit toggle ────────────
+  private interactWithLamp(target: PlacedItem, form: 'mushroom-lamp' | 'garden-lantern'): void {
+    const litField = form === 'mushroom-lamp' ? 'lampLit' : 'lanternLit';
+    if (target.entry[litField]) {
+      // Un-lighting is silent: just snuff it (no investigate, no payoff).
+      target.entry[litField] = false;
+      this.replateStarter(target);
+      this.savePlaced();
+      return;
+    }
+    this.armStarter(target, form, 'lit', () => {
+      target.entry[litField] = true;
+      this.replateStarter(target);
+      this.savePlaced();
+      this.ui.toast(tDyn(`item.${form}.lit`));
+      // The Datou settle is once per lamp per day; the guard is committed only
+      // here, on the actual lighting, so an abandoned walk never burns the day.
+      const dayKey = this.starterDayKey(target, 'lamp');
+      if (this.loadRaw(dayKey) !== dailyKey()) {
+        this.saveRaw(dayKey, dailyKey());
+        this.summonDatou(target, form, 'lit');
+      }
+    });
+  }
+
+  // ── pet-bed / stool / seed-chest: a two-step staged ritual ───────────────
+  private interactWithStaged(
+    target: PlacedItem,
+    form: 'pet-bed' | 'stool' | 'seed-chest',
+  ): void {
+    const cfg = STAGED[form];
+    const stage = cfg.normalize(target.entry[cfg.field]);
+    if (stage === cfg.terminal) {
+      // Terminal: pet-bed re-tap replays the calm settle, but once per bed per
+      // day and via Datou's arrival (proximity + reactCooldown gated) — so the
+      // farmable comfort beat can never restack into over-praise. stool &
+      // seed-chest rest here (long-press to pick up / move, like every keepsake).
+      if (form === 'pet-bed') {
+        const dayKey = this.starterDayKey(target, 'bed');
+        if (this.loadRaw(dayKey) !== dailyKey()) {
+          this.saveRaw(dayKey, dailyKey());
+          this.summonDatou(target, 'pet-bed', 'nested');
+        } else {
+          this.datouRig.pulse();
+        }
+      }
+      return;
+    }
+    if (stage === cfg.states[0]) {
+      // Player arrives, the first state advances (a seat dent, a circled bed, a
+      // sorted chest), then Datou is summoned for the settle.
+      this.armStarter(target, form, cfg.payoffBeat, () => {
+        (target.entry as unknown as Record<string, unknown>)[cfg.field] = cfg.next(stage);
+        if (cfg.midToast) this.ui.toast(tDyn(cfg.midToast));
+        this.replateStarter(target);
+        this.savePlaced();
+        this.summonDatou(target, form, cfg.payoffBeat);
+      });
+      return;
+    }
+    // mid state (seated / circled / sorted): waiting on Datou — re-summon him.
+    this.summonDatou(target, form, cfg.payoffBeat);
+  }
+
+  // ── chime / repair-toy: the lightweight tap → walk-over → warm beat ──────
+  private interactWithLightStarter(target: PlacedItem, form: string): void {
+    const r = lightStarterFor(form);
+    if (!r) return;
+    this.pendingLightStarter = { target, reaction: r };
+    // Datou trots over; the warm beat lands on his arrival. (Same as a lab
+    // keepsake's datou-actor beat — no player walk needed for the reaction.)
+    this.companion.investigate(target.entry.x, target.entry.z);
+  }
+
+  /** Datou reached a ritual item — advance the final state, re-plate, react. */
+  private resolveStarterArrival(target: PlacedItem, form: RitualForm, beat: string): void {
+    const e = target.entry;
+    if (form === 'sprout-pot') {
+      if (beat === 'watered') {
+        // First leaf shows. Gate the day so the bud only opens on a later
+        // return visit ("checks each new leaf on the way home").
+        e.sproutStage = 'leafing';
+        e.sproutDay = dailyKey();
+        this.replateStarter(target);
+        const r = this.ritualReaction('sprout-pot', 'watered');
+        if (r) this.fireStarterReaction(r, 'item.sprout-pot.watered');
+      } else {
+        // bloom: a fresh return day after leafing — the bud opens, the payoff.
+        e.sproutStage = 'bloom';
+        e.sproutDay = dailyKey();
+        this.replateStarter(target);
+        const r = this.ritualReaction('sprout-pot', 'bloom');
+        if (r) this.fireStarterReaction(r, 'item.sprout-pot.bloom');
+      }
+      this.savePlaced();
+      return;
+    }
+    if (form === 'mailbox') {
+      const hasNote = this.mailboxHasNote(e);
+      e.mailDay = dailyKey();
+      // Swing the little door open for ~1 s, then settle to the resting read.
+      this.replateStarter(target, true);
+      window.setTimeout(() => {
+        if (this.placedItems.includes(target)) this.replateStarter(target);
+      }, 1000);
+      if (hasNote) {
+        const r = this.ritualReaction('mailbox', 'note');
+        if (r) this.fireStarterReaction(r, 'item.mailbox.note');
+      } else {
+        // Empty day: a quiet "nobody today" — pulse+reach only, no emotion.
+        this.datouRig.pulse();
+        this.datouRig.reach();
+        this.saying = { text: tDyn('voice.starterMailboxEmpty.1'), left: 4.5 };
+        this.ui.toast(tDyn('item.mailbox.empty'));
+      }
+      this.savePlaced();
+      return;
+    }
+    if (form === 'mushroom-lamp' || form === 'garden-lantern') {
+      const r = this.ritualReaction(form, 'lit');
+      if (r) this.fireStarterReaction(r);
+      return;
+    }
+    // pet-bed / stool / seed-chest: advance to the terminal state + react.
+    const cfg = STAGED[form as 'pet-bed' | 'stool' | 'seed-chest'];
+    (e as unknown as Record<string, unknown>)[cfg.field] = cfg.terminal;
+    this.replateStarter(target);
+    const r = this.ritualReaction(form, cfg.payoffBeat);
+    if (r) this.fireStarterReaction(r, cfg.payoffToast);
+    this.savePlaced();
   }
 
   private savePlaced(): void {
@@ -1153,7 +2161,13 @@ export class Game {
 
   /** Lives in the pack and feeds the bench (gatherables + coffer finds, §9). */
   private isPackResource(mat: string): boolean {
-    return this.isGatherable(mat) || mat === 'feather' || mat === 'reed' || mat === 'old-bolt';
+    return (
+      this.isGatherable(mat) ||
+      mat === 'feather' ||
+      mat === 'reed' ||
+      mat === 'old-bolt' ||
+      mat === 'clay-lump'
+    );
   }
 
   /** Exists as a ground pickable Datou can forage. */
@@ -1588,6 +2602,7 @@ export class Game {
 
   private placeCoffer(): void {
     this.cofferOpen = this.loadRaw('wwd.coffer') === '1';
+    if (this.cofferOpen) this.bankHomeBlueprints();
     this.cofferCutout = new Cutout(drawCoffer(7, this.cofferOpen), {
       height: 0.7,
       shadowRadius: 0.5,
@@ -1606,23 +2621,28 @@ export class Game {
     this.cofferOpen = true;
     this.saveRaw('wwd.coffer', '1');
 
-    // Bank the three bootstrap blueprints — the fetch stick (feeds the play
-    // loop) and the two t1 tools (the §8.2 node bootstrap), each fully revealed
-    // so the chest READS as a how-to, not a riddle.
-    for (const form of ['stick', 'axe', 'pickaxe'] as const) {
-      this.bankFullBlueprint(form, t('coffer.context'));
-    }
+    this.bankHomeBlueprints();
     // A generous starter haul: at least 5 of each material category (wood /
     // stone / plant / found) so the player can immediately try the bench across
     // every recipe group, not just the three banked blueprints. Each material
     // here is one the pack can actually hold (see isPackResource).
-    const STARTER: Array<[ItemId, number]> = [
-      ['twig', 6], // wood
-      ['pebble', 6], // stone
-      ['flower', 5], // plant
-      ['feather', 5], // found
+    const STARTER: Array<[PackId, number]> = [
+      ['twig', 12], // wood
+      ['pebble', 12], // stone
+      ['clay-lump', 12], // ceramic starter forms
+      ['flower', 10], // plant
+      ['feather', 8], // found
     ];
     for (const [mat, n] of STARTER) this.backpack.add(mat, n);
+
+    // BOBO's field-lab kit: his ten special co-inventions, one of each. Place
+    // one, tap it, and watch him react in character — the louder reactions are
+    // earned as the bond grows (the spin, the max-bond easter egg stay locked
+    // until then). Granted once, here, so the whole catalogue is playable.
+    if (this.loadRaw('wwd.labKit') !== '1') {
+      for (const it of LAB_ITEMS) this.backpack.add(it.id, 1);
+      this.saveRaw('wwd.labKit', '1');
+    }
 
     // Re-plate to the opened state + a calm warm beat.
     if (this.cofferCutout) {
@@ -1641,6 +2661,19 @@ export class Game {
       mood: this.physics.getDatouState().mood,
     });
     this.ui.toast(t('coffer.opened'));
+  }
+
+  /** Idempotent so existing open-coffer saves receive newly added starter forms. */
+  private bankHomeBlueprints(): void {
+    // Preserve the fetch and resource-tool bootstrap that opens the rest of the park.
+    for (const form of [...STARTER_ITEM_FORMS, 'stick', 'axe', 'pickaxe'] as const) {
+      this.bankFullBlueprint(form, t('coffer.context'));
+    }
+    // The eight interactive park keepsakes are revealed alongside the starters,
+    // so the full set of touchable rituals is craftable from the first session.
+    for (const item of PARK_ITEMS) {
+      this.bankFullBlueprint(item.form, t('coffer.context'));
+    }
   }
 
   /** Bank an authored pattern with every cell revealed — a fully revealed
@@ -1712,7 +2745,10 @@ export class Game {
     this.armedSetpiece = null;
     this.beatCooldown = 20;
     this.activeBeat = { sp, t: 0, spawned: 0, echoed: this.setpieceEchoedToday(sp) };
-    this.ui.showName(tDyn(`setpiece.${sp.id}.name`), tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`));
+    this.ui.showName(
+      tDyn(`setpiece.${sp.id}.name`),
+      tDyn(`setpiece.${sp.id}.line.${this.setpieceVariant(sp)}`),
+    );
     if (!this.datouRig.playClip(sp.clip)) {
       this.datouRig.pulse();
       this.datouRig.reach();
@@ -2485,6 +3521,118 @@ export class Game {
         this.offerPickup(hit);
       } else if (!this.player.hasTarget) {
         this.pendingPickup = null;
+      }
+    }
+
+    // The bowl ritual waits for the right companion to arrive before changing state.
+    if (this.pendingBowl) {
+      const { target, actor } = this.pendingBowl;
+      if (!this.placedItems.includes(target)) {
+        this.pendingBowl = null;
+      } else {
+        const x = actor === 'player' ? this.player.x : state.position.x;
+        const z = actor === 'player' ? this.player.z : state.position.z;
+        const reach = actor === 'player' ? 2.2 : 1.1;
+        if (Math.hypot(target.entry.x - x, target.entry.z - z) <= reach) {
+          this.advanceFoodBowl(target);
+        } else if (actor === 'player' && !this.player.hasTarget) {
+          this.pendingBowl = null;
+        }
+      }
+    }
+
+    // A field-lab item mid-loop: the player walks over to start it, then Datou
+    // walks over to react. Same two-actor arrival pattern as the bowl.
+    if (this.pendingLabReact) {
+      const { target, lab, actor } = this.pendingLabReact;
+      if (!this.placedItems.includes(target)) {
+        this.pendingLabReact = null;
+      } else if (actor === 'player') {
+        if (Math.hypot(target.entry.x - this.player.x, target.entry.z - this.player.z) <= 2.4) {
+          this.pendingLabReact = null;
+          this.playLabItem(target, lab);
+        } else if (!this.player.hasTarget) {
+          this.pendingLabReact = null;
+        }
+      } else {
+        const d = Math.hypot(
+          state.position.x - target.entry.x,
+          state.position.z - target.entry.z,
+        );
+        if (d <= 1.2) {
+          this.pendingLabReact = null;
+          if (this.reactCooldown <= 0) {
+            this.reactCooldown = REACT_COOLDOWN;
+            this.fireLabReaction(lab);
+          }
+        }
+      }
+    }
+
+    // A starter-item ritual mid-loop: same two-actor arrival as the bowl. On
+    // player arrival we re-dispatch (now in reach, the inline beat runs); on
+    // Datou arrival the state advance + warm body beat land. Like the bowl,
+    // the arrival ALWAYS resolves (state transitions are one-time and self-
+    // limiting); reactCooldown only nudges so other reactions don't pile on.
+    if (this.pendingStarter) {
+      const { target, form, beat, actor } = this.pendingStarter;
+      if (!this.placedItems.includes(target)) {
+        this.pendingStarter = null;
+      } else if (actor === 'player') {
+        if (Math.hypot(target.entry.x - this.player.x, target.entry.z - this.player.z) <= 2.2) {
+          this.pendingStarter = null;
+          this.interactWithStarter(target, form);
+        } else if (!this.player.hasTarget) {
+          this.pendingStarter = null;
+        }
+      } else {
+        const d = Math.hypot(state.position.x - target.entry.x, state.position.z - target.entry.z);
+        if (d <= 1.1) {
+          this.pendingStarter = null;
+          this.reactCooldown = REACT_COOLDOWN;
+          this.resolveStarterArrival(target, form, beat);
+        }
+      }
+    }
+
+    // A park keepsake: Datou arrives and gives its payoff (with the earned clip
+    // for the two play items). The state advance + re-plate already happened on
+    // the tap; here only the reaction lands. The free choice-wheel honors
+    // reactCooldown so rapid re-spins can't stack the praise into over-praise.
+    if (this.pendingPark) {
+      const { target, item, gated } = this.pendingPark;
+      if (!this.placedItems.includes(target)) {
+        this.pendingPark = null;
+      } else {
+        const d = Math.hypot(state.position.x - target.entry.x, state.position.z - target.entry.z);
+        if (d <= 1.2) {
+          this.pendingPark = null;
+          if (item.gate === 'free' && this.reactCooldown > 0) {
+            // Too soon after the last beat — let the spin read, skip the payoff.
+          } else {
+            this.reactCooldown = REACT_COOLDOWN;
+            this.resolveParkArrival(target, item, gated);
+          }
+        }
+      }
+    }
+
+    // A light starter (chime / repair-toy): Datou arrives and gives the beat.
+    // Honor reactCooldown (these are pure affectionate beats with no state to
+    // advance), so cycling several can't stack into the over-praise window.
+    if (this.pendingLightStarter) {
+      const { target, reaction } = this.pendingLightStarter;
+      if (!this.placedItems.includes(target)) {
+        this.pendingLightStarter = null;
+      } else {
+        const d = Math.hypot(state.position.x - target.entry.x, state.position.z - target.entry.z);
+        if (d <= 1.2) {
+          this.pendingLightStarter = null;
+          if (this.reactCooldown <= 0) {
+            this.reactCooldown = REACT_COOLDOWN;
+            this.fireStarterReaction(reaction);
+          }
+        }
       }
     }
 
