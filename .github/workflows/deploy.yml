@@ -2,7 +2,9 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - integration/companion-game
   workflow_dispatch:
 
 permissions:
@@ -12,34 +14,56 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Read .nvmrc
-        id: nvmrc
-        run: echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/setup-node@v4
+      - name: Checkout main
+        uses: actions/checkout@v4
         with:
-          node-version: ${{ steps.nvmrc.outputs.version }}
+          ref: main
+          path: main
+
+      - name: Checkout companion game
+        uses: actions/checkout@v4
+        with:
+          ref: integration/companion-game
+          path: companion-game
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: main/.nvmrc
           cache: npm
+          cache-dependency-path: |
+            main/package-lock.json
+            companion-game/package-lock.json
 
-      - name: Install
-        run: npm ci
+      - name: Build main
+        working-directory: main
+        run: |
+          npm ci
+          npm run build
 
-      - name: Build
-        run: npm run build
+      - name: Build companion game
+        working-directory: companion-game
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p site/companion-game
+          cp -R main/dist/. site/
+          cp -R companion-game/dist/. site/companion-game/
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build
