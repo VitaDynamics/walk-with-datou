@@ -3,20 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Walk with Datou - a cozy web game prototype." />
+    <meta name="description" content="Walk with Datou — a quiet companion diorama." />
     <title>Walk with Datou</title>
     <link
       rel="icon"
       type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐕%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🤖%3C/text%3E%3C/svg%3E"
     />
     <style>
       :root {
         color-scheme: light;
+        /* DESIGN_BASELINE tokens */
+        --bg: #f5f2ec;
+        --surface: rgba(255, 255, 255, 0.72);
+        --surface-strong: #ffffff;
+        --text-primary: #1d1d1f;
+        --text-secondary: #6e6e73;
+        --text-tertiary: #9a9a9e;
+        --accent: #7c8c7a;
+        --accent-soft: #dde5d8;
+        --accent-warm: #d6bfa7;
+        --accent-warm-soft: #efe2d2;
+        --radius-s: 14px;
+        --radius-m: 20px;
+        --radius-card: 28px;
+        --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.06);
+        --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.08);
+        --fast: 160ms;
+        --normal: 280ms;
         font-family:
           'Inter',
           -apple-system,
           BlinkMacSystemFont,
+          'PingFang SC',
           'Helvetica Neue',
           sans-serif;
       }
@@ -26,51 +45,978 @@
         padding: 0;
         height: 100%;
         overflow: hidden;
-        background: #d9eef7;
+        background: var(--bg);
+        color: var(--text-primary);
       }
       #game-canvas {
         display: block;
         width: 100vw;
         height: 100vh;
-        cursor: crosshair;
+        touch-action: none;
       }
-      #hud {
+
+      /* Time-of-day grade (E7) — a quiet 2-stop wash, never a filter look. */
+      #daylight {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+        background: #d6a05a;
+        opacity: 0;
+        transition:
+          opacity 1200ms ease,
+          background-color 1200ms ease;
+      }
+
+      /* Soft paper vignette over the whole frame (very quiet). */
+      #vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 120% 105% at 50% 42%,
+          rgba(58, 55, 47, 0) 62%,
+          rgba(58, 55, 47, 0.1) 100%
+        );
+        z-index: 2;
+      }
+
+      /* --- Status capsule (top-left): name · mood · trust --- */
+      #status-card {
         position: absolute;
-        top: 16px;
-        left: 16px;
-        padding: 10px 14px;
-        background: rgba(255, 255, 255, 0.78);
-        backdrop-filter: blur(6px);
-        border-radius: 12px;
-        font-size: 13px;
-        line-height: 1.5;
-        color: #2a3540;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        top: 20px;
+        left: 20px;
+        z-index: 5;
+        padding: 14px 18px 12px;
+        background: var(--surface);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-radius: var(--radius-m);
+        box-shadow: var(--shadow-card);
+        user-select: none;
+        min-width: 168px;
+      }
+      #status-card .title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        margin-bottom: 6px;
+      }
+      #status-card .status-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      #mood-word {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--text-primary);
+        font-size: 11.5px;
+      }
+      .trust-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 9px;
+      }
+      .trust-label {
+        font-size: 10.5px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .trust-bar {
+        flex: 1;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.07);
+        overflow: hidden;
+      }
+      #trust-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        background: var(--accent);
+        transition: width 600ms ease;
+      }
+      #found-today {
+        margin-top: 7px;
+        font-size: 11px;
+        color: var(--text-tertiary);
+      }
+      #physics-tag {
+        margin-top: 5px;
+        font-size: 10px;
+        color: var(--text-tertiary);
+        opacity: 0.8;
+      }
+
+      /* --- Onboarding hint (fades after first interaction) --- */
+      #hint-line {
+        position: absolute;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        z-index: 4;
+        padding: 8px 18px;
+        border-radius: 999px;
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+        box-shadow: var(--shadow-card);
+        font-size: 12.5px;
+        color: var(--text-secondary);
         pointer-events: none;
         user-select: none;
+        transition: opacity 700ms ease;
+        white-space: nowrap;
       }
-      #hud .title {
+
+      /* --- Thought chip floating near Datou --- */
+      #want-chip,
+      #say-chip {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 4;
+        padding: 6px 14px;
+        margin-top: -10px;
+        border-radius: 999px;
+        background: var(--surface-strong);
+        box-shadow: var(--shadow-card);
+        font-size: 12.5px;
+        color: var(--text-primary);
+        pointer-events: none;
+        user-select: none;
+        white-space: nowrap;
+        animation: chip-in var(--normal) ease-out;
+      }
+      @keyframes chip-in {
+        from {
+          opacity: 0;
+          margin-top: -4px;
+        }
+        to {
+          opacity: 1;
+          margin-top: -10px;
+        }
+      }
+
+      /* --- Landmark object card (anchored over the clicked world item) --- */
+      #landmark-info[hidden] {
+        display: none;
+      }
+      #landmark-info {
+        position: absolute;
+        z-index: 5;
+        width: min(320px, calc(100vw - 32px));
+        transform: translate(-50%, calc(-100% - 14px));
+        padding: 13px 15px 14px;
+        border: 1px solid rgba(77, 72, 61, 0.12);
+        border-radius: 18px;
+        background: rgba(255, 253, 248, 0.94);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow: 0 16px 48px rgba(50, 45, 36, 0.14);
+        pointer-events: none;
+        user-select: none;
+        animation: landmark-info-in var(--normal) ease-out;
+      }
+      #landmark-info::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -7px;
+        width: 14px;
+        height: 14px;
+        transform: translateX(-50%) rotate(45deg);
+        border-right: 1px solid rgba(77, 72, 61, 0.12);
+        border-bottom: 1px solid rgba(77, 72, 61, 0.12);
+        background: rgba(255, 253, 248, 0.94);
+      }
+      #landmark-info-area {
+        margin-bottom: 6px;
+        color: var(--accent);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        line-height: 1.35;
+        text-transform: uppercase;
+      }
+      #landmark-info-title {
+        margin-bottom: 4px;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.25;
+      }
+      #landmark-info-body {
+        color: var(--text-secondary);
+        font-size: 12.5px;
+        line-height: 1.45;
+      }
+      @keyframes landmark-info-in {
+        from {
+          opacity: 0;
+          transform: translate(-50%, calc(-100% - 8px));
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, calc(-100% - 14px));
+        }
+      }
+
+      /* --- Placing bar (persistent while a keepsake waits for the ground) --- */
+      #placing-bar[hidden] {
+        display: none;
+      }
+      #placing-bar {
+        position: absolute;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        z-index: 6;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 10px 7px 18px;
+        border-radius: 999px;
+        background: var(--surface-strong);
+        box-shadow: var(--shadow-card);
+        font-size: 12.5px;
+        color: var(--text-primary);
+        user-select: none;
+        white-space: nowrap;
+        animation: chip-in var(--normal) ease-out;
+      }
+      #placing-cancel {
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background var(--fast) ease;
+      }
+      #placing-cancel:hover {
+        background: var(--accent-warm-soft);
+      }
+
+      /* --- Pickup card (anchored over a tapped keepsake) --- */
+      #pickup-card[hidden] {
+        display: none;
+      }
+      #pickup-card {
+        position: absolute;
+        z-index: 5;
+        transform: translate(-50%, calc(-100% - 14px));
+        padding: 11px 13px 12px;
+        border: 1px solid rgba(77, 72, 61, 0.12);
+        border-radius: 18px;
+        background: rgba(255, 253, 248, 0.94);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow: 0 16px 48px rgba(50, 45, 36, 0.14);
+        user-select: none;
+        white-space: nowrap;
+        animation: landmark-info-in var(--normal) ease-out;
+      }
+      #pickup-card::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -7px;
+        width: 14px;
+        height: 14px;
+        transform: translateX(-50%) rotate(45deg);
+        border-right: 1px solid rgba(77, 72, 61, 0.12);
+        border-bottom: 1px solid rgba(77, 72, 61, 0.12);
+        background: rgba(255, 253, 248, 0.94);
+      }
+      #pickup-title {
+        margin-bottom: 8px;
+        font-size: 13.5px;
+        font-weight: 650;
+        line-height: 1.25;
+        text-align: center;
+      }
+      .pickup-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      .pickup-actions button {
+        border: none;
+        padding: 6px 16px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 550;
+        cursor: pointer;
+        transition: background var(--fast) ease;
+      }
+      .pickup-actions button:hover {
+        background: var(--accent-warm-soft);
+      }
+
+      /* --- Toast (memory saved / milestone) --- */
+      #toast {
+        position: absolute;
+        left: 50%;
+        bottom: 150px;
+        transform: translateX(-50%);
+        z-index: 6;
+        padding: 9px 20px;
+        border-radius: 999px;
+        background: var(--surface-strong);
+        box-shadow: var(--shadow-soft);
+        font-size: 13px;
+        color: var(--text-primary);
+        pointer-events: none;
+        user-select: none;
+        transition: opacity 400ms ease;
+        max-width: 70vw;
+        text-align: center;
+      }
+
+      /* --- Name chip (what you touched — quiet two-line pill) --- */
+      #name-chip {
+        position: absolute;
+        left: 50%;
+        bottom: 198px;
+        transform: translateX(-50%);
+        z-index: 6;
+        padding: 8px 18px;
+        border-radius: 18px;
+        background: var(--surface-strong);
+        box-shadow: var(--shadow-card);
+        text-align: center;
+        pointer-events: none;
+        user-select: none;
+        transition: opacity 400ms ease;
+        max-width: 70vw;
+      }
+      #name-chip-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      #name-chip-line {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 1px;
+      }
+
+      /* --- Action bar (bottom-center) --- */
+      #action-bar {
+        position: absolute;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%);
+        z-index: 5;
+        display: flex;
+        gap: 10px;
+        padding: 8px;
+        background: var(--surface);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-radius: 999px;
+        box-shadow: var(--shadow-card);
+      }
+      #action-bar button {
+        border: none;
+        padding: 10px 22px;
+        border-radius: 999px;
+        background: transparent;
+        font-size: 13.5px;
+        font-weight: 500;
+        font-family: inherit;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition:
+          background var(--fast) ease,
+          color var(--fast) ease,
+          transform var(--fast) ease;
+        user-select: none;
+      }
+      #action-bar button:hover {
+        background: rgba(255, 255, 255, 0.85);
+        color: var(--text-primary);
+      }
+      #action-bar button:active {
+        transform: scale(0.97);
+      }
+      #action-bar button.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* --- Backpack sheet (left side) --- */
+      #pack-panel[hidden] {
+        display: none;
+      }
+      #pack-panel {
+        position: absolute;
+        top: 150px;
+        left: 20px;
+        bottom: 96px;
+        width: min(300px, 80vw);
+        z-index: 7;
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+        animation: sheet-in var(--normal) ease-out;
+      }
+      #pack-panel .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      #pack-close {
+        border: none;
+        background: transparent;
+        font-size: 18px;
+        line-height: 1;
+        color: var(--text-tertiary);
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+      #pack-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 4px 14px 12px;
+        overflow-y: auto;
+      }
+      .pack-item {
+        position: relative;
+        width: 58px;
+        height: 58px;
+        border-radius: var(--radius-s);
+        background: var(--surface-strong);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        transition: transform var(--fast) ease;
+      }
+      .pack-item:hover {
+        transform: translateY(-1px);
+      }
+      .pack-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .pack-item .pack-count {
+        position: absolute;
+        right: 4px;
+        bottom: 3px;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        background: var(--accent-soft);
+        border-radius: 999px;
+        padding: 1px 6px;
+      }
+      .pack-item .pack-use {
+        position: absolute;
+        left: 4px;
+        top: 3px;
+        font-size: 9px;
+        color: var(--text-tertiary);
+      }
+      .pack-empty {
+        padding: 14px 6px;
+        font-size: 12px;
+        color: var(--text-tertiary);
+        line-height: 1.5;
+      }
+      /* --- Memories sheet (right side) --- */
+      #memories-panel[hidden] {
+        display: none;
+      }
+      #memories-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        bottom: 96px;
+        width: min(320px, 84vw);
+        z-index: 7;
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+        animation: sheet-in var(--normal) ease-out;
+      }
+      @keyframes sheet-in {
+        from {
+          opacity: 0;
+          transform: translateX(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      #memories-panel .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px 10px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      #memories-close {
+        border: none;
+        background: transparent;
+        font-size: 18px;
+        line-height: 1;
+        color: var(--text-tertiary);
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 999px;
+      }
+      #memories-close:hover {
+        color: var(--text-primary);
+      }
+      #memories-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .memory-card {
+        background: var(--surface-strong);
+        border-radius: var(--radius-s);
+        padding: 11px 14px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+        border-left: 3px solid var(--accent-soft);
+      }
+      .memory-card.kind-discovery {
+        border-left-color: var(--accent);
+      }
+      .memory-card.kind-milestone {
+        border-left-color: var(--accent-warm);
+      }
+      .memory-text {
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--text-primary);
+      }
+      .memory-time {
+        margin-top: 4px;
+        font-size: 10.5px;
+        color: var(--text-tertiary);
+      }
+      .memory-empty {
+        padding: 24px 10px;
+        font-size: 12.5px;
+        color: var(--text-tertiary);
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      /* --- Minimap (bottom-right) --- */
+      #minimap {
+        position: absolute;
+        right: 20px;
+        bottom: 26px;
+        z-index: 5;
+        width: 168px;
+        height: 168px;
+        border-radius: 18px;
+        box-shadow: var(--shadow-card);
+        background: var(--surface);
+        cursor: pointer;
+      }
+
+      /* --- Overview (map) button, under settings --- */
+      #map-button {
+        position: absolute;
+        top: 68px;
+        right: 20px;
+        z-index: 6;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        border: none;
+        border-radius: 50%;
+        background: var(--surface);
+        color: var(--text-secondary);
+        box-shadow: var(--shadow-card);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+        user-select: none;
+        transition: background var(--fast) ease;
+      }
+      #map-button:hover {
+        background: var(--surface-strong);
+      }
+      #map-button.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* --- Settings (cog + popover) --- */
+      #settings-button {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 6;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        border: none;
+        border-radius: 50%;
+        background: var(--surface);
+        color: var(--text-secondary);
+        box-shadow: var(--shadow-card);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+        user-select: none;
+        transition:
+          transform var(--fast) ease,
+          background var(--fast) ease;
+      }
+      #settings-button:hover {
+        background: var(--surface-strong);
+        transform: rotate(30deg);
+      }
+      #settings-panel {
+        position: absolute;
+        top: 68px;
+        right: 20px;
+        width: 236px;
+        z-index: 8;
+        padding: 16px 18px;
+        background: var(--surface);
+        backdrop-filter: blur(18px);
+        border-radius: var(--radius-m);
+        box-shadow: var(--shadow-soft);
+        font-size: 13px;
+        user-select: none;
+      }
+      #settings-panel .panel-title {
         font-weight: 600;
         margin-bottom: 4px;
       }
-      #hud .mood {
-        display: inline-block;
-        padding: 2px 8px;
-        margin-top: 4px;
-        border-radius: 999px;
-        background: #ffe8a3;
-        font-size: 12px;
+      #settings-panel .panel-sub {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        margin-bottom: 10px;
+      }
+      #settings-panel .opt {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px;
+        margin-bottom: 6px;
+        border-radius: var(--radius-s);
+        cursor: pointer;
+        transition: background var(--fast) ease;
+      }
+      #settings-panel .opt:hover {
+        background: var(--accent-soft);
+      }
+      #settings-panel .opt input {
+        margin-top: 2px;
+        accent-color: var(--accent);
+      }
+      #settings-panel .opt .opt-label {
+        font-weight: 600;
+      }
+      #settings-panel .opt .opt-desc {
+        display: block;
+        font-size: 11px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+      #settings-note {
+        min-height: 14px;
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--accent-warm);
+      }
+      .lang-toggle {
+        display: inline-flex;
+        margin: 6px 0 12px;
+        border-radius: var(--radius-s);
+        overflow: hidden;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      .lang-btn {
+        border: none;
+        background: transparent;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: background var(--fast) ease;
+      }
+      .lang-btn:hover {
+        background: var(--accent-soft);
+      }
+      .lang-btn.active {
+        background: var(--accent);
+        color: #fff;
+      }
+      /* The outfit picker has five options — let it wrap and breathe. */
+      .outfit-toggle {
+        display: flex;
+        flex-wrap: wrap;
+        border: none;
+        gap: 6px;
+        margin: 4px 0 12px;
+      }
+      .outfit-toggle .lang-btn {
+        padding: 5px 12px;
+        border-radius: var(--radius-s);
+        border: 1px solid rgba(0, 0, 0, 0.08);
       }
     </style>
   </head>
   <body>
     <canvas id="game-canvas"></canvas>
-    <div id="hud">
-      <div class="title">Walk with Datou</div>
-      <div>WASD / Arrow keys to walk</div>
-      <div>Click on Datou to pet</div>
-      <div>Datou mood: <span id="mood-tag" class="mood">calm</span></div>
+    <div id="daylight"></div>
+    <div id="vignette"></div>
+
+    <!-- Status capsule -->
+    <div id="status-card">
+      <div class="title" data-i18n="app.title">Walk with Datou</div>
+      <div class="status-row"><span id="mood-word">calm</span></div>
+      <div class="trust-wrap">
+        <span class="trust-label" data-i18n="status.trust">Trust</span>
+        <div class="trust-bar"><div id="trust-fill"></div></div>
+      </div>
+      <div id="found-today"></div>
+      <div id="physics-tag"></div>
     </div>
+
+    <!-- Onboarding hint -->
+    <div id="hint-line" data-i18n="hint.firstSteps"></div>
+
+    <!-- Thought chip (floats near Datou) -->
+    <div id="want-chip" hidden></div>
+    <!-- BOBO speaking (voice line, floats near Datou) -->
+    <div id="say-chip" hidden></div>
+
+    <!-- Clicked landmark object explanation -->
+    <div id="landmark-info" role="status" aria-live="polite" hidden>
+      <div id="landmark-info-area"></div>
+      <div id="landmark-info-title"></div>
+      <div id="landmark-info-body"></div>
+    </div>
+
+    <!-- Placement mode: what's in hand + how to set it down / cancel -->
+    <div id="placing-bar" role="status" hidden>
+      <span id="placing-label"></span>
+      <button id="placing-cancel" type="button" aria-label="Cancel">✕</button>
+    </div>
+
+    <!-- Pickup card (anchored over a tapped placed keepsake) -->
+    <div id="pickup-card" hidden>
+      <div id="pickup-title"></div>
+      <div class="pickup-actions">
+        <button id="pickup-take" type="button"></button>
+        <button id="pickup-move" type="button"></button>
+      </div>
+    </div>
+
+    <!-- Quiet toast -->
+    <div id="toast" hidden></div>
+
+    <!-- Name chip (what you touched) -->
+    <div id="name-chip" role="status" aria-live="polite" hidden>
+      <div id="name-chip-title"></div>
+      <div id="name-chip-line"></div>
+    </div>
+
+    <!-- Action bar -->
+    <div id="action-bar">
+      <button id="btn-leash" type="button" data-i18n="console.leash">Leash</button>
+      <button id="btn-pack" type="button" data-i18n="console.pack">Backpack</button>
+      <button id="btn-fetch" type="button" data-i18n="console.fetch">Fetch</button>
+      <button id="btn-workshop" type="button" data-i18n="console.workshop">Workshop</button>
+      <button id="btn-memories" type="button" data-i18n="console.memories">Memories</button>
+    </div>
+
+    <!-- Backpack sheet -->
+    <div id="pack-panel" role="dialog" aria-label="Backpack" hidden>
+      <div class="panel-head">
+        <span data-i18n="pack.title">Backpack</span>
+        <button id="pack-close" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="pack-items"></div>
+    </div>
+
+    <!-- Memories sheet -->
+    <div id="memories-panel" role="dialog" aria-label="Memories" hidden>
+      <div class="panel-head">
+        <span data-i18n="memories.title">Memories</span>
+        <button id="memories-close" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="memories-list"></div>
+    </div>
+
+    <!-- Minimap -->
+    <canvas id="minimap" width="336" height="336" title="Map"></canvas>
+
+    <!-- Overview toggle (M) -->
+    <button id="map-button" type="button" title="Overview (M)" aria-label="Overview">⌖</button>
+
+    <!-- Settings -->
+    <button
+      id="settings-button"
+      type="button"
+      title="Settings"
+      aria-label="Settings"
+      aria-haspopup="true"
+      aria-expanded="false"
+      aria-controls="settings-panel"
+    >
+      ⚙
+    </button>
+    <div id="settings-panel" role="dialog" aria-label="Settings" hidden>
+      <div class="panel-title" data-i18n="settings.language">Language</div>
+      <div id="lang-toggle" class="lang-toggle">
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+        <button type="button" class="lang-btn" data-lang="zh">中文</button>
+      </div>
+
+      <div class="panel-title" data-i18n="settings.walker">Human companion</div>
+      <div id="char-toggle" class="lang-toggle">
+        <button type="button" class="lang-btn char-btn" data-char="mei" data-i18n="settings.mei">
+          Mei
+        </button>
+        <button type="button" class="lang-btn char-btn" data-char="an" data-i18n="settings.an">
+          An
+        </button>
+      </div>
+
+      <div class="panel-sub" data-i18n="settings.outfit">Shared moment</div>
+      <div id="outfit-toggle" class="lang-toggle outfit-toggle">
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="scout"
+          data-i18n="settings.outfit.scout"
+        >
+          Field notes
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="pajama"
+          data-i18n="settings.outfit.pajama"
+        >
+          Workshop AM
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="cape"
+          data-i18n="settings.outfit.cape"
+        >
+          Night walk
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="picnic"
+          data-i18n="settings.outfit.picnic"
+        >
+          Slow Sunday
+        </button>
+        <button
+          type="button"
+          class="lang-btn outfit-btn"
+          data-outfit="rain"
+          data-i18n="settings.outfit.rain"
+        >
+          Rain shelter
+        </button>
+      </div>
+
+      <div class="panel-sub" data-i18n="settings.age">Age</div>
+      <div id="age-toggle" class="lang-toggle">
+        <button type="button" class="lang-btn age-btn" data-age="kid" data-i18n="settings.age.kid">
+          Kid
+        </button>
+        <button
+          type="button"
+          class="lang-btn age-btn"
+          data-age="teen"
+          data-i18n="settings.age.teen"
+        >
+          Teen
+        </button>
+        <button
+          type="button"
+          class="lang-btn age-btn"
+          data-age="adult"
+          data-i18n="settings.age.adult"
+        >
+          Adult
+        </button>
+      </div>
+
+      <div class="panel-title" data-i18n="settings.physics">Physics engine</div>
+      <div class="panel-sub">
+        <span data-i18n="settings.running">Now running</span>:
+        <span id="settings-active">Lite</span>
+      </div>
+
+      <label class="opt">
+        <input type="radio" name="physics-choice" value="placeholder" />
+        <span>
+          <span class="opt-label" data-i18n="settings.lite">Lite</span>
+          <span class="opt-desc" data-i18n="settings.liteDesc"
+            >Instant, lightweight motion. Best on older devices.</span
+          >
+        </span>
+      </label>
+      <label class="opt">
+        <input type="radio" name="physics-choice" value="mujoco" />
+        <span>
+          <span class="opt-label" data-i18n="settings.mujoco">MuJoCo physics</span>
+          <span class="opt-desc" data-i18n="settings.mujocoDesc"
+            >Real simulation engine (~8.5 MB download).</span
+          >
+        </span>
+      </label>
+
+      <div id="settings-note"></div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

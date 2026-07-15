@@ -39,7 +39,7 @@ type DatouMode = 'idle' | 'follow' | 'explore' | 'leashed';
 
 interface DatouState {
   position: { x: number; y: number; z: number }; // metres, world frame
-  yaw: number; // radians, 0 = +X
+  yaw: number; // radians, rotation about +Y, 0 faces +Z
   velocity: { x: number; y: number; z: number };
   mood: 'happy' | 'calm' | 'curious' | 'tired';
 }

@@ -11,3 +11,31 @@ coverage
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Downloaded CC0 GLB asset packs — reproduced by `npm run fetch:assets`, not
+# committed (tens–hundreds of MB of binaries). The generated manifest IS committed
+# so the game knows its catalog even before assets are fetched. The seed-set
+# sidecar overrides under public/models are kept. See scripts/fetch-assets.mjs.
+public/models/**/*.glb
+public/models/**/*.gltf
+public/models/**/*.bin
+public/models/**/*.png
+public/models/**/*.jpg
+
+# Decimated Vita robot meshes — reproduced by `npm run prep:robot` from the
+# read-only sim-app robot bundle (39 MB raw → ~3 MB decimated). Not committed
+# (binary STL blobs). The committed manifest.json + vita01evt.xml + keyframes.xml
+# + walk.json describe the robot + its motion so the game knows its rig even
+# before the meshes are prepped. See scripts/prep-robot.mjs.
+public/robots/**/meshes/*.STL
+public/robots/**/meshes/*.stl
+
+# Design & planning docs — kept locally, deliberately not tracked upstream.
+# The three docs that predate this work (ARCHITECTURE, PHYSICS_INTEGRATION,
+# ROADMAP) stay tracked; everything else under docs/ is working material that
+# lives on the author's machine only. Source comments cite these by section
+# (e.g. "BUILDING_SYSTEM §3.2") — those refs point at local files by design.
+docs/*
+!docs/ARCHITECTURE.md
+!docs/PHYSICS_INTEGRATION.md
+!docs/ROADMAP.md

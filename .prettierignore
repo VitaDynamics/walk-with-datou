@@ -4,3 +4,5 @@ dist
 *.log
 .vite
 coverage
+# Vendored MuJoCo WASM build (DeepMind, Apache-2.0)
+src/physics/mujoco/vendor

@@ -37,7 +37,8 @@ npm run dev
 npm run build
 ```
 
-Then open the URL printed by Vite (default `http://localhost:5173`).
+Then open the URL printed by Vite (default `http://localhost:5173`). From another device on
+the same network, open `http://<this-machine-lan-ip>:5173`.
 
 **Controls:**
 

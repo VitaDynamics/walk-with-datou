@@ -16,8 +16,24 @@ export interface Vec3 {
   z: number;
 }
 
+/**
+ * A solid, walk-blocking obstacle as a circle in the XZ ground plane. The game
+ * supplies these (from World) so a backend can make Datou collide with the
+ * scene. Structurally identical to World's Collider.
+ */
+export interface WorldCollider {
+  x: number;
+  z: number;
+  radius: number;
+}
+
 export interface DatouState {
-  /** World-frame position in metres. +Y is up. */
+  /**
+   * World-frame position in metres. +Y is up. `position.y` is the
+   * ground-contact (feet) height — the rendered Datou mesh has its origin at
+   * its feet — so on flat ground y = 0. Backends must report feet height, not
+   * a body-center height, or Datou will appear to float.
+   */
   position: Vec3;
   /** Rotation around +Y axis in radians. Convention: 0 faces +Z. */
   yaw: number;
@@ -40,6 +56,13 @@ export interface PhysicsAdapter {
   setTarget(x: number, z: number): void;
   /** Signal a user pet event. */
   applyPet(): void;
+  /**
+   * Optional: supply the park's solid obstacles so Datou collides with the
+   * scene. The MuJoCo backend bakes these into its model at init; the
+   * placeholder uses them for kinematic push-out. Backends that ignore
+   * collision may omit this.
+   */
+  setColliders?(colliders: readonly WorldCollider[]): void;
   /** Read Datou's current state for rendering. */
   getDatouState(): DatouState;
   /** Free any resources held by the adapter. */

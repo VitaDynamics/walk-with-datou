@@ -1,4 +1,10 @@
-import type { DatouMode, DatouMood, DatouState, PhysicsAdapter } from './PhysicsAdapter';
+import type {
+  DatouMode,
+  DatouMood,
+  DatouState,
+  PhysicsAdapter,
+  WorldCollider,
+} from './PhysicsAdapter';
 
 /**
  * Lightweight kinematic stand-in for the real MuJoCo simulation. Good enough to
@@ -12,20 +18,35 @@ import type { DatouMode, DatouMood, DatouState, PhysicsAdapter } from './Physics
  *    drifts to 'curious' while moving, and to 'tired' if stationary too long.
  */
 export class PlaceholderPhysics implements PhysicsAdapter {
-  private static readonly SPEED = 2.8; // m/s
-  private static readonly FOLLOW_MIN_DIST = 1.8;
-  private static readonly ARRIVE_DIST = 0.4;
+  // Companionable walking pace near a target, with a real trot when it has
+  // ground to cover (the human walks 3.1 / runs 5.4 m/s — Datou keeps up).
+  private static readonly SPEED_NEAR = 1.8; // m/s
+  private static readonly SPEED_FAR = 5.8; // a touch above the human's run
+  private static readonly FAR_DIST = 6; // beyond this, trot (explore/idle)
+  // In follow mode the leash is only 2 m — trot as soon as the slack is gone.
+  private static readonly FAR_DIST_FOLLOW = 1.9;
+  private static readonly FOLLOW_MIN_DIST = 1.3;
+  private static readonly ARRIVE_DIST = 0.25;
   private static readonly HAPPY_DURATION = 5; // seconds
   private static readonly WANDER_INTERVAL_MIN = 3;
   private static readonly WANDER_INTERVAL_MAX = 7;
-  private static readonly PARK_HALF_EXTENT = 22;
+  // Off-leash potter range around the player — idle wander stays companionable
+  // instead of roaming the whole 500 m park.
+  private static readonly WANDER_NEAR = 3;
+  private static readonly WANDER_FAR = 11;
+  // Clamp bound, kept just inside the world's walkable radius
+  // (WORLD_WALK_RADIUS 245 in world/zones.ts). The physics layer stays
+  // independent of the game layer, so this mirrors that value.
+  private static readonly HALF_EXTENT = 245;
 
   private state: DatouState = {
-    position: { x: 2, y: 0, z: 0 },
+    position: { x: 1.4, y: 0, z: 0.8 },
     yaw: 0,
     velocity: { x: 0, y: 0, z: 0 },
     mood: 'calm',
   };
+  private static readonly DATOU_RADIUS = 0.45; // for obstacle push-out
+
   private mode: DatouMode = 'follow';
   private playerPos = { x: 0, z: 0 };
   private target = { x: 0, z: 0 };
@@ -33,9 +54,14 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   private wanderTimer = 0;
   private happyTimer = 0;
   private stationaryTimer = 0;
+  private colliders: readonly WorldCollider[] = [];
 
   async init(): Promise<void> {
     // Nothing to load.
+  }
+
+  setColliders(colliders: readonly WorldCollider[]): void {
+    this.colliders = colliders;
   }
 
   setMode(mode: DatouMode): void {
@@ -61,7 +87,28 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   step(dt: number): void {
     const desired = this.computeDesiredTarget(dt);
     this.moveToward(desired.x, desired.z, dt);
+    this.resolveCollisions();
     this.updateMood(dt);
+  }
+
+  /** Push Datou out of any park obstacle it overlaps (circle vs circle). */
+  private resolveCollisions(): void {
+    const r = PlaceholderPhysics.DATOU_RADIUS;
+    for (const c of this.colliders) {
+      const dx = this.state.position.x - c.x;
+      const dz = this.state.position.z - c.z;
+      const minDist = c.radius + r;
+      const distSq = dx * dx + dz * dz;
+      if (distSq >= minDist * minDist) continue;
+      const dist = Math.sqrt(distSq);
+      if (dist < 1e-6) {
+        this.state.position.x = c.x + minDist;
+        continue;
+      }
+      const push = (minDist - dist) / dist;
+      this.state.position.x += dx * push;
+      this.state.position.z += dz * push;
+    }
   }
 
   getDatouState(): DatouState {
@@ -86,10 +133,14 @@ export class PlaceholderPhysics implements PhysicsAdapter {
             PlaceholderPhysics.WANDER_INTERVAL_MIN +
             Math.random() *
               (PlaceholderPhysics.WANDER_INTERVAL_MAX - PlaceholderPhysics.WANDER_INTERVAL_MIN);
-          const r = PlaceholderPhysics.PARK_HALF_EXTENT;
+          // Potter around the player, not the whole park.
+          const a = Math.random() * Math.PI * 2;
+          const d =
+            PlaceholderPhysics.WANDER_NEAR +
+            Math.random() * (PlaceholderPhysics.WANDER_FAR - PlaceholderPhysics.WANDER_NEAR);
           this.wanderTarget = {
-            x: (Math.random() - 0.5) * 2 * r * 0.7,
-            z: (Math.random() - 0.5) * 2 * r * 0.7,
+            x: this.playerPos.x + Math.cos(a) * d,
+            z: this.playerPos.z + Math.sin(a) * d,
           };
         }
         return this.wanderTarget;
@@ -107,8 +158,11 @@ export class PlaceholderPhysics implements PhysicsAdapter {
       this.mode === 'follow' ? PlaceholderPhysics.FOLLOW_MIN_DIST : PlaceholderPhysics.ARRIVE_DIST;
 
     if (dist > stopDist) {
-      const vx = (dx / dist) * PlaceholderPhysics.SPEED;
-      const vz = (dz / dist) * PlaceholderPhysics.SPEED;
+      const farDist =
+        this.mode === 'follow' ? PlaceholderPhysics.FAR_DIST_FOLLOW : PlaceholderPhysics.FAR_DIST;
+      const speed = dist > farDist ? PlaceholderPhysics.SPEED_FAR : PlaceholderPhysics.SPEED_NEAR;
+      const vx = (dx / dist) * speed;
+      const vz = (dz / dist) * speed;
       this.state.position.x += vx * dt;
       this.state.position.z += vz * dt;
       this.state.velocity.x = vx;
@@ -129,7 +183,7 @@ export class PlaceholderPhysics implements PhysicsAdapter {
   }
 
   private clampToPark(): void {
-    const r = PlaceholderPhysics.PARK_HALF_EXTENT;
+    const r = PlaceholderPhysics.HALF_EXTENT;
     if (this.state.position.x > r) this.state.position.x = r;
     if (this.state.position.x < -r) this.state.position.x = -r;
     if (this.state.position.z > r) this.state.position.z = r;
