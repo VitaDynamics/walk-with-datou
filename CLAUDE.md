@@ -97,22 +97,24 @@ The single product north star, confirmed with the user: **make Datou feel alive*
 
 ## Key docs
 
-- `docs/DESIGN_BASELINE.md` — **binding** visual/UX/emotional rules (read first).
-- `docs/CHARACTER_REFACTOR_PLAN.md` — Datou **is BOBO** (2049 ENFP inventor pup,
-  character bible in `docs/基于角色个性特征的机器狗行为模式探索.pdf`); trait/
-  emotion/behavior engines, motion language, phases C1–C8. Canon for *who*
-  Datou is; the baseline still governs *how it looks*.
-- `docs/WORLD_ENRICHMENT_PLAN.md` — the Living Park plan (E1–E8): named/
-  touchable world, large interactive setpieces, visible resource nodes,
-  orchard fruit/veg, animals, world-side use of the 501 forms.
-- `docs/BUILDING_SYSTEM.md` — the Workshop plan: generative 1 000+ item space,
-  3×3 arrangement grammar, no-blueprint discovery, Datou inspirations &
-  foraging. Implement in its W1–W7 phases.
-- `docs/quadruped-game-design-research.md` — gameplay research behind the
-  diorama loop (wants/rapport, daily return, memories, personality axes).
-- `docs/GAMEPLAY_DESIGN.md`, `docs/INTERACTION_VERBS.md` — companion systems;
-  align them to the baseline where they conflict.
+Only three docs are tracked in this repo:
+
 - `docs/ARCHITECTURE.md`, `docs/PHYSICS_INTEGRATION.md` — code structure & physics
   (pre-refactor in places; the physics adapter sections still hold).
-- `docs/ENVIRONMENT_DESIGN.md`, `docs/ASSET_CATALOG.md` — **historical** park/asset
-  work, removed from the codebase; don't rebuild from these.
+- `docs/ROADMAP.md` — where this is going.
+
+### Design docs live outside the repo
+
+The design and planning material — the binding visual baseline, the BOBO
+character canon, the Workshop and Living Park plans, the gameplay research — is
+**kept locally and deliberately not tracked** (see the `docs/*` rule in
+`.gitignore`). Source comments cite it by section, e.g. `BUILDING_SYSTEM §3.2` in
+`src/game/workshop/grammar.ts` or `CHARACTER_IMPLEMENTATION §C4` in
+`src/datou/voice.ts`. Those citations are **intentional pointers to local
+files**, not dead links — they name the spec a file implements.
+
+If you have the docs locally, they are canon and `DESIGN_BASELINE.md` is binding;
+read it before any visual work. If you do **not** have them, the rules summarized
+at the top of this file are the operative subset — follow them, and don't
+reconstruct or rewrite the missing docs from the code. Ask the author for the
+docs rather than guessing at a section a comment cites.

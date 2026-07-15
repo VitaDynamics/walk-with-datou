@@ -29,3 +29,13 @@ public/models/**/*.jpg
 # before the meshes are prepped. See scripts/prep-robot.mjs.
 public/robots/**/meshes/*.STL
 public/robots/**/meshes/*.stl
+
+# Design & planning docs — kept locally, deliberately not tracked upstream.
+# The three docs that predate this work (ARCHITECTURE, PHYSICS_INTEGRATION,
+# ROADMAP) stay tracked; everything else under docs/ is working material that
+# lives on the author's machine only. Source comments cite these by section
+# (e.g. "BUILDING_SYSTEM §3.2") — those refs point at local files by design.
+docs/*
+!docs/ARCHITECTURE.md
+!docs/PHYSICS_INTEGRATION.md
+!docs/ROADMAP.md
