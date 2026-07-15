@@ -82,6 +82,8 @@ import { Fetch } from './Fetch';
 import { Forage } from './Forage';
 import { Keys } from './Keys';
 import { cueChime, cueResponse } from './cues';
+import { Footsteps } from './Footsteps';
+import { Footprints } from '../world/Footprints';
 import { LandmarkDirector, type LandmarkTarget } from './LandmarkDirector';
 import { Memories } from './Memories';
 import { Pointer } from './Pointer';
@@ -308,6 +310,14 @@ export class Game {
   private readonly humanRig: HumanRig;
   private readonly leash = new Leash();
   private readonly player = new Player();
+  // Per-footfall foley — the walk's felt cadence. Datou steps lighter & quieter.
+  private readonly humanSteps = new Footsteps({ gain: 1, pitch: 1 });
+  private readonly datouSteps = new Footsteps({ gain: 0.55, pitch: 1.12 });
+  // Fading ink prints behind the walkers — a desire-path where you tread most.
+  private readonly footprints = new Footprints();
+  // Dev/QA only: drive the human on a slow loop for walk-feedback screenshots.
+  private autowalk = false;
+  private autowalkPhase = 0;
   private readonly physics: PhysicsAdapter;
   private readonly companion: Companion;
   private readonly bond: Bond;
@@ -460,6 +470,7 @@ export class Game {
 
     this.world = new World(dailySeed(), this.loadJson<string[]>(this.pickedKey(), []));
     this.scene.add(this.world.group);
+    this.scene.add(this.footprints.mesh);
 
     const shadowTex = canvasTexture(paintContactShadow());
     this.datouRig = new DatouRig(shadowTex);
@@ -849,6 +860,13 @@ export class Game {
         this.player.z = p.z;
         if (Number.isFinite(yaw)) this.cameraRig.setYaw(yaw);
       }
+    }
+
+    // Dev/QA: ?autowalk=1 makes the human stroll a slow loop on its own so
+    // headless screenshots can capture walk-only feedback (footsteps foley,
+    // camera look-ahead, the fading footprint trail). Inert in normal play.
+    if (new URLSearchParams(location.search).get('autowalk') === '1') {
+      this.autowalk = true;
     }
 
     // Dev/QA: ?qa=place|pickup presets the placement affordances (placing bar,
@@ -3455,9 +3473,22 @@ export class Game {
     const dt = Math.min((now - this.lastTime) / 1000, MAX_DT);
     this.lastTime = now;
 
+    // Dev/QA autowalk: retarget along a slow circle so the walk is self-driving.
+    if (this.autowalk && !this.player.hasTarget) {
+      this.autowalkPhase += 0.8;
+      this.player.walkTo(Math.cos(this.autowalkPhase) * 7, 4 + Math.sin(this.autowalkPhase) * 7);
+    }
+
     // Human movement (keyboard wins over tap-target).
     this.player.update(dt, this.keys.axis(), this.cameraRig.azimuth);
     this.physics.setPlayerPosition(this.player.x, this.player.z);
+    const humanSpeed = Math.hypot(this.player.vx, this.player.vz);
+    this.humanSteps.update(dt, this.player.x, this.player.z, humanSpeed);
+    if (humanSpeed > 0.15) {
+      const yaw = Math.atan2(this.player.vx, this.player.vz);
+      this.footprints.trail('human', this.player.x, this.player.z, yaw, 1);
+    }
+    this.footprints.update(dt);
 
     // Soothing hold keeps the warmth flowing.
     if (this.comforting) {
@@ -3471,6 +3502,12 @@ export class Game {
 
     this.physics.step(dt);
     const state = this.physics.getDatouState();
+    const datouSpeed = Math.hypot(state.velocity.x, state.velocity.z);
+    this.datouSteps.update(dt, state.position.x, state.position.z, datouSpeed);
+    if (datouSpeed > 0.15) {
+      const dyaw = Math.atan2(state.velocity.x, state.velocity.z);
+      this.footprints.trail('datou', state.position.x, state.position.z, dyaw, 0.62);
+    }
 
     this.fetch.update(dt, state, this.player);
     if (!this.fetch.active && this.harvest.active) {
@@ -3826,7 +3863,8 @@ export class Game {
     }
 
     const focus = new THREE.Vector3(this.player.x, 0, this.player.z);
-    this.cameraRig.update(dt, focus);
+    const walkVel = new THREE.Vector3(this.player.vx, 0, this.player.vz);
+    this.cameraRig.update(dt, focus, walkVel);
 
     this.minimap?.update(
       dt,

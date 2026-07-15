@@ -17,6 +17,14 @@ const MAX_DIST_OVERVIEW = 430;
 const OVERVIEW_DIST = 330;
 const DRAG_RATE = 0.0045; // rad per px
 const ZOOM_STEP = 1.1;
+const LEAD_PER_MS = 0.55; // metres of look-ahead per m/s of speed
+const LEAD_MAX = 2.2; // capped so fast running never yanks the frame
+
+/** One velocity axis → a clamped look-ahead offset in metres. */
+function leadOffset(v: number): number {
+  const lead = v * LEAD_PER_MS;
+  return lead > LEAD_MAX ? LEAD_MAX : lead < -LEAD_MAX ? -LEAD_MAX : lead;
+}
 
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
@@ -29,6 +37,10 @@ export class CameraRig {
   private overviewOn = false;
   private readonly focus = new THREE.Vector3(0, 0, 0.6);
   private readonly panFocus = new THREE.Vector3();
+  // Eased look-ahead offset — the camera leads the walk, settling back on stop.
+  private readonly lead = new THREE.Vector3();
+  // Slow breathing bob so a still frame isn't dead (sub-centimetre, never shake).
+  private breath = 0;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(34, aspect, 0.1, 900);
@@ -89,23 +101,40 @@ export class CameraRig {
     this.camera.updateProjectionMatrix();
   }
 
-  update(dt: number, target: THREE.Vector3): void {
+  /**
+   * @param velocity optional walker velocity (m/s, XZ) so the camera can look
+   *        slightly ahead of motion. Omit (or zero) for the overview / teleport.
+   */
+  update(dt: number, target: THREE.Vector3, velocity?: THREE.Vector3): void {
     const k = dt > 0 ? 1 - Math.exp(-dt * 5) : 1;
     this.yaw += (this.targetYaw - this.yaw) * k;
     this.dist += (this.targetDist - this.dist) * k;
     const targetPitch = this.overviewOn ? PITCH_OVERVIEW : PITCH;
     this.pitch += (targetPitch - this.pitch) * k;
 
+    // Look-ahead: ease a small offset toward the direction of travel (capped),
+    // so the camera anticipates the walk and drifts back to centre when you
+    // stop. Disabled in overview, where the focus is a free pan.
+    const goalLeadX = this.overviewOn ? 0 : leadOffset(velocity?.x ?? 0);
+    const goalLeadZ = this.overviewOn ? 0 : leadOffset(velocity?.z ?? 0);
+    const kl = dt > 0 ? 1 - Math.exp(-dt * 1.8) : 1;
+    this.lead.x += (goalLeadX - this.lead.x) * kl;
+    this.lead.z += (goalLeadZ - this.lead.z) * kl;
+
     // Follow the walking pair with calm easing — or the free pan in overview.
     const kf = dt > 0 ? 1 - Math.exp(-dt * 3.2) : 1;
     const goal = this.overviewOn ? this.panFocus : target;
-    this.focus.x += (goal.x - this.focus.x) * kf;
-    this.focus.z += (goal.z - this.focus.z) * kf;
+    this.focus.x += (goal.x + this.lead.x - this.focus.x) * kf;
+    this.focus.z += (goal.z + this.lead.z - this.focus.z) * kf;
+
+    // Breathing bob — a slow, tiny vertical sway of the eye height (not shake).
+    this.breath += dt * 0.9;
+    const bob = this.overviewOn ? 0 : Math.sin(this.breath) * 0.03;
 
     const hr = this.dist * Math.cos(this.pitch);
     this.camera.position.set(
       this.focus.x + Math.sin(this.yaw) * hr,
-      this.dist * Math.sin(this.pitch),
+      this.dist * Math.sin(this.pitch) + bob,
       this.focus.z + Math.cos(this.yaw) * hr,
     );
     this.camera.lookAt(this.focus.x, 0.45, this.focus.z);
