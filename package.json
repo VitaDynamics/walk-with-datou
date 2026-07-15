@@ -28,6 +28,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@mujoco/mujoco": "^3.10.0",
     "three": "^0.180.0"
   },
   "devDependencies": {

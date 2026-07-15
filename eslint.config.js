@@ -7,8 +7,6 @@ export default tseslint.config(
       'node_modules',
       '*.config.js',
       '*.config.ts',
-      // Vendored MuJoCo WASM build (DeepMind, Apache-2.0). Not our source.
-      'src/physics/mujoco/vendor',
     ],
   },
   ...tseslint.configs.recommended,
